@@ -1,0 +1,22 @@
+# Bog'liqliklar
+node_modules/
+
+# Vercel
+.vercel/
+
+# Firebase
+.firebase/
+firebase-debug.log
+
+# OS / muharrir
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Arduino build artefaktlari
+firmware/build/
+*.bin
+*.elf
+*.hex
