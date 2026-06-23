@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="uz">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Lake — Baliq ko'llari monitoringi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{ --bg:#eaf4f4; --ink:#0d2b2b; --ink-soft:#5a7575; --brand:#0e8f8f; --brand-d:#0a6e6e; --card:#ffffff; }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{ font-family:'Sora',system-ui,sans-serif; color:var(--ink);
+        min-height:100vh; display:flex; align-items:center; justify-content:center; padding:24px;
+        background:radial-gradient(1200px 600px at 50% -10%, #d4ecec 0%, var(--bg) 55%); }
+  .wrap{ width:100%; max-width:760px; }
+  .hero{ text-align:center; margin-bottom:34px; }
+  .logo{ font-size:34px; font-weight:700; letter-spacing:-.5px; }
+  .logo span{ color:var(--brand); }
+  .tag{ color:var(--ink-soft); margin-top:8px; font-size:15px; }
+  .grid{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  @media(max-width:560px){ .grid{ grid-template-columns:1fr; } }
+  .card{ background:var(--card); border-radius:20px; padding:28px 24px; text-decoration:none; color:inherit;
+         box-shadow:0 14px 40px rgba(13,43,43,.10); border:1px solid rgba(14,143,143,.08);
+         transition:transform .15s ease, box-shadow .15s ease; display:block; }
+  .card:hover{ transform:translateY(-4px); box-shadow:0 22px 56px rgba(13,43,43,.16); }
+  .ic{ width:54px; height:54px; border-radius:14px; display:grid; place-items:center; font-size:26px;
+       background:linear-gradient(135deg, var(--brand), var(--brand-d)); color:#fff; margin-bottom:16px; }
+  .card h2{ font-size:19px; font-weight:600; }
+  .card p{ color:var(--ink-soft); font-size:13.5px; margin-top:6px; line-height:1.5; }
+  .go{ margin-top:16px; color:var(--brand); font-weight:600; font-size:14px; }
+  .foot{ text-align:center; color:var(--ink-soft); font-size:12.5px; margin-top:30px; line-height:1.7; }
+  .foot code{ background:#dceeee; padding:2px 7px; border-radius:6px; font-size:12px; }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <div class="logo">Smart<span>Lake</span></div>
+      <div class="tag">Baliq ko'llari uchun avtomatik aeratsiya va masofaviy monitoring tizimi</div>
+    </div>
+
+    <div class="grid">
+      <a class="card" href="fermer.html">
+        <div class="ic">🐟</div>
+        <h2>Fermer paneli</h2>
+        <p>Ko'llaringizni kuzating: kislorod, harorat, pH, aerator holati va tarix. Telefon uchun qulay.</p>
+        <div class="go">Kirish →</div>
+      </a>
+
+      <a class="card" href="admin.html">
+        <div class="ic">🛡️</div>
+        <h2>Admin paneli</h2>
+        <p>Qurilmalar, fermerlar, viloyatlar va sozlamalarni boshqarish. Rollar bo'yicha kirish.</p>
+        <div class="go">Kirish →</div>
+      </a>
+    </div>
+
+    <div class="foot">
+      Firebase sozlanmagan bo'lsa, tizim <b>lokal rejimda</b> (faqat shu brauzerda) ishlaydi.<br>
+      Bulutga ulash uchun <code>firebase-config.js</code> faylini to'ldiring — qarang <code>README.md</code>.
+    </div>
+  </div>
+</body>
+</html>
