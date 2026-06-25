@@ -1,0 +1,14 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Tahrirlovchilar
+.vscode/
+.idea/
+
+# Vercel
+.vercel
+
+# Node (agar keyinchalik qo'shilsa)
+node_modules/
+npm-debug.log*

@@ -1,0 +1,22 @@
+{
+  "rules": {
+    "nodes": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      "$nodeId": {
+        "history": {
+          ".indexOn": ["ts"]
+        }
+      }
+    },
+    "gateway": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "commands": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["ts"]
+    }
+  }
+}
