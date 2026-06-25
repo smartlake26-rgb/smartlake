@@ -3,20 +3,15 @@
     "nodes": {
       ".read": "auth != null",
       ".write": "auth != null",
-      "$nodeId": {
-        "history": {
-          ".indexOn": ["ts"]
-        }
-      }
+      "$nodeId": { "history": { ".indexOn": ["ts"] } }
     },
-    "gateway": {
+    "gateway": { ".read": "auth != null", ".write": "auth != null" },
+    "commands": { ".read": "auth != null", ".write": "auth != null", ".indexOn": ["ts"] },
+    "requests": { ".read": "auth != null", ".write": "auth != null", ".indexOn": ["ts"] },
+    "registry": { ".read": "auth != null", ".write": "auth != null" },
+    "users": {
       ".read": "auth != null",
-      ".write": "auth != null"
-    },
-    "commands": {
-      ".read": "auth != null",
-      ".write": "auth != null",
-      ".indexOn": ["ts"]
+      "$uid": { ".write": "auth != null && auth.uid === $uid" }
     }
   }
 }

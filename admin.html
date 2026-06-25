@@ -173,19 +173,11 @@ const mem={};
 function dbGet(k){ try{const v=localStorage.getItem('sla_'+k); if(v!==null) return JSON.parse(v);}catch(e){} return mem[k]??null; }
 function dbSet(k,v){ mem[k]=v; try{localStorage.setItem('sla_'+k,JSON.stringify(v));}catch(e){} }
 
-/* ============================================================
-   FIREBASE — JONLI MA'LUMOT (fermer ilovasi bilan bir xil baza)
-   ------------------------------------------------------------
-   Gateway yozadi:
-     /nodes/<AQid>/latest   = {do, ph, t, aer, mode, rssi, snr, ts ...}
-     /gateway/<gwid>/status = {lora, nodes, gw_rssi, ts ...}
-   Admin o'qiydi va real qurilmalarni demo ro'yxati ustiga "qoplaydi".
-   Buyruq: /commands ga push -> gateway o'qib LoRa orqali yuboradi.
-   Firebase sozlanmagan (XXXX) bo'lsa — hamma narsa demo rejimida ishlaydi.
-   ============================================================ */
+/* ============ FIREBASE — JONLI MA'LUMOT (fermer ilovasi bilan bir xil baza) ============ */
 let fbDb=null, fbReady=false; const LIVE={}, LIVE_GW={};
-const LIVE_FRESH_MS=15*60*1000;   // 15 daqiqadan eski -> o'sha qurilma "oflayn"
-
+let REQS={};            // /requests — fermerlardan kelgan ko'l tasdiq so'rovlari
+let FB_USERS={};         // /users — ro'yxatdan o'tgan real fermerlar (akkauntlar)
+const LIVE_FRESH_MS=15*60*1000;
 function fbInit(){
   try{
     if(typeof firebase==='undefined' || typeof FIREBASE_CONFIG==='undefined'){ fbBadge(false); return; }
@@ -203,79 +195,49 @@ function fbInit(){
       Object.keys(v).forEach(id=>{ if(v[id]&&v[id].status) LIVE_GW[id]=v[id].status; });
       mergeGateways(); refreshFB();
     }, ()=>{});
+    fbDb.ref('requests').on('value', snap=>{ REQS=snap.val()||{}; refreshFB(); buildNav&&CUR&&buildNav(); }, ()=>{});
+    fbDb.ref('users').on('value', snap=>{ FB_USERS=snap.val()||{}; refreshFB(); }, ()=>{});
   }catch(e){ fbBadge(false); }
 }
 function fbFresh(ts){ return typeof ts==='number' && (Date.now()-ts)<=LIVE_FRESH_MS; }
-
-/* Real /nodes qiymatlarini demo qurilma ro'yxati USTIGA qoplaymiz.
-   - Ro'yxatda bo'lmagan real qurilma -> yangi qo'shiladi (biriktirilmagan).
-   - Demo (real bo'lmagan) qurilmalar tegilmaydi: ular simulyatsiyada qoladi. */
 function mergeLive(){
   if(!fbReady) return;
-  let devs=dbGet('devices')||[]; let changed=false;
-  const byChip={}; devs.forEach(d=>byChip[d.chipId]=d);
-  Object.keys(LIVE).forEach(id=>{
-    const lv=LIVE[id]||{}; const fresh=fbFresh(+lv.ts);
-    let d=byChip[id];
+  let devs=dbGet('devices')||[]; let changed=false; const byChip={}; devs.forEach(d=>byChip[d.chipId]=d);
+  Object.keys(LIVE).forEach(id=>{ const lv=LIVE[id]||{}; const fresh=fbFresh(+lv.ts); let d=byChip[id];
     if(!d){ d=makeDevice(id,null,'(biriktirilmagan)',''); d.real=true; devs.push(d); byChip[id]=d; changed=true; }
     d.real=true;
-    if(fresh){
-      if(lv.do!=null)  d.do=+(+lv.do).toFixed(1);
-      if(lv.ph!=null)  d.ph=+(+lv.ph).toFixed(1);
-      if(lv.t!=null)   d.temp=+(+lv.t).toFixed(1);
-      if(typeof lv.rssi==='number') d.rssi=lv.rssi;
-      if(typeof lv.snr==='number')  d.snr=lv.snr;
-      if(lv.aer!=null) d.aerator=!!(+lv.aer);
-      d.lastSeen=+lv.ts;
-      if(d.status!=='blocked') d.status='active';
-      changed=true;
-    } else if(d.status!=='blocked' && d.status!=='offline'){ d.status='offline'; changed=true; }
-  });
-  // real bo'lib endi ko'rinmayotgan qurilma -> oflayn
+    if(fresh){ if(lv.do!=null)d.do=+(+lv.do).toFixed(1); if(lv.ph!=null)d.ph=+(+lv.ph).toFixed(1); if(lv.t!=null)d.temp=+(+lv.t).toFixed(1);
+      if(typeof lv.rssi==='number')d.rssi=lv.rssi; if(typeof lv.snr==='number')d.snr=lv.snr; if(lv.aer!=null)d.aerator=!!(+lv.aer);
+      d.lastSeen=+lv.ts; if(d.status!=='blocked')d.status='active'; changed=true; }
+    else if(d.status!=='blocked' && d.status!=='offline'){ d.status='offline'; changed=true; } });
   devs.forEach(d=>{ if(d.real && !LIVE[d.chipId] && d.status==='active'){ d.status='offline'; changed=true; } });
   if(changed) dbSet('devices',devs);
 }
-
-/* Real /gateway holatini shlyuzlar ro'yxati ustiga qoplaymiz. */
 function mergeGateways(){
-  let gws=dbGet('gateways')||[]; let changed=false;
-  const byId={}; gws.forEach(g=>byId[g.id]=g);
-  Object.keys(LIVE_GW).forEach(id=>{
-    const s=LIVE_GW[id]||{}; const online=fbFresh(+s.ts) && (s.lora==null || +s.lora!==0);
-    let g=byId[id];
-    if(!g){ g={id, name:'Shlyuz '+id, region:'', host:'real (Firebase)', online, nodeCount:+s.nodes||0,
-              lastSeen:+s.ts||Date.now(), fw:'gw-fb', band:'433 MHz', sf:9, real:true}; gws.push(g); byId[id]=g; changed=true; }
-    g.real=true; g.online=online; g.lastSeen=+s.ts||g.lastSeen;
-    if(s.nodes!=null) g.nodeCount=+s.nodes;
-    if(typeof s.gw_rssi==='number') g.gwRssi=s.gw_rssi;
-    changed=true;
-  });
+  let gws=dbGet('gateways')||[]; let changed=false; const byId={}; gws.forEach(g=>byId[g.id]=g);
+  Object.keys(LIVE_GW).forEach(id=>{ const st=LIVE_GW[id]||{}; const online=fbFresh(+st.ts)&&(st.lora==null||+st.lora!==0); let g=byId[id];
+    if(!g){ g={id,name:'Shlyuz '+id,region:'',host:'real (Firebase)',online,nodeCount:+st.nodes||0,lastSeen:+st.ts||Date.now(),fw:'gw-fb',band:'433 MHz',sf:9,real:true}; gws.push(g); byId[id]=g; changed=true; }
+    g.real=true; g.online=online; g.lastSeen=+st.ts||g.lastSeen; if(st.nodes!=null)g.nodeCount=+st.nodes; if(typeof st.gw_rssi==='number')g.gwRssi=st.gw_rssi; changed=true; });
   gws.forEach(g=>{ if(g.real && !LIVE_GW[g.id] && g.online){ g.online=false; changed=true; } });
   if(changed) dbSet('gateways',gws);
 }
-
-/* Joriy ko'rinishni qayta chizish (admin tizimga kirgan bo'lsa). */
 let _fbT=null;
-function refreshFB(){ if(!CUR) return; clearTimeout(_fbT); _fbT=setTimeout(()=>{
-  try{ buildNav(); const R={devices:renderDevices,gateways:renderGateways,alerts:renderAlerts,analytics:renderAnalytics};
-    if(R[page]) R[page](); }catch(e){} },150); }
-
-/* Buyruqni Firebase'ga yuborish (gateway o'qib LoRa orqali tarqatadi).
-   obj — masalan {aer:1}, {mindo:5}, {farq:2}, {kritik:3}, {mode:1}, {status:1} */
-function fbSendCmd(id,obj){
-  if(!fbDb||!id) return false;
-  try{ fbDb.ref('commands').push(Object.assign({node:id, ts:Date.now()}, obj)); return true; }catch(e){ return false; }
-}
-
-/* 🟢 Firebase / ⚪ Demo belgisi (fermer ilovasidagi kabi) */
-function fbBadge(on){
-  let b=document.getElementById('fb-badge');
+function refreshFB(){ if(!CUR) return; clearTimeout(_fbT); _fbT=setTimeout(()=>{ try{ buildNav();
+  const R={devices:renderDevices,gateways:renderGateways,alerts:renderAlerts,analytics:renderAnalytics,approvals:renderApprovals,users:renderUsers};
+  if(R[page]) R[page](); }catch(e){} },150); }
+function fbSendCmd(id,obj){ if(!fbDb||!id) return false; try{ fbDb.ref('commands').push(Object.assign({node:id,ts:Date.now()},obj)); return true; }catch(e){ return false; } }
+/* Fermer so'rovini tasdiqlash -> /registry/<chip>.approved=true, so'rovni o'chiramiz */
+function fbApproveReq(key){ if(!fbDb) return; const r=REQS[key]; if(!r) return;
+  try{ fbDb.ref('registry/'+r.chip).set({approved:true, lake:r.lake||'', region:r.region||'', farmer:r.farmer||'', ts:Date.now()});
+    fbDb.ref('requests/'+key).remove(); }catch(e){} }
+function fbRejectReq(key){ if(!fbDb) return; try{ fbDb.ref('requests/'+key).remove(); }catch(e){} }
+function fbLiveRequests(){ return Object.keys(REQS||{}).map(k=>Object.assign({_key:k}, REQS[k])); }
+function fbBadge(on){ let b=document.getElementById('fb-badge');
   if(!b){ b=document.createElement('div'); b.id='fb-badge';
     b.style.cssText='position:fixed;left:10px;bottom:10px;z-index:9999;font:600 11px/1.4 var(--sans);padding:5px 11px;border-radius:20px;opacity:.95;box-shadow:0 2px 10px rgba(0,0,0,.18)';
     if(document.body) document.body.appendChild(b); }
   if(on){ b.style.background='#1E9E6A'; b.style.color='#fff'; b.textContent='\ud83d\udfe2 Firebase'; }
-  else  { b.style.background='#E9EFED'; b.style.color='#5E736E'; b.textContent='\u26aa Demo'; }
-}
+  else  { b.style.background='#E9EFED'; b.style.color='#5E736E'; b.textContent='\u26aa Demo'; } }
 
 /* ============ ROLLAR / RBAC ============ */
 const ROLES={ super:'Super admin', operator:'Operator', region:'Region menejeri', support:'Qo\'llab-quvvatlash', analyst:'Analitik' };
@@ -418,7 +380,7 @@ function adminLogout(){ dbSet('session',null); CUR=null;
 
 /* ============ NAV / ROUTER ============ */
 function buildNav(){ const nav=document.getElementById('nav');
-  const pend=(dbGet('approvals')||[]).filter(a=>a.status==='pending').length;
+  const pend=(dbGet('approvals')||[]).filter(a=>a.status==='pending').length + (fbReady?fbLiveRequests().filter(r=>CUR.role!=='region'||(r.region||'')===CUR.region).length:0);
   const al=getAlerts().filter(a=>!a.ack).length;
   const gwOff=(dbGet('gateways')||[]).filter(g=>!g.online && (CUR.role!=='region'||g.region===CUR.region)).length;
   nav.innerHTML=SECTIONS.filter(s=>can(s.id)).map(s=>{
@@ -530,18 +492,14 @@ function devConfig(id){ const x=(dbGet('devices')||[]).find(d=>d.chipId===id);
       <div class="field"><label>Kritik DO</label><input id="c-krit" type="number" value="${x.kritik}"></div>
     </div>
     <div style="font-size:12px;color:var(--ink-soft)">Bu chegaralar shlyuz orqali ThingsBoard RPC (LoRa downlink) bilan qurilmaga yuboriladi.</div>`,
-    [{t:'Yuborish',cls:'btn',fn:()=>{ const list=dbGet('devices')||[]; const d=list.find(z=>z.chipId===id); d.minDo=+v('c-min');d.farq=+v('c-farq');d.kritik=+v('c-krit'); dbSet('devices',list);
-      let sent=false; sent=fbSendCmd(id,{mindo:d.minDo})||sent; sent=fbSendCmd(id,{farq:d.farq})||sent; sent=fbSendCmd(id,{kritik:d.kritik})||sent;
-      audit('Qurilma sozlandi: '+id); toast(sent?'Chegaralar qurilmaga yuborildi':'Chegaralar yuborildi (demo)'); closeModal(); renderDevices(); }}]);
+    [{t:'Yuborish',cls:'btn',fn:()=>{ const list=dbGet('devices')||[]; const d=list.find(z=>z.chipId===id); d.minDo=+v('c-min');d.farq=+v('c-farq');d.kritik=+v('c-krit'); dbSet('devices',list); audit('Qurilma sozlandi: '+id); toast('Chegaralar yuborildi'); closeModal(); renderDevices(); }}]);
 }
 function devCmd(id){ const x=(dbGet('devices')||[]).find(d=>d.chipId===id);
   modal('Aerator buyrug\'i — '+id, `
     <div class="field"><label>Rejim</label>
       <select id="c-relay"><option value="auto"${sel(x.relay,'auto')}>Avtomatik</option><option value="on"${sel(x.relay,'on')}>Majburan yoqish</option></select></div>
     <div style="font-size:12px;color:var(--ink-soft)">Buyruq shlyuz orqali qurilmaga (LoRa) yuboriladi. Xavfsizlik uchun majburan o'chirish yo'q — past kislorodda aerator avtomatik yonadi.</div>`,
-    [{t:'Yuborish',cls:'btn',fn:()=>{ const list=dbGet('devices')||[]; const d=list.find(z=>z.chipId===id); d.relay=v('c-relay'); applyRelay(d); dbSet('devices',list);
-      const sent=fbSendCmd(id,{aer: d.relay==='on'?1:0}); audit('Aerator buyruq ('+d.relay+'): '+id);
-      toast(sent?'Buyruq qurilmaga yuborildi':'Buyruq yuborildi (demo)'); closeModal(); renderDevices(); buildNav(); }}]);
+    [{t:'Yuborish',cls:'btn',fn:()=>{ const list=dbGet('devices')||[]; const d=list.find(z=>z.chipId===id); d.relay=v('c-relay'); applyRelay(d); dbSet('devices',list); const sent=fbSendCmd(id,{aer:d.relay==='on'?1:0}); audit('Aerator buyruq ('+d.relay+'): '+id); toast(sent?'Buyruq qurilmaga yuborildi':'Buyruq yuborildi (demo)'); closeModal(); renderDevices(); buildNav(); }}]);
 }
 function devBlock(id){ const list=dbGet('devices')||[]; const x=list.find(d=>d.chipId===id);
   if(!confirm((x.status==='blocked'?'Faollashtirilsinmi?':'Bloklansinmi?')+' '+id)) return;
@@ -576,9 +534,24 @@ function saveDevices(){ dbSet('devices',dbGet('devices')); }/* eski */
 
 /* ============ KO'L TASDIG'I ============ */
 function renderApprovals(){ let a=dbGet('approvals')||[]; if(CUR.role==='region') a=a.filter(x=>x.region===CUR.region);
+  const live = fbReady ? fbLiveRequests().filter(r=>CUR.role!=='region'||(r.region||'')===CUR.region).sort((x,y)=>(y.ts||0)-(x.ts||0)) : [];
+  const livePanel = live.length ? `
+    <div class="panel"><div class="panel-h"><h2>🟢 Yangi so'rovlar (fermer ilovasidan, jonli)</h2></div>
+    <table><thead><tr><th>Fermer</th><th>Chip ID</th><th>Ko'l</th><th>Viloyat</th><th>Vaqt</th><th></th></tr></thead><tbody>
+    ${live.map(r=>`<tr>
+      <td>${esc(r.farmer||'(fermer)')}<div style="font-size:11px;color:var(--ink-soft)">${esc(r.phone||'')}</div></td>
+      <td class="mono">${esc(r.chip||'')}</td><td>${esc(r.lake||'')}</td><td>${esc(r.region||'—')}</td>
+      <td style="font-size:12px;color:var(--ink-soft)">${ago(r.ts||Date.now())}</td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="btn mini" style="background:#E2F3EB;color:#0F6E47" onclick="approveLive('${r._key}')">Tasdiqlash</button>
+        <button class="btn mini" style="background:#FBE3E0;color:#A12C22" onclick="rejectLive('${r._key}')">Rad etish</button></td>
+    </tr>`).join('')}
+    </tbody></table>
+    <div style="font-size:12px;color:var(--ink-soft);padding:0 18px 12px">Tasdiqlasangiz, fermer ilovasida o'sha ko'l darhol to'liq ishlaydi (/registry).</div></div>` : '';
   const pend=a.filter(x=>x.status==='pending');
   C().innerHTML=`
     ${stats([['Kutilmoqda',pend.length],['Tasdiqlangan',a.filter(x=>x.status==='approved').length],['Rad etilgan',a.filter(x=>x.status==='rejected').length]])}
+    ${livePanel}
     <div class="panel"><div class="panel-h"><h2>Tasdiqlash navbati</h2></div>
     <table><thead><tr><th>Fermer</th><th>Chip ID</th><th>Ko'l</th><th>Viloyat</th><th>Vaqt</th><th>Holat</th><th></th></tr></thead><tbody>
     ${a.length?a.map(x=>`<tr>
@@ -592,6 +565,8 @@ function renderApprovals(){ let a=dbGet('approvals')||[]; if(CUR.role==='region'
     </tbody></table></div>
     <div style="font-size:12.5px;color:var(--ink-soft)">Tasdiqlash begona/o'g'irlangan qurilmalar ulanmasligi uchun. Tasdiqlangach qurilma fermerga biriktiriladi.</div>`;
 }
+function approveLive(key){ const r=REQS[key]||{}; fbApproveReq(key); audit('Ko\'l tasdiqlandi: '+(r.chip||'')+' ('+(r.lake||'')+')'); toast('Tasdiqlandi — fermerga yuborildi'); renderApprovals(); buildNav(); }
+function rejectLive(key){ const r=REQS[key]||{}; if(!confirm('So\'rov rad etilsinmi? '+(r.chip||''))) return; fbRejectReq(key); audit('Ko\'l so\'rovi rad etildi: '+(r.chip||'')); toast('Rad etildi'); renderApprovals(); buildNav(); }
 function approve(id,ok){ const a=dbGet('approvals')||[]; const x=a.find(y=>y.id===id); if(!x) return;
   x.status=ok?'approved':'rejected'; dbSet('approvals',a);
   if(ok){
@@ -610,11 +585,25 @@ function approve(id,ok){ const a=dbGet('approvals')||[]; const x=a.find(y=>y.id=
 
 /* ============ FOYDALANUVCHILAR ============ */
 let usrFilter={q:'',region:''};
+function fbFarmers(){ return Object.keys(FB_USERS||{}).map(uid=>{ const u=FB_USERS[uid]||{}; const pr=u.profile||{};
+  return {uid, ism:pr.ism||'', fam:pr.fam||'', phone:pr.phone||'', email:pr.email||'', region:pr.vil||'', tum:pr.tum||'', joined:pr.joined||0, lakeCount:Object.keys(u.lakes||{}).length}; }); }
 function renderUsers(){ let f=dbGet('farmers')||[]; const dev=dbGet('devices')||[];
   if(CUR.role==='region') f=f.filter(x=>x.region===CUR.region);
+  let real = fbReady ? fbFarmers() : [];
+  if(CUR.role==='region') real=real.filter(x=>x.region===CUR.region);
+  const realPanel = real.length ? `
+    <div class="panel"><div class="panel-h"><h2>🟢 Ro'yxatdan o'tgan fermerlar (akkauntlar, jonli)</h2></div>
+    <table><thead><tr><th>Fermer</th><th>Email / Telefon</th><th>Viloyat</th><th>Ko'llari</th></tr></thead><tbody>
+    ${real.sort((a,b)=>(b.joined||0)-(a.joined||0)).map(x=>`<tr>
+      <td>${esc(x.ism)} ${esc(x.fam)}<div style="font-size:11px;color:var(--ink-faint)">ro'yxat: ${x.joined?dt(x.joined):'—'}</div></td>
+      <td class="mono" style="font-size:12px">${esc(x.email||'—')}<div style="color:var(--ink-faint)">${esc(x.phone||'')}</div></td>
+      <td>${esc(x.region||'—')}</td><td class="mono">${x.lakeCount}</td></tr>`).join('')}
+    </tbody></table>
+    <div style="font-size:12px;color:var(--ink-soft);padding:0 18px 12px">Bu fermerlar ilovadan email+parol bilan ro'yxatdan o'tgan. Ma'lumotlari Firebase'da (/users) saqlanadi.</div></div>` : '';
   const list=f.filter(x=>(!usrFilter.q||(x.ism+x.fam+x.phone).toLowerCase().includes(usrFilter.q.toLowerCase()))&&(!usrFilter.region||x.region===usrFilter.region));
   C().innerHTML=`
-    ${stats([['Jami fermer',f.length],['Faol',f.filter(x=>x.status==='active').length],['Bloklangan',f.filter(x=>x.status==='suspended').length]])}
+    ${stats([['Akkauntlar',real.length],['Demo fermer',f.length],['Faol',f.filter(x=>x.status==='active').length]])}
+    ${realPanel}
     <div class="toolbar">
       <input class="grow" placeholder="Ism yoki telefon bo'yicha qidirish" oninput="usrFilter.q=this.value;renderUsers()" value="${usrFilter.q}">
       <select onchange="usrFilter.region=this.value;renderUsers()"><option value="">Viloyat: barchasi</option>${REGIONS.map(r=>`<option ${sel(usrFilter.region,r)}>${r}</option>`).join('')}</select>
@@ -719,8 +708,7 @@ function lakeDetail(uid,chip){ const d=(dbGet('devices')||[]).find(x=>x.chipId==
   setTimeout(()=>{ drawAChart(d); bindAChart(); },0);
 }
 function lakeSaveThr(chip){ const list=dbGet('devices')||[]; const d=list.find(x=>x.chipId===chip); d.minDo=+v('ld-min');d.farq=+v('ld-farq');d.kritik=+v('ld-krit');d.relay=v('ld-relay'); applyRelay(d);
-  dbSet('devices',list); fbSendCmd(chip,{mindo:d.minDo}); fbSendCmd(chip,{farq:d.farq}); fbSendCmd(chip,{kritik:d.kritik}); fbSendCmd(chip,{aer: d.relay==='on'?1:0});
-  audit('Ko\'l chegaralari tahrirlandi: '+d.lake+' ('+chip+')'); toast('Saqlandi va yuborildi'); buildNav(); lakeDetail(d.farmerId,chip); }
+  dbSet('devices',list); audit('Ko\'l chegaralari tahrirlandi: '+d.lake+' ('+chip+')'); toast('Saqlandi va yuborildi'); buildNav(); lakeDetail(d.farmerId,chip); }
 function lakeSaveFish(chip){ const list=dbGet('devices')||[]; const d=list.find(x=>x.chipId===chip); d.fish.count=+v('ld-cnt');d.fish.avgG=+v('ld-w');d.fish.feedType=v('ld-feed');
   dbSet('devices',list); audit('Ko\'l baliq ma\'lumoti tahrirlandi: '+d.lake+' ('+chip+')'); toast('Saqlandi'); lakeDetail(d.farmerId,chip); }
 
@@ -1077,7 +1065,7 @@ let tt; function toast(m){ const e=document.getElementById('toast'); e.textConte
 
 /* ============ START ============ */
 seed();
-fbInit();   // real qurilma/shlyuz ma'lumotini Firebase'dan ulaymiz (sozlanmagan bo'lsa — demo)
+fbInit();
 (function start(){
   const s=dbGet('session'); if(s){ const a=(dbGet('admins')||[]).find(x=>x.login===s); if(a){ CUR=a; enterAdmin(); return; } }
   document.getElementById('lg-pass').addEventListener('keydown',e=>{ if(e.key==='Enter') doLogin(); });
