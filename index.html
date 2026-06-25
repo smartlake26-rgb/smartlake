@@ -275,6 +275,13 @@
 const mem={};
 function dbGet(k){ try{const v=localStorage.getItem('sl_'+k); if(v!==null) return JSON.parse(v);}catch(e){} return mem[k]??null; }
 function dbSet(k,v){ mem[k]=v; try{localStorage.setItem('sl_'+k, JSON.stringify(v));}catch(e){}
+  /* Lokal rejim (Firebase yo'q): joriy akkauntga profil/ko'llarni sinxron saqlash */
+  if(!fbDb && CURRENT_EMAIL && (k==='user'||k==='lakes')){
+    try{ const a=dbGet('accounts')||{}; if(a[CURRENT_EMAIL]){
+      if(k==='user') a[CURRENT_EMAIL].profile=v; else a[CURRENT_EMAIL].lakes=v;
+      mem.accounts=a; localStorage.setItem('sl_accounts', JSON.stringify(a));
+    } }catch(e){}
+  }
   if(_loadingCloud || !AUTH_UID || !fbDb) return;
   try{
     if(k==='lakes'){ const o={}; (v||[]).forEach(L=>{ if(L&&L.id) o[L.id]=L; }); fbDb.ref('users/'+AUTH_UID+'/lakes').set(o); }
@@ -285,7 +292,7 @@ function dbSet(k,v){ mem[k]=v; try{localStorage.setItem('sl_'+k, JSON.stringify(
 /* ===== FIREBASE (real-time ma'lumot) =====
    Gateway har ko'l NODE'sini /nodes/<AQid>/latest ga yozadi.
    Ko'lning id'si (AQxxxxxx) NODE id bilan aynan mos kelishi kerak. */
-let LIVE={}, HIST={}, REG={}, fbDb=null, fbAuth=null, fbReady=false, AUTH_UID=null, _loadingCloud=false, _entered=false, _subbed=false; const histSubs={};
+let LIVE={}, HIST={}, REG={}, fbDb=null, fbAuth=null, fbReady=false, AUTH_UID=null, _loadingCloud=false, _entered=false, _subbed=false, CURRENT_EMAIL=null; const histSubs={};
 const LIVE_FRESH_MS=15*60*1000; // 15 daqiqadan eski bo'lsa shu ko'l "demo"ga qaytadi
 function fbConfigured(){ return typeof firebase!=='undefined' && typeof FIREBASE_CONFIG!=='undefined'
   && FIREBASE_CONFIG.databaseURL && String(FIREBASE_CONFIG.apiKey||'').indexOf('XXXX')<0; }
@@ -522,10 +529,10 @@ function init(){
   liveTimer=setInterval(liveTick,4000);
   const cloud=fbInit();
   if(cloud){ showScreen('s-auth'); setAuthMode('login'); return; }
-  USER=dbGet('user'); LAKES=dbGet('lakes')||[];
+  USER=dbGet('user'); LAKES=dbGet('lakes')||[]; CURRENT_EMAIL=dbGet('session')||null;
   let _mig=false; LAKES.forEach(L=>{ if(L.mode==='off'){ L.mode='auto'; _mig=true; } }); if(_mig) dbSet('lakes',LAKES);
   if(USER){ if(USER.photo && !USER.photos){ USER.photos=[USER.photo]; USER.photoIdx=0; delete USER.photo; dbSet('user',USER); } if(!USER.photos) USER.photos=[]; }
-  if(!USER){ showScreen('s-register'); }
+  if(!USER){ showScreen('s-auth'); setAuthMode('login'); }
   else if(getPin()){ showScreen('s-lock'); setTimeout(()=>{const e=document.getElementById('lock-pin'); if(e)e.focus();},200); }
   else { enterApp(); }
 }
@@ -560,8 +567,8 @@ function authErr(e){ const c=(e&&e.code)||'';
 function authSubmit(){
   const err=document.getElementById('au-err');
   const email=val('au-email'); const pass=(document.getElementById('au-pass')||{}).value||'';
-  if(!fbAuth){ err.textContent='Firebase sozlanmagan'; return; }
   if(!email||!pass){ err.textContent='Email va parolni kiriting'; return; }
+  if(!fbAuth){ return localAuthSubmit(email, pass, err); }   /* Firebase yo'q -> lokal kirish/ro'yxat */
   if(authMode==='register'){
     const ism=val('au-ism'),fam=val('au-fam'),vil=val('au-vil'),tum=val('au-tum'),phone=val('au-phone');
     if(!ism||!fam){ err.textContent='Ism va familiyani kiriting'; return; }
@@ -577,6 +584,42 @@ function authSubmit(){
     fbAuth.signInWithEmailAndPassword(email,pass).catch(e=>{ err.textContent=authErr(e); });
   }
 }
+/* ===== LOKAL AKKAUNT (Firebase sozlanmaganda email+parol bilan kirish) ===== */
+function normEmail(e){ return String(e||'').trim().toLowerCase(); }
+function localAuthSubmit(email, pass, err){
+  email=normEmail(email);
+  const accounts=dbGet('accounts')||{};
+  if(authMode==='register'){
+    const ism=val('au-ism'),fam=val('au-fam'),vil=val('au-vil'),tum=val('au-tum'),phone=val('au-phone');
+    if(!ism||!fam){ err.textContent='Ism va familiyani kiriting'; return; }
+    if(!vil){ err.textContent='Viloyatni tanlang'; return; }
+    if(pass.length<6){ err.textContent='Parol kamida 6 belgi'; return; }
+    if(accounts[email]){ err.textContent="Bu email allaqachon ro'yxatdan o'tgan"; return; }
+    const prof={ism,fam,vil,tum,phone,email,role:'farmer',joined:Date.now(),photos:[]};
+    accounts[email]={ pass, profile:prof, lakes:[] };
+    dbSet('accounts', accounts);
+    localSignIn(email);
+    toast('Xush kelibsiz, '+ism+'!');
+  } else {
+    const acc=accounts[email];
+    if(!acc){ err.textContent='Bunday foydalanuvchi topilmadi'; return; }
+    if(acc.pass!==pass){ err.textContent="Email yoki parol noto'g'ri"; return; }
+    localSignIn(email);
+  }
+}
+function localSignIn(email){
+  email=normEmail(email);
+  const acc=(dbGet('accounts')||{})[email]; if(!acc) return;
+  CURRENT_EMAIL=email; dbSet('session', email);
+  USER=acc.profile||null; if(USER && !USER.photos) USER.photos=[];
+  LAKES=acc.lakes||[];
+  dbSet('user',USER); dbSet('lakes',LAKES);
+  _entered=false;
+  const e=document.getElementById('au-err'); if(e) e.textContent='';
+  if(getPin()){ showScreen('s-lock'); setTimeout(()=>{const el=document.getElementById('lock-pin'); if(el)el.focus();},150); }
+  else enterApp();
+}
+
 /* ===== REGISTER (eski lokal rejim — Firebase sozlanmaganida) ===== */
 function registerUser(){
   const ism=val('r-ism'),fam=val('r-fam'),vil=val('r-vil'),tum=val('r-tum');
@@ -1059,8 +1102,9 @@ function logout(){ if(!confirm("Hisobdan chiqasizmi?")) return;
   try{ ['pin','lang'].forEach(k=>localStorage.removeItem('sl_'+k)); }catch(e){}
   mem.pin=null; delShowId=null; _entered=false;
   if(fbAuth){ try{ fbAuth.signOut(); }catch(e){} return; }
-  try{ ['user','lakes'].forEach(k=>localStorage.removeItem('sl_'+k)); }catch(e){}
-  USER=null; LAKES=[]; mem.user=null; mem.lakes=null; showScreen('s-register'); }
+  try{ ['user','lakes','session'].forEach(k=>localStorage.removeItem('sl_'+k)); }catch(e){}
+  USER=null; LAKES=[]; mem.user=null; mem.lakes=null; mem.session=null; CURRENT_EMAIL=null;
+  showScreen('s-auth'); setAuthMode('login'); }
 
 /* ===== TIL / I18N ===== */
 function getLang(){ return dbGet('lang')||'uz-latin'; }
