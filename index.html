@@ -561,13 +561,22 @@ function authErr(e){ const c=(e&&e.code)||'';
   if(c.indexOf('network')>=0) return "Internet aloqasi yo'q";
   return 'Xatolik yuz berdi'; }
 function farmerForgotPass(){
-  const err=document.getElementById('au-err'); const email=val('au-email');
-  if(!email){ err.style.color='var(--crit)'; err.textContent='Avval emailingizni kiriting, keyin bosing'; return; }
+  const err=document.getElementById('au-err');
   if(!fbAuth){ err.style.color='var(--crit)'; err.textContent="Bu rejimda parol tiklash mavjud emas"; return; }
+  let email=prompt("Parolni tiklash uchun ro'yxatdan o'tgan email manzilingizni kiriting:", (val('au-email')||''));
+  if(email===null) return;                       /* bekor qildi */
+  email=String(email).trim().toLowerCase();
+  if(!email || email.indexOf('@')<1){ err.style.color='var(--crit)'; err.textContent="To'g'ri email kiriting"; return; }
   err.style.color='var(--ink-soft)'; err.textContent='Yuborilmoqda...';
   fbAuth.sendPasswordResetEmail(email)
-    .then(()=>{ err.style.color='#1E9E6A'; err.textContent='Parolni tiklash havolasi '+email+' ga yuborildi. Pochtangizni tekshiring.'; })
-    .catch(e=>{ err.style.color='var(--crit)'; err.textContent=authErr(e); });
+    .then(()=>{ err.style.color='#1E9E6A'; err.textContent='Tiklash havolasi '+email+' ga yuborildi. Pochtangizni (spam papkasini ham) tekshiring.'; })
+    .catch(e=>{ const c=(e&&e.code)||'';
+      if(c.indexOf('user-not-found')>=0){
+        setAuthMode('register'); const f=document.getElementById('au-email'); if(f) f.value=email;
+        err.style.color='var(--crit)'; err.textContent="Bu email ro'yxatdan o'tmagan. Iltimos, avval ro'yxatdan o'ting.";
+      } else if(c.indexOf('invalid-email')>=0){ err.style.color='var(--crit)'; err.textContent="Email noto'g'ri"; }
+      else { err.style.color='var(--crit)'; err.textContent=authErr(e); }
+    });
 }
 function authSubmit(){
   const err=document.getElementById('au-err');
@@ -910,9 +919,10 @@ function drawChart(L){
     return;
   }
   const padL=6,padR=26,padT=12,padB=22, plotH=H-padT-padB, plotW=W-padL-padR;
-  const X=i=>padL+i/(data.length-1)*plotW;
+  const [rN,rStep]=RCONF[curRange]; const tNow=Date.now(); const tFrom=tNow-(rN-1)*rStep; const tSpan=(tNow-tFrom)||1;
+  const X=t=>padL+Math.max(0,Math.min(1,(t-tFrom)/tSpan))*plotW;
   const Y=(p,v)=>{ const P=PARAMS[p]; let r=(v-P.dmin)/(P.dmax-P.dmin); r=Math.max(0,Math.min(1,r)); return padT+(1-r)*plotH; };
-  chGeom={X,Y,padL,padR,padT,padB,plotW,plotH,W,H};
+  chGeom={X,Y,padL,padR,padT,padB,plotW,plotH,W,H,tFrom,tNow,tSpan};
   // ozgina gorizontal grid
   ctx.strokeStyle='#EAF0EE'; ctx.lineWidth=1;
   for(let g=0;g<=3;g++){ const y=padT+g/3*plotH; ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(W-padR,y); ctx.stroke(); }
@@ -921,18 +931,18 @@ function drawChart(L){
     for(let i=0;i<data.length-1;i++){ const v1=data[i][p], v2=data[i+1][p];
       const col=zoneCol(p, Math.min(v1,v2)===v1? worse(p,v1,v2):worse(p,v1,v2));
       ctx.beginPath(); ctx.setLineDash(P.dash); ctx.lineWidth=p==='do'?2.4:1.8;
-      ctx.strokeStyle=col; ctx.moveTo(X(i),Y(p,v1)); ctx.lineTo(X(i+1),Y(p,v2)); ctx.stroke(); }
+      ctx.strokeStyle=col; ctx.moveTo(X(data[i].t),Y(p,v1)); ctx.lineTo(X(data[i+1].t),Y(p,v2)); ctx.stroke(); }
     ctx.setLineDash([]);
     // oxirgi yorliq
     const li=data.length-1; ctx.fillStyle='#5E736E'; ctx.font='700 10px '+monoFam();
-    ctx.fillText(P.label, X(li)+4, Y(p,data[li][p])+3);
+    ctx.fillText(P.label, X(data[li].t)+4, Y(p,data[li][p])+3);
   }
   ['temp','ph','do'].forEach(drawLine);
   // x vaqt belgilari
   ctx.fillStyle='#92A29E'; ctx.font='10px '+monoFam(); ctx.textAlign='left';
-  ctx.fillText(fmtT(data[0].t), padL, H-6);
-  ctx.textAlign='center'; ctx.fillText(fmtT(data[(data.length/2)|0].t), padL+plotW/2, H-6);
-  ctx.textAlign='right'; ctx.fillText(fmtT(data[data.length-1].t), W-padR, H-6); ctx.textAlign='left';
+  ctx.fillText(fmtT(tFrom), padL, H-6);
+  ctx.textAlign='center'; ctx.fillText(fmtT((tFrom+tNow)/2), padL+plotW/2, H-6);
+  ctx.textAlign='right'; ctx.fillText(fmtT(tNow), W-padR, H-6); ctx.textAlign='left';
   // kursor
   if(chIdx===null) chIdx=data.length-1;
   drawCursor();
@@ -947,8 +957,8 @@ function drawCursor(){
   // drawChart oxirida chaqiriladi va move'da drawChart qayta ishlaydi.
   const {X,Y,padT,plotH}=chGeom; const ctx=cv.getContext('2d'); const i=chIdx; const d=chData[i];
   ctx.save(); ctx.strokeStyle='rgba(17,48,43,.35)'; ctx.setLineDash([4,4]); ctx.lineWidth=1;
-  ctx.beginPath(); ctx.moveTo(X(i),padT-4); ctx.lineTo(X(i),padT+plotH+2); ctx.stroke(); ctx.setLineDash([]);
-  ['do','ph','temp'].forEach(p=>{ const y=Y(p,d[p]); ctx.beginPath(); ctx.arc(X(i),y,4,0,7);
+  ctx.beginPath(); ctx.moveTo(X(d.t),padT-4); ctx.lineTo(X(d.t),padT+plotH+2); ctx.stroke(); ctx.setLineDash([]);
+  ['do','ph','temp'].forEach(p=>{ const y=Y(p,d[p]); ctx.beginPath(); ctx.arc(X(d.t),y,4,0,7);
     ctx.fillStyle=zoneCol(p,d[p]); ctx.fill(); ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke(); });
   ctx.restore();
   // pastdagi o'qish
@@ -961,9 +971,11 @@ function drawCursor(){
 }
 function bindChart(){
   const cv=document.getElementById('chart'); if(!cv) return;
-  const move=clientX=>{ if(!chGeom) return; const r=cv.getBoundingClientRect();
-    let i=Math.round((clientX-r.left-chGeom.padL)/chGeom.plotW*(chData.length-1));
-    i=Math.max(0,Math.min(chData.length-1,i)); if(i===chIdx) return; chIdx=i;
+  const move=clientX=>{ if(!chGeom||!chData||!chData.length) return; const r=cv.getBoundingClientRect();
+    const frac=Math.max(0,Math.min(1,(clientX-r.left-chGeom.padL)/chGeom.plotW));
+    const tt=chGeom.tFrom+frac*(chGeom.tNow-chGeom.tFrom);
+    let best=0,bd=Infinity; for(let k=0;k<chData.length;k++){ const dd=Math.abs(chData[k].t-tt); if(dd<bd){bd=dd;best=k;} }
+    if(best===chIdx) return; chIdx=best;
     const L=getLake(currentLake); drawChart(L); };
   cv.ontouchstart=e=>{ move(e.touches[0].clientX); };
   cv.ontouchmove=e=>{ move(e.touches[0].clientX); e.preventDefault(); };

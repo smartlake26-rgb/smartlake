@@ -435,7 +435,7 @@ function go(id){ if(!can(id)) return; page=id;
 let devFilter={q:'',gw:'',status:''};
 function renderDevices(){
   let d=dbGet('devices')||[]; const farmers=dbGet('farmers')||[]; const gws=dbGet('gateways')||[];
-  if(CUR.role==='region') d=d.filter(x=>inMyRegion(x.region));
+  if(CUR.role==='region') d=d.filter(x=>{ const eff=x.region||((regForChip(x.chipId)||{}).region)||((reqForChip(x.chipId)||{}).region)||''; return inMyRegion(eff); });
   const f=d.filter(x=> (!devFilter.q || (x.chipId+x.lake).toLowerCase().includes(devFilter.q.toLowerCase()))
     && (!devFilter.gw||x.gwId===devFilter.gw) && (!devFilter.status||x.status===devFilter.status));
   const fname=id=>{ const fr=farmers.find(y=>y.id===id); return fr?fr.ism+' '+fr.fam:'—'; };
