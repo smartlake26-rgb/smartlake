@@ -170,7 +170,7 @@ function dbGet(k){ try{const v=localStorage.getItem('sla_'+k); if(v!==null) retu
 function dbSet(k,v){ mem[k]=v; try{localStorage.setItem('sla_'+k,JSON.stringify(v));}catch(e){} }
 
 /* ============ FIREBASE — JONLI MA'LUMOT (fermer ilovasi bilan bir xil baza) ============ */
-let fbDb=null, fbReady=false; const LIVE={}, LIVE_GW={};
+let fbDb=null, fbAuth=null, fbReady=false; const LIVE={}, LIVE_GW={};
 let REQS={};            // /requests — fermerlardan kelgan ko'l tasdiq so'rovlari
 let FB_USERS={};         // /users — ro'yxatdan o'tgan real fermerlar (akkauntlar)
 let ADMIN_ROLES={};      // /adminRoles — super admin bergan rollar (email bo'yicha)
@@ -182,22 +182,58 @@ function fbInit(){
     if(!FIREBASE_CONFIG.databaseURL || String(FIREBASE_CONFIG.apiKey||'').indexOf('XXXX')>=0){ fbBadge(false); return; }
     firebase.initializeApp(FIREBASE_CONFIG);
     fbDb=firebase.database();
-    firebase.auth().signInAnonymously().catch(()=>{});
-    fbDb.ref('nodes').on('value', snap=>{
-      const v=snap.val()||{}; Object.keys(LIVE).forEach(k=>delete LIVE[k]);
-      Object.keys(v).forEach(id=>{ if(v[id]&&v[id].latest) LIVE[id]=v[id].latest; });
-      fbReady=true; fbBadge(true); mergeLive(); refreshFB();
-    }, ()=>fbBadge(false));
-    fbDb.ref('gateway').on('value', snap=>{
-      const v=snap.val()||{}; Object.keys(LIVE_GW).forEach(k=>delete LIVE_GW[k]);
-      Object.keys(v).forEach(id=>{ if(v[id]&&v[id].status) LIVE_GW[id]=v[id].status; });
-      mergeGateways(); refreshFB();
-    }, ()=>{});
-    fbDb.ref('requests').on('value', snap=>{ REQS=snap.val()||{}; refreshFB(); buildNav&&CUR&&buildNav(); }, ()=>{});
-    fbDb.ref('users').on('value', snap=>{ FB_USERS=snap.val()||{}; refreshFB(); }, ()=>{});
-    fbDb.ref('adminRoles').on('value', snap=>{ ADMIN_ROLES=snap.val()||{}; if(CUR&&CUR.role==='super'&&page==='settings') renderSettings(); }, ()=>{});
-    fbDb.ref('registry').on('value', snap=>{ REGISTRY=snap.val()||{}; refreshFB(); }, ()=>{});
+    fbAuth=firebase.auth();
+    fbAuth.onAuthStateChanged(handleAdminAuth);
   }catch(e){ fbBadge(false); }
+}
+let _adminListenersOn=false;
+function attachAdminListeners(){
+  if(_adminListenersOn || !fbDb) return; _adminListenersOn=true;
+  fbDb.ref('nodes').on('value', snap=>{
+    const v=snap.val()||{}; Object.keys(LIVE).forEach(k=>delete LIVE[k]);
+    Object.keys(v).forEach(id=>{ if(v[id]&&v[id].latest) LIVE[id]=v[id].latest; });
+    fbReady=true; fbBadge(true); mergeLive(); refreshFB();
+  }, ()=>fbBadge(false));
+  fbDb.ref('gateway').on('value', snap=>{
+    const v=snap.val()||{}; Object.keys(LIVE_GW).forEach(k=>delete LIVE_GW[k]);
+    Object.keys(v).forEach(id=>{ if(v[id]&&v[id].status) LIVE_GW[id]=v[id].status; });
+    mergeGateways(); refreshFB();
+  }, ()=>{});
+  fbDb.ref('requests').on('value', snap=>{ REQS=snap.val()||{}; refreshFB(); buildNav&&CUR&&buildNav(); }, ()=>{});
+  fbDb.ref('users').on('value', snap=>{ FB_USERS=snap.val()||{}; refreshFB(); }, ()=>{});
+  fbDb.ref('admins').on('value', snap=>{ ADMIN_ROLES=snap.val()||{}; if(CUR&&CUR.role==='super'&&page==='settings') renderSettings(); }, ()=>{});
+  fbDb.ref('registry').on('value', snap=>{ REGISTRY=snap.val()||{}; refreshFB(); }, ()=>{});
+}
+/* Haqiqiy hisob bilan kirish: super admin emaili yoki /admins/<uid> */
+function handleAdminAuth(user){
+  if(!user){ CUR=null; _adminListenersOn=false; showLoginScreen(); return; }
+  resolveAdminRole(user).then(info=>{
+    if(!info){
+      const errEl=document.getElementById('lg-err');
+      if(errEl){ errEl.style.color='var(--crit)'; errEl.textContent="Bu akkauntda admin huquqi yo'q"; }
+      try{ fbAuth.signOut(); }catch(e){}
+      showLoginScreen();
+      return;
+    }
+    attachAdminListeners();
+    CUR={ email:(user.email||'').toLowerCase(), uid:user.uid, name:((user.email||'admin').split('@')[0]||'admin'),
+          role:info.role, region:info.region||'', regions:(info.regions&&info.regions.length?info.regions:(info.region?[info.region]:[])) };
+    enterAdmin();
+  });
+}
+function resolveAdminRole(user){
+  const e=String(user.email||'').trim().toLowerCase();
+  return new Promise(resolve=>{
+    if(e===SUPER_ADMIN_EMAIL){ resolve({role:'super',region:'',regions:[]}); return; }
+    if(!fbDb){ resolve(null); return; }
+    fbDb.ref('admins/'+user.uid).once('value')
+      .then(snap=>{ const r=snap.val(); if(r&&r.role){ const regions=Array.isArray(r.regions)?r.regions:(r.region?[r.region]:[]); resolve({role:r.role, region:regions[0]||'', regions}); } else resolve(null); })
+      .catch(()=>resolve(null));
+  });
+}
+function showLoginScreen(){
+  const app=document.getElementById('app'), login=document.getElementById('login');
+  if(app) app.style.display='none'; if(login) login.style.display='flex';
 }
 function fbFresh(ts){ return typeof ts==='number' && (Date.now()-ts)<=LIVE_FRESH_MS; }
 function mergeLive(){
@@ -381,12 +417,11 @@ function doLogin(){
   const errEl=document.getElementById('lg-err');
   errEl.style.color='var(--crit)';
   if(!email||!pass){ errEl.textContent='Email va parolni kiriting'; return; }
+  if(!fbAuth){ errEl.textContent='Firebase ulanmagan'; return; }
   errEl.style.color='var(--ink-soft)'; errEl.textContent='Kirilmoqda...';
-  verifyAdminCreds(email, pass)
-    .then(u=> resolveAdminRoleByEmail(u.email))
-    .then(info=>{ if(!info){ errEl.textContent='Bu akkauntda admin huquqi yo\'q'; return; }
-      errEl.textContent=''; audit('Tizimga kirdi: '+email); enterAdminAs(email, info); })
-    .catch(e=>{ errEl.textContent=adminAuthErr(e); });
+  fbAuth.signInWithEmailAndPassword(email, pass)
+    .then(()=>{ errEl.textContent=''; audit('Tizimga kirdi: '+email); /* handleAdminAuth rolni tekshirib kiritadi */ })
+    .catch(e=>{ errEl.style.color='var(--crit)'; errEl.textContent=adminAuthErr(e); });
 }
 function enterAdmin(){
   document.getElementById('login').style.display='none';
@@ -397,7 +432,8 @@ function enterAdmin(){
   buildNav();
   const first=SECTIONS.find(s=>can(s.id)); go(first?first.id:'devices');
 }
-function adminLogout(){ dbSet('adminEmail',null); CUR=null;
+function adminLogout(){ CUR=null; _adminListenersOn=false;
+  if(fbAuth){ try{ fbAuth.signOut(); }catch(e){} }
   document.getElementById('app').style.display='none';
   document.getElementById('login').style.display='flex';
   v2('lg-user',''); v2('lg-pass',''); document.getElementById('lg-err').textContent=''; }
@@ -995,7 +1031,7 @@ function renderSettings(){ const s=dbGet('settings')||{}; const admins=dbGet('ad
         <div class="row2">
           <div class="field"><label>Foydalanuvchi (ro'yxatdan o'tganlar)</label>
             <input id="ar-search" placeholder="Ism, familiya yoki email bo'yicha qidirish..." oninput="arFilter()" style="margin-bottom:8px">
-            <select id="ar-email" size="6"><option value="">— tanlang —</option>${ru.map(u=>`<option value="${esc((u.email||'').toLowerCase())}">${esc(u.ism)} ${esc(u.fam)} · ${esc(u.email)}</option>`).join('')}</select>
+            <select id="ar-email" size="6"><option value="">— tanlang —</option>${ru.map(u=>`<option value="${esc(u.uid)}">${esc(u.ism)} ${esc(u.fam)} · ${esc(u.email)}</option>`).join('')}</select>
             <div class="hint" id="ar-count" style="font-size:11.5px;color:var(--ink-faint);margin-top:4px">${ru.length} ta foydalanuvchi</div></div>
           <div class="field"><label>Rol</label><select id="ar-role" onchange="document.getElementById('ar-regwrap').style.display=this.value==='region'?'block':'none'">
             <option value="operator">Operator</option>
@@ -1027,30 +1063,31 @@ function arFilter(){
   const all=(fbReady?fbFarmers():[]).filter(u=>u.email);
   const ru=all.filter(u=> !q || ((u.ism+' '+u.fam+' '+u.email).toLowerCase().includes(q)));
   const cur=sel.value;
-  sel.innerHTML='<option value="">— tanlang —</option>'+ru.map(u=>`<option value="${esc((u.email||'').toLowerCase())}">${esc(u.ism)} ${esc(u.fam)} · ${esc(u.email)}</option>`).join('');
-  if(ru.some(u=>(u.email||'').toLowerCase()===cur)) sel.value=cur;
+  sel.innerHTML='<option value="">— tanlang —</option>'+ru.map(u=>`<option value="${esc(u.uid)}">${esc(u.ism)} ${esc(u.fam)} · ${esc(u.email)}</option>`).join('');
+  if(ru.some(u=>u.uid===cur)) sel.value=cur;
   const cnt=document.getElementById('ar-count'); if(cnt) cnt.textContent=ru.length+' ta foydalanuvchi'+(q?' (filtrlangan)':'');
 }
 function assignRole(){
-  const sel=document.getElementById('ar-email'); const email=(sel?sel.value:'').trim().toLowerCase(), role=v('ar-role');
+  const sel=document.getElementById('ar-email'); const uid=(sel?sel.value:''); const role=v('ar-role');
   const regions=Array.from(document.querySelectorAll('.ar-reg-cb:checked')).map(c=>c.value);
   const errEl=document.getElementById('ar-err');
   const setErr=m=>{ if(errEl){errEl.style.color='var(--crit)';errEl.textContent=m;} else toast(m); };
-  if(!email){ setErr('Foydalanuvchini tanlang'); return; }
+  if(!uid){ setErr('Foydalanuvchini tanlang'); return; }
+  const usr=(fbReady?fbFarmers():[]).find(u=>u.uid===uid);
+  if(!usr){ setErr("Bu foydalanuvchi ro'yxatdan o'tmagan"); return; }
+  const email=(usr.email||'').toLowerCase();
   if(email===SUPER_ADMIN_EMAIL){ setErr('Bu super admin — rol berish shart emas'); return; }
-  const registered=(fbReady?fbFarmers():[]).some(u=>(u.email||'').toLowerCase()===email);
-  if(!registered){ setErr("Bu foydalanuvchi ro'yxatdan o'tmagan"); return; }
   if(role==='region' && !regions.length){ setErr('Region menejeri uchun kamida bitta hudud tanlang'); return; }
   if(!fbDb){ setErr('Firebase ulanmagan'); return; }
-  fbDb.ref('adminRoles/'+adminEmailKey(email)).set({ email, role, regions:(role==='region'?regions:[]), region:(role==='region'?(regions[0]||''):''), ts:Date.now() })
+  fbDb.ref('admins/'+uid).set({ email, role, regions:(role==='region'?regions:[]), region:(role==='region'?(regions[0]||''):''), ts:Date.now() })
     .then(()=>{ audit('Rol berildi: '+email+' -> '+ROLES[role]); toast('Rol berildi'); if(errEl){errEl.style.color='var(--good)';errEl.textContent='Rol berildi: '+email;} })
-    .catch(()=>setErr('Xato — saqlanmadi'));
+    .catch(()=>setErr('Xato — faqat super admin rol bera oladi'));
 }
 function removeRole(key){
   if(!confirm('Rol olib tashlansinmi?')) return;
   if(!fbDb){ toast('Firebase ulanmagan'); return; }
   const r=(ADMIN_ROLES||{})[key]||{};
-  fbDb.ref('adminRoles/'+key).remove()
+  fbDb.ref('admins/'+key).remove()
     .then(()=>{ audit('Rol olib tashlandi: '+(r.email||key)); toast('Olib tashlandi'); })
     .catch(()=>toast('Xato'));
 }
@@ -1171,8 +1208,6 @@ let tt; function toast(m){ const e=document.getElementById('toast'); e.textConte
 seed();
 fbInit();
 (function start(){
-  const e=dbGet('adminEmail');
-  if(e){ resolveAdminRoleByEmail(e).then(info=>{ if(info){ enterAdminAs(e, info); } }); }
   document.getElementById('lg-pass').addEventListener('keydown',ev=>{ if(ev.key==='Enter') doLogin(); });
 })();
 </script>
