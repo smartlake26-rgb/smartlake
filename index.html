@@ -21,14 +21,23 @@
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0; height:100%; overflow:hidden;}
-  body{ font-family:var(--sans); background:#cfdbd8; color:var(--ink);
+  body{ font-family:var(--sans); background:#0A4A42; color:var(--ink);
     font-size:15px; line-height:1.5; -webkit-font-smoothing:antialiased; overscroll-behavior:none;}
   /* .app = ekran "uyasi": balandligi viewport bo'yicha qat'iy, ichida bitta ekran ko'rinadi */
   .app{ max-width:480px; margin:0 auto; height:100vh; height:100dvh; background:var(--bg);
     position:relative; overflow:hidden; }
   .topbar{ position:sticky; top:0; z-index:30; background:var(--primary);
     color:#fff; padding:12px 16px; display:flex; align-items:center; gap:12px;
-    box-shadow:0 2px 14px rgba(10,92,80,.25); min-height:58px; }
+    box-shadow:0 2px 14px rgba(10,92,80,.25); min-height:58px; overflow:hidden; }
+  .topbar > *{ position:relative; z-index:2; }
+  /* har bir ekran yuqorisidagi yashil zonada oqar to'lqin */
+  .topbar::before{ content:""; position:absolute; inset:0; z-index:0; pointer-events:none;
+    background:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScxMjAnIGhlaWdodD0nMjInIHZpZXdCb3g9JzAgMCAxMjAgMjInPjxwYXRoIGQ9J00wIDExIHEzMCAtNiA2MCAwIHQ2MCAwJyBmaWxsPSdub25lJyBzdHJva2U9JyNmZmZmZmYnIHN0cm9rZS13aWR0aD0nMS42Jy8+PC9zdmc+") repeat; background-size:120px 22px; opacity:.16;
+    animation:slWave 9s linear infinite; }
+  .topbar::after{ content:""; position:absolute; left:0; right:0; bottom:-1px; height:14px; z-index:1; pointer-events:none;
+    background:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScxMjAnIGhlaWdodD0nMTQnIHZpZXdCb3g9JzAgMCAxMjAgMTQnPjxwYXRoIGQ9J00wIDggcTMwIC02IDYwIDAgdDYwIDAnIGZpbGw9J25vbmUnIHN0cm9rZT0nI2ZmZmZmZicgc3Ryb2tlLXdpZHRoPScyLjQnIHN0cm9rZS1saW5lY2FwPSdyb3VuZCcvPjwvc3ZnPg==") repeat-x; background-size:120px 14px; opacity:.5;
+    animation:slWave 6s linear infinite reverse; }
+  @keyframes slWave{ to{ background-position-x:-120px; } }
   .topbar .back{ font-size:26px; line-height:1; cursor:pointer; width:24px; }
   .tb-logo{ width:34px; height:34px; object-fit:contain; flex-shrink:0;
     filter:drop-shadow(0 1px 2px rgba(0,0,0,.2)); }
@@ -92,16 +101,20 @@
   .field .hint{ font-size:11.5px; color:var(--ink-faint); margin-top:5px;}
   .row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px;}
   /* onboarding ekranlari — .screen.active orqali flex-column bo'ladi, ortig'i scroll bo'ladi */
-  .screen.onb{ padding:46px 22px 30px;
+  .screen.onb{ padding:46px 22px 30px; min-height:100%;
     background:
       radial-gradient(120% 75% at 12% 0%, rgba(31,192,214,.42) 0%, rgba(31,192,214,0) 55%),
       radial-gradient(130% 90% at 100% 100%, rgba(10,74,66,.70) 0%, rgba(10,74,66,0) 60%),
       linear-gradient(158deg,#11A294 0%,#0E7C6B 46%,#0A4A42 100%);
     color:#fff; overflow-y:auto; -webkit-overflow-scrolling:touch; position:relative; }
-  /* nozik to'lqin bezagi (pastda) */
-  .screen.onb::after{ content:""; position:absolute; left:0; right:0; bottom:0; height:140px;
-    background:
-      radial-gradient(80% 120% at 50% 140%, rgba(255,255,255,.10) 0%, rgba(255,255,255,0) 60%);
+  .screen.onb > *{ position:relative; z-index:1; }
+  /* butun yashil fon bo'ylab oqar suv teksturasi */
+  .screen.onb::before{ content:""; position:absolute; inset:0; z-index:0; pointer-events:none;
+    background:url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHdpZHRoPScxMjAnIGhlaWdodD0nMjInIHZpZXdCb3g9JzAgMCAxMjAgMjInPjxwYXRoIGQ9J00wIDExIHEzMCAtNiA2MCAwIHQ2MCAwJyBmaWxsPSdub25lJyBzdHJva2U9JyNmZmZmZmYnIHN0cm9rZS13aWR0aD0nMS42Jy8+PC9zdmc+") repeat; background-size:120px 22px; opacity:.13;
+    animation:slWave 12s linear infinite; }
+  /* pastki nozik yorug'lik */
+  .screen.onb::after{ content:""; position:absolute; left:0; right:0; bottom:0; height:160px; z-index:0;
+    background:radial-gradient(80% 120% at 50% 140%, rgba(255,255,255,.10) 0%, rgba(255,255,255,0) 60%);
     pointer-events:none; }
   .onb-logo{ width:108px; height:auto; display:block; margin:6px auto 8px;
     filter:drop-shadow(0 10px 22px rgba(0,0,0,.30)); position:relative; z-index:1; }
