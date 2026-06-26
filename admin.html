@@ -135,6 +135,7 @@
     <div class="field"><label>Parol</label><input id="lg-pass" type="password" placeholder="parol" autocomplete="current-password"></div>
     <button class="btn" style="width:100%" onclick="doLogin()">Kirish</button>
     <div id="lg-err" style="color:var(--crit);font-size:12px;text-align:center;margin-top:8px;min-height:14px"></div>
+    <div style="text-align:center;margin-top:10px"><a href="#" onclick="forgotPass();return false;" style="font-size:12.5px;color:var(--good);text-decoration:none">Parolni unutdingizmi?</a></div>
   </div>
 </div>
 
@@ -229,6 +230,9 @@ function fbApproveReq(key){ if(!fbDb) return; const r=REQS[key]; if(!r) return;
     fbDb.ref('requests/'+key).remove(); }catch(e){} }
 function fbRejectReq(key){ if(!fbDb) return; try{ fbDb.ref('requests/'+key).remove(); }catch(e){} }
 function fbLiveRequests(){ return Object.keys(REQS||{}).map(k=>Object.assign({_key:k}, REQS[k])); }
+/* Chip bo'yicha fermer yuborgan (hali tasdiqlanmagan) so'rovni topadi — ko'l/fermer nomini ko'rsatish uchun */
+function reqForChip(chip){ const c=String(chip||'').toUpperCase();
+  const ks=Object.keys(REQS||{}); for(const k of ks){ const r=REQS[k]; if(r && String(r.chip||'').toUpperCase()===c) return r; } return null; }
 function fbBadge(on){ let b=document.getElementById('fb-badge');
   if(!b){ b=document.createElement('div'); b.id='fb-badge';
     b.style.cssText='position:fixed;left:10px;bottom:10px;z-index:9999;font:600 11px/1.4 var(--sans);padding:5px 11px;border-radius:20px;opacity:.95;box-shadow:0 2px 10px rgba(0,0,0,.18)';
@@ -368,8 +372,9 @@ function enterAdminAs(email, info){
 function doLogin(){
   const email=v('lg-user').trim().toLowerCase(), pass=v('lg-pass');
   const errEl=document.getElementById('lg-err');
+  errEl.style.color='var(--crit)';
   if(!email||!pass){ errEl.textContent='Email va parolni kiriting'; return; }
-  errEl.textContent='Kirilmoqda...';
+  errEl.style.color='var(--ink-soft)'; errEl.textContent='Kirilmoqda...';
   verifyAdminCreds(email, pass)
     .then(u=> resolveAdminRoleByEmail(u.email))
     .then(info=>{ if(!info){ errEl.textContent='Bu akkauntda admin huquqi yo\'q'; return; }
@@ -389,6 +394,16 @@ function adminLogout(){ dbSet('adminEmail',null); CUR=null;
   document.getElementById('app').style.display='none';
   document.getElementById('login').style.display='flex';
   v2('lg-user',''); v2('lg-pass',''); document.getElementById('lg-err').textContent=''; }
+function forgotPass(){
+  const email=v('lg-user').trim().toLowerCase();
+  const errEl=document.getElementById('lg-err');
+  if(!email){ errEl.style.color='var(--crit)'; errEl.textContent='Avval email kiriting, keyin "Parolni unutdingizmi?" bosing'; return; }
+  if(typeof firebase==='undefined' || !firebase.auth){ errEl.style.color='var(--crit)'; errEl.textContent='Firebase ulanmagan'; return; }
+  errEl.style.color='var(--ink-soft)'; errEl.textContent='Yuborilmoqda...';
+  firebase.auth().sendPasswordResetEmail(email)
+    .then(()=>{ errEl.style.color='var(--good)'; errEl.textContent='Parolni tiklash havolasi '+email+' ga yuborildi. Pochtangizni tekshiring.'; })
+    .catch(e=>{ errEl.style.color='var(--crit)'; errEl.textContent=adminAuthErr(e); });
+}
 /* ============ NAV / ROUTER ============ */
 function buildNav(){ const nav=document.getElementById('nav');
   const pend=(dbGet('approvals')||[]).filter(a=>a.status==='pending').length + (fbReady?fbLiveRequests().filter(r=>CUR.role!=='region'||(r.region||'')===CUR.region).length:0);
@@ -429,9 +444,9 @@ function renderDevices(){
       ${CUR.role!=='region'?'<button class="btn" onclick="deviceAdd()">+ Qurilma</button>':''}
     </div>
     <div class="panel"><table><thead><tr><th>Chip ID</th><th>Ko'l / Fermer</th><th>Shlyuz</th><th>RSSI / SNR</th><th>DO</th><th>Oxirgi</th><th>Holat</th><th></th></tr></thead><tbody>
-    ${f.length?f.map(x=>`<tr>
+    ${f.length?f.map(x=>{ const rq=x.farmerId?null:reqForChip(x.chipId); const _lake=x.farmerId?x.lake:((rq&&rq.lake)||x.lake); const _farmer=x.farmerId?fname(x.farmerId):((rq&&rq.farmer)?rq.farmer:''); return `<tr>
       <td class="mono">${x.chipId}<div style="font-size:11px;color:var(--ink-faint)">${x.fw||'—'}</div></td>
-      <td>${esc(x.lake)}<div style="font-size:11px;color:var(--ink-soft)">${fname(x.farmerId)}</div></td>
+      <td>${esc(_lake)}<div style="font-size:11px;color:var(--ink-soft)">${_farmer?esc(_farmer):'<span style="color:var(--ink-faint)">—</span>'}${(!x.farmerId&&rq)?' <span style="color:var(--warn)">· kutilmoqda</span>':''}</div></td>
       <td><span class="pill p-blue">${x.gwId||'—'}</span></td>
       <td class="mono">${x.rssi!=null?(x.rssi+' dBm'):'—'}<div style="font-size:11px;color:var(--ink-faint)">${x.snr!=null?('SNR '+x.snr+' dB'):''}</div></td>
       <td class="mono">${x.do?x.do:'—'}</td>
@@ -442,7 +457,7 @@ function renderDevices(){
         <button class="btn mini" onclick="devConfig('${x.chipId}')">Sozlash</button>
         <button class="btn mini" onclick="devCmd('${x.chipId}')">Buyruq</button>
         <button class="btn mini" onclick="devBlock('${x.chipId}')">${x.status==='blocked'?'Faollashtirish':'Bloklash'}</button>
-      </td></tr>`).join(''):`<tr><td colspan="8"><div class="empty">Qurilma topilmadi</div></td></tr>`}
+      </td></tr>`; }).join(''):`<tr><td colspan="8"><div class="empty">Qurilma topilmadi</div></td></tr>`}
     </tbody></table></div>`;
 }
 function devStatusPill(s){ return s==='active'?'<span class="pill p-good">Onlayn</span>':s==='offline'?'<span class="pill p-grey">Oflayn</span>':'<span class="pill p-crit">Bloklangan</span>'; }
