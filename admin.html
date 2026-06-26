@@ -42,7 +42,8 @@
     display:flex; align-items:center; gap:11px; font-size:13.5px; font-weight:500; cursor:pointer; margin-bottom:2px;}
   .nav button:hover{ background:var(--side-2);}
   .nav button.on{ background:var(--side-active); color:#fff; font-weight:600;}
-  .nav button .ic{ font-size:16px; width:20px; text-align:center;}
+  .nav button .ic{ font-size:16px; width:20px; text-align:center; line-height:0;}
+  .nav button .ic svg{ vertical-align:middle;}
   .nav button .badge{ margin-left:auto; background:var(--crit); color:#fff; font-size:10px; font-weight:700; border-radius:9px; padding:1px 6px;}
   .side-user{ border-top:1px solid rgba(255,255,255,.08); padding-top:12px; font-size:12.5px;}
   .side-user .nm{ color:#fff; font-weight:600;}
@@ -284,20 +285,22 @@ function fbBadge(on){ let b=document.getElementById('fb-badge');
 /* ============ ROLLAR / RBAC ============ */
 const ROLES={ super:'Super admin', operator:'Operator', region:'Region menejeri', support:'Qo\'llab-quvvatlash', analyst:'Analitik' };
 const SECTIONS=[
-  {id:'devices',  name:'Qurilmalar',        ic:'📟', roles:['super','operator','region']},
-  {id:'gateways', name:'Shlyuzlar',         ic:'🛰️', roles:['super','operator','region']},
-  {id:'approvals',name:'Ko\'l tasdig\'i',   ic:'✅', roles:['super','operator','region']},
-  {id:'users',    name:'Foydalanuvchilar',  ic:'👥', roles:['super','operator','region','support']},
-  {id:'feeds',    name:'Yem turlari',        ic:'🍚', roles:['super','operator']},
-  {id:'alerts',   name:'Ogohlantirishlar',   ic:'🔔', roles:['super','operator','region','support']},
-  {id:'analytics',name:'Analitika',          ic:'📊', roles:['super','operator','region','analyst']},
-  {id:'ai',       name:'AI tavsiyalar',       ic:'🤖', roles:['super','operator']},
-  {id:'announce', name:'E\'lonlar',           ic:'📣', roles:['super','operator']},
-  {id:'billing',  name:'To\'lov / obuna',     ic:'💳', roles:['super']},
-  {id:'support',  name:'Qo\'llab-quvvatlash', ic:'🛟', roles:['super','operator','support']},
-  {id:'audit',    name:'Audit jurnali',       ic:'📜', roles:['super']},
-  {id:'settings', name:'Sozlamalar',          ic:'⚙️', roles:['super']},
+  {id:'devices',  name:'Qurilmalar',        ic:'cpu', roles:['super','operator','region']},
+  {id:'gateways', name:'Shlyuzlar',         ic:'broadcast', roles:['super','operator','region']},
+  {id:'approvals',name:'Ko\'l tasdig\'i',   ic:'check', roles:['super','operator','region']},
+  {id:'users',    name:'Foydalanuvchilar',  ic:'users', roles:['super','operator','region','support']},
+  {id:'feeds',    name:'Yem turlari',        ic:'feed', roles:['super','operator']},
+  {id:'alerts',   name:'Ogohlantirishlar',   ic:'bell', roles:['super','operator','region','support']},
+  {id:'analytics',name:'Analitika',          ic:'chart', roles:['super','operator','region','analyst']},
+  {id:'ai',       name:'AI tavsiyalar',       ic:'sparkles', roles:['super','operator']},
+  {id:'announce', name:'E\'lonlar',           ic:'megaphone', roles:['super','operator']},
+  {id:'billing',  name:'To\'lov / obuna',     ic:'card', roles:['super']},
+  {id:'support',  name:'Qo\'llab-quvvatlash', ic:'lifebuoy', roles:['super','operator','support']},
+  {id:'audit',    name:'Audit jurnali',       ic:'file', roles:['super']},
+  {id:'settings', name:'Sozlamalar',          ic:'gear', roles:['super']},
 ];
+function icon(name,size){ size=size||20; const B={waves:'<path d="M3 7c1.5 0 1.5 1.4 3 1.4S7.5 7 9 7s1.5 1.4 3 1.4S13.5 7 15 7s1.5 1.4 3 1.4S19.5 7 21 7"/><path d="M3 12c1.5 0 1.5 1.4 3 1.4S7.5 12 9 12s1.5 1.4 3 1.4S13.5 12 15 12s1.5 1.4 3 1.4S19.5 12 21 12"/><path d="M3 17c1.5 0 1.5 1.4 3 1.4S7.5 17 9 17s1.5 1.4 3 1.4S13.5 17 15 17s1.5 1.4 3 1.4S19.5 17 21 17"/>',bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',user:'<path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/>',users:'<path d="M16 21v-1.8a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4V21"/><circle cx="9" cy="7" r="3.2"/><path d="M22 21v-1.8a4 4 0 0 0-3-3.9"/><path d="M16 3.3a4 4 0 0 1 0 7.4"/>',cpu:'<rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/><path d="M9 2.5v2M15 2.5v2M9 19.5v2M15 19.5v2M2.5 9h2M2.5 15h2M19.5 9h2M19.5 15h2"/>',gear:'<circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.2 5.2l1.8 1.8M17 17l1.8 1.8M18.8 5.2 17 7M7 17l-1.8 1.8"/>',lifebuoy:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.6"/><path d="M5.6 5.6l3.3 3.3M15.1 15.1l3.3 3.3M18.4 5.6l-3.3 3.3M5.6 18.4l3.3-3.3"/>',sparkles:'<path d="M12 3.5l1.7 4.3 4.3 1.7-4.3 1.7L12 15.5l-1.7-4.3L6 9.5l4.3-1.7z"/><path d="M18.5 14.5l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"/>',check:'<circle cx="12" cy="12" r="8.5"/><path d="M8.3 12.4l2.4 2.4 4.6-5"/>',phone:'<path d="M21 16.5v2.6a2 2 0 0 1-2.2 2 19.4 19.4 0 0 1-8.4-3A19 19 0 0 1 4.5 14 19.4 19.4 0 0 1 1.5 5.5 2 2 0 0 1 3.5 3.3h2.6a2 2 0 0 1 2 1.7c.1.9.3 1.7.6 2.5a2 2 0 0 1-.5 2.1L7.1 8.9a15.5 15.5 0 0 0 6 6l1.3-1.1a2 2 0 0 1 2.1-.5c.8.3 1.6.5 2.5.6a2 2 0 0 1 1.7 2z"/>',broadcast:'<circle cx="12" cy="12" r="2"/><path d="M16.2 7.8a6 6 0 0 1 0 8.4M7.8 16.2a6 6 0 0 1 0-8.4M19 5a10 10 0 0 1 0 14M5 19a10 10 0 0 1 0-14"/>',feed:'<path d="M4 11h16a8 8 0 0 1-8 8 8 8 0 0 1-8-8z"/><path d="M12 11V7a3 3 0 0 1 3-3"/><path d="M9 11c0-1.5 1-2.5 2-3"/>',chart:'<path d="M4 4v16h16"/><rect x="7" y="11" width="3" height="6" rx="0.6"/><rect x="12" y="7" width="3" height="10" rx="0.6"/><rect x="17" y="13" width="3" height="4" rx="0.6"/>',megaphone:'<path d="M3 11v2a1 1 0 0 0 1 1h2l4 3.4a1 1 0 0 0 1.7-.8V7.4a1 1 0 0 0-1.7-.8L6 10H4a1 1 0 0 0-1 1z"/><path d="M16 9a4 4 0 0 1 0 6"/>',card:'<rect x="2.5" y="5.5" width="19" height="13" rx="2.5"/><path d="M2.5 9.5h19"/><path d="M6 14.5h4"/>',file:'<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8.5 13h7M8.5 16.5h5"/>'};
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle">'+(B[name]||'')+'</svg>'; }
 function can(id){ const s=SECTIONS.find(x=>x.id===id); return s && s.roles.includes(CUR.role); }
 
 /* ============ SEED (demo) ============ */
@@ -456,7 +459,7 @@ function buildNav(){ const nav=document.getElementById('nav');
     let b=''; if(s.id==='approvals'&&pend) b=`<span class="badge">${pend}</span>`;
     if(s.id==='alerts'&&al) b=`<span class="badge">${al}</span>`;
     if(s.id==='gateways'&&gwOff) b=`<span class="badge">${gwOff}</span>`;
-    return `<button id="nav-${s.id}" onclick="go('${s.id}')"><span class="ic">${s.ic}</span>${s.name}${b}</button>`; }).join('');
+    return `<button id="nav-${s.id}" onclick="go('${s.id}')"><span class="ic">${icon(s.ic,18)}</span>${s.name}${b}</button>`; }).join('');
 }
 function go(id){ if(!can(id)) return; page=id;
   document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('on'));
@@ -608,7 +611,7 @@ function saveDevices(){ dbSet('devices',dbGet('devices')); }/* eski */
 function renderApprovals(){ let a=dbGet('approvals')||[]; if(CUR.role==='region') a=a.filter(x=>inMyRegion(x.region));
   const live = fbReady ? fbLiveRequests().filter(r=>CUR.role!=='region'||inMyRegion(r.region||'')).sort((x,y)=>(y.ts||0)-(x.ts||0)) : [];
   const livePanel = live.length ? `
-    <div class="panel"><div class="panel-h"><h2>🟢 Yangi so'rovlar (fermer ilovasidan, jonli)</h2></div>
+    <div class="panel"><div class="panel-h"><h2><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--good);margin-right:8px;vertical-align:middle"></span>Yangi so'rovlar (fermer ilovasidan, jonli)</h2></div>
     <table><thead><tr><th>Fermer</th><th>Chip ID</th><th>Ko'l</th><th>Viloyat</th><th>Vaqt</th><th></th></tr></thead><tbody>
     ${live.map(r=>`<tr>
       <td>${esc(r.farmer||'(fermer)')}<div style="font-size:11px;color:var(--ink-soft)">${esc(r.phone||'')}</div></td>
@@ -695,7 +698,7 @@ function renderUsers(){ let f=dbGet('farmers')||[]; const dev=dbGet('devices')||
   let real = fbReady ? fbFarmers() : [];
   if(CUR.role==='region') real=real.filter(x=>inMyRegion(x.region));
   const realPanel = real.length ? `
-    <div class="panel"><div class="panel-h"><h2>🟢 Ro'yxatdan o'tgan fermerlar (akkauntlar, jonli)</h2></div>
+    <div class="panel"><div class="panel-h"><h2><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--good);margin-right:8px;vertical-align:middle"></span>Ro'yxatdan o'tgan fermerlar (akkauntlar, jonli)</h2></div>
     <table><thead><tr><th>Fermer</th><th>Email / Telefon</th><th>Viloyat</th><th>Ko'llari</th></tr></thead><tbody>
     ${real.sort((a,b)=>(b.joined||0)-(a.joined||0)).map(x=>`<tr>
       <td>${esc(x.ism)} ${esc(x.fam)}<div style="font-size:11px;color:var(--ink-faint)">ro'yxat: ${x.joined?dt(x.joined):'—'}</div></td>
@@ -730,7 +733,7 @@ function userDetail(id){ const x=(dbGet('farmers')||[]).find(y=>y.id===id); cons
     <button class="btn mini" onclick="go('users')">← Foydalanuvchilar</button>
     <div class="panel" style="margin-top:14px"><div class="panel-h"><h2>${esc(x.ism)} ${esc(x.fam)}</h2>
       ${x.status==='active'?'<span class="pill p-good">Faol</span>':'<span class="pill p-crit">Bloklangan</span>'}
-      <a class="btn sm" href="tel:${x.phone}">📞 Qo'ng'iroq</a></div>
+      <a class="btn sm" href="tel:${x.phone}">${icon('phone',15)} Qo'ng'iroq</a></div>
       <div class="panel-b" style="padding:18px">
         <div class="row3">
           <div class="field" style="margin:0"><label>Telefon</label><div class="mono">${x.phone}</div></div>
@@ -969,7 +972,7 @@ function renderSupport(){ const t=dbGet('tickets')||[];
       <td>${x.status==='open'?'<span class="pill p-warn">Ochiq</span>':'<span class="pill p-grey">Yopilgan</span>'}</td>
       <td style="font-size:12px;color:var(--ink-soft)">${dt(x.date)}</td>
       <td style="text-align:right;white-space:nowrap">
-        <a class="btn mini" href="tel:${x.phone}" onclick="event.stopPropagation()">📞</a>
+        <a class="btn mini" href="tel:${x.phone}" onclick="event.stopPropagation()">${icon('phone',15)}</a>
         <button class="btn mini" onclick="ticketView('${x.id}')">Ochish</button></td></tr>`).join('')}
     </tbody></table></div>`;
 }

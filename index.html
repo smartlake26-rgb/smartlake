@@ -139,7 +139,10 @@
   .kv .k{ color:var(--ink-soft);} .kv .v{ font-family:var(--mono); font-weight:700;}
   .kv .v.big{ font-size:18px; color:var(--primary);}
   .empty{ text-align:center; padding:40px 20px; color:var(--ink-soft);}
-  .empty .ic{ font-size:40px; margin-bottom:10px;}
+  .empty .ic{ font-size:40px; margin-bottom:10px; line-height:0;}
+  .menu-item .ic{ color:var(--primary); }
+  .menu-item .ic svg,.nav button .ic svg,.empty .ic svg,.opt .t svg,.bell svg,.relay button .ic svg{ vertical-align:middle; }
+  .opt .t svg{ margin-right:8px; color:var(--primary); }
   .empty .t{ font-weight:600; color:var(--ink); margin-bottom:4px;}
   .toast{ position:fixed; left:50%; bottom:84px; transform:translateX(-50%) translateY(20px);
     background:var(--ink); color:#fff; padding:11px 18px; border-radius:24px; font-size:13.5px;
@@ -253,14 +256,14 @@
         <h1 id="tb-title">Smart Lake</h1>
         <div class="sub" id="tb-sub"></div>
       </div>
-      <div class="bell" id="tb-bell" onclick="show('notif')">🔔<span class="dot" id="bell-dot" style="display:none">0</span></div>
+      <div class="bell" id="tb-bell" onclick="show('notif')"><svg xmlns="http://www.w3.org/2000/svg" width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span class="dot" id="bell-dot" style="display:none">0</span></div>
     </div>
     <div class="content" id="content"></div>
     <button class="addbtn" id="addbtn" onclick="show('addlake')" style="display:none">＋</button>
     <div class="nav">
-      <button id="nav-lakes" class="on" onclick="show('lakes')"><span class="ic">🌊</span>Ko'llar</button>
-      <button id="nav-notif" onclick="show('notif')"><span class="ic">🔔</span>Bildirishnoma</button>
-      <button id="nav-prof" onclick="show('profile')"><span class="ic">👤</span>Profil</button>
+      <button id="nav-lakes" class="on" onclick="show('lakes')"><span class="ic"><svg xmlns="http://www.w3.org/2000/svg" width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle"><path d="M3 7c1.5 0 1.5 1.4 3 1.4S7.5 7 9 7s1.5 1.4 3 1.4S13.5 7 15 7s1.5 1.4 3 1.4S19.5 7 21 7"/><path d="M3 12c1.5 0 1.5 1.4 3 1.4S7.5 12 9 12s1.5 1.4 3 1.4S13.5 12 15 12s1.5 1.4 3 1.4S19.5 12 21 12"/><path d="M3 17c1.5 0 1.5 1.4 3 1.4S7.5 17 9 17s1.5 1.4 3 1.4S13.5 17 15 17s1.5 1.4 3 1.4S19.5 17 21 17"/></svg></span>Ko'llar</button>
+      <button id="nav-notif" onclick="show('notif')"><span class="ic"><svg xmlns="http://www.w3.org/2000/svg" width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>Bildirishnoma</button>
+      <button id="nav-prof" onclick="show('profile')"><span class="ic"><svg xmlns="http://www.w3.org/2000/svg" width="23" height="23" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg></span>Profil</button>
     </div>
   </div>
 </div>
@@ -390,6 +393,8 @@ const RCONF={ '1s':[60,60000], '6s':[72,300000], '24s':[96,900000],
 /* ===== STATE ===== */
 let USER=null, LAKES=[], view='lakes', currentLake=null, curTab='mon', curRange='24s', liveTimer=null, suppressPush=false;
 let chData=null, chGeom=null, chIdx=null;   // chart holati
+function icon(name,size){ size=size||22; const B={waves:'<path d="M3 7c1.5 0 1.5 1.4 3 1.4S7.5 7 9 7s1.5 1.4 3 1.4S13.5 7 15 7s1.5 1.4 3 1.4S19.5 7 21 7"/><path d="M3 12c1.5 0 1.5 1.4 3 1.4S7.5 12 9 12s1.5 1.4 3 1.4S13.5 12 15 12s1.5 1.4 3 1.4S19.5 12 21 12"/><path d="M3 17c1.5 0 1.5 1.4 3 1.4S7.5 17 9 17s1.5 1.4 3 1.4S13.5 17 15 17s1.5 1.4 3 1.4S19.5 17 21 17"/>',bell:'<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/>',user:'<path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/>',cpu:'<rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/><path d="M9 2.5v2M15 2.5v2M9 19.5v2M15 19.5v2M2.5 9h2M2.5 15h2M19.5 9h2M19.5 15h2"/>',gear:'<circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.2 5.2l1.8 1.8M17 17l1.8 1.8M18.8 5.2 17 7M7 17l-1.8 1.8"/>',lifebuoy:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3.6"/><path d="M5.6 5.6l3.3 3.3M15.1 15.1l3.3 3.3M18.4 5.6l-3.3 3.3M5.6 18.4l3.3-3.3"/>',lock:'<rect x="4.5" y="11" width="15" height="9.5" rx="2"/><path d="M8 11V7.5a4 4 0 0 1 8 0V11"/>',sparkles:'<path d="M12 3.5l1.7 4.3 4.3 1.7-4.3 1.7L12 15.5l-1.7-4.3L6 9.5l4.3-1.7z"/><path d="M18.5 14.5l.8 1.9 1.9.8-1.9.8-.8 1.9-.8-1.9-1.9-.8 1.9-.8z"/>',clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 1.8"/>',check:'<circle cx="12" cy="12" r="8.5"/><path d="M8.3 12.4l2.4 2.4 4.6-5"/>',phone:'<path d="M21 16.5v2.6a2 2 0 0 1-2.2 2 19.4 19.4 0 0 1-8.4-3A19 19 0 0 1 4.5 14 19.4 19.4 0 0 1 1.5 5.5 2 2 0 0 1 3.5 3.3h2.6a2 2 0 0 1 2 1.7c.1.9.3 1.7.6 2.5a2 2 0 0 1-.5 2.1L7.1 8.9a15.5 15.5 0 0 0 6 6l1.3-1.1a2 2 0 0 1 2.1-.5c.8.3 1.6.5 2.5.6a2 2 0 0 1 1.7 2z"/>',send:'<path d="M21.5 2.5 10.5 13.5"/><path d="M21.5 2.5l-7 19-4-8.5-8.5-4z"/>',mail:'<rect x="3" y="5.5" width="18" height="13" rx="2.5"/><path d="M3.5 7l8.5 5.5L20.5 7"/>',globe:'<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.3 2.3 3.6 5.3 3.6 8.5S14.3 18.2 12 20.5c-2.3-2.3-3.6-5.3-3.6-8.5S9.7 5.8 12 3.5z"/>',power:'<path d="M12 3.5v8"/><path d="M6.8 6.8a7.5 7.5 0 1 0 10.4 0"/>'};
+  return '<svg xmlns="http://www.w3.org/2000/svg" width="'+size+'" height="'+size+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle">'+(B[name]||'')+'</svg>'; }
 
 /* ===== SIMULATION (demo) ===== */
 function rnd(s){ let x=Math.sin(s*9999)*10000; return x-Math.floor(x); }
@@ -684,7 +689,7 @@ function setTop(t,s){ document.getElementById('tb-title').textContent=t; documen
 /* ===== LAKES LIST ===== */
 function renderLakes(){
   const C=document.getElementById('content');
-  if(LAKES.length===0){ C.innerHTML=`<div class="empty"><div class="ic">🌊</div>
+  if(LAKES.length===0){ C.innerHTML=`<div class="empty"><div class="ic" style="color:var(--primary)">${icon('waves',40)}</div>
     <div class="t">Hali ko'l qo'shilmagan</div><div>Pastdagi <b>＋</b> tugmasi orqali birinchi ko'lingizni qo'shing.</div></div>`; return; }
   const tm=nowHHMM();
   const wbanner = WEATHER
@@ -825,8 +830,8 @@ function renderMon(L,B){
 
     <div class="sec-h">Aeratorni boshqarish</div>
     <div class="relay">
-      <button data-m="auto" class="${L.mode==='auto'?'on':''}" onclick="setMode('auto')"><span class="ic">⚙️</span>Avtomatik</button>
-      <button data-m="on" class="${L.mode==='on'?'on':''}" onclick="setMode('on')"><span class="ic">⏻</span>Majburan yoqish</button>
+      <button data-m="auto" class="${L.mode==='auto'?'on':''}" onclick="setMode('auto')"><span class="ic">${icon('gear',18)}</span>Avtomatik</button>
+      <button data-m="on" class="${L.mode==='on'?'on':''}" onclick="setMode('on')"><span class="ic">${icon('power',18)}</span>Majburan yoqish</button>
     </div>
     <div style="font-size:12px;color:var(--ink-faint);margin-top:8px;text-align:center;">Avtomatikda DO ${L.settings.minDo} mg/L dan pasaysa aerator o'zi yonadi. «Majburan yoqish»da doim ishlaydi. Xavfsizlik uchun qo'lda o'chirish yo'q — DO yetarli bo'lganda o'zi o'chadi.</div>
 
@@ -840,12 +845,12 @@ function renderMon(L,B){
       <div class="kv"><span class="k">Joriy o'rtacha vazn</span><span class="v">${b.avgG} g</span></div>
       <div class="kv"><span class="k">Umumiy massa</span><span class="v big">${b.totalKg.toLocaleString('ru-RU')} kg</span></div>
       <div style="font-size:11.5px;color:var(--ink-faint);margin-top:8px;">Boshlang'ich ${b.initKg} kg + o'sish (yem ÷ FCR).</div>`
-      : `<div style="text-align:center;color:var(--ink-soft);padding:6px 0 12px">Baliq soni, vazni va yem miqdorini kiriting — umumiy massa avtomatik hisoblanadi.</div><button class="btn sm" style="width:100%" onclick="setTab('set')">⚙ Sozlamalarni ochish</button>`}
+      : `<div style="text-align:center;color:var(--ink-soft);padding:6px 0 12px">Baliq soni, vazni va yem miqdorini kiriting — umumiy massa avtomatik hisoblanadi.</div><button class="btn sm" style="width:100%" onclick="setTab('set')">${icon('gear',15)} Sozlamalarni ochish</button>`}
     </div>
 
     <div class="sec-h">Ertangi yem tavsiyasi</div>
     ${(()=>{ const rec=recFeed(L);
-      if(rec.none) return `<div class="card"><div style="text-align:center;color:var(--ink-soft);padding:6px 0 12px">${rec.none==='type'?"Yem turini tanlang — kunlik yem jadval bo'yicha hisoblanadi.":"Baliq ma'lumotlarini kiriting."}</div><button class="btn sm" style="width:100%" onclick="setTab('set')">⚙ Sozlamalarni ochish</button></div>`;
+      if(rec.none) return `<div class="card"><div style="text-align:center;color:var(--ink-soft);padding:6px 0 12px">${rec.none==='type'?"Yem turini tanlang — kunlik yem jadval bo'yicha hisoblanadi.":"Baliq ma'lumotlarini kiriting."}</div><button class="btn sm" style="width:100%" onclick="setTab('set')">${icon('gear',15)} Sozlamalarni ochish</button></div>`;
       return `<div class="card">
         <div class="kv"><span class="k">Yem turi</span><span class="v" style="font-size:13px">${rec.feedName}</span></div>
         <div class="kv"><span class="k">Suv harorati (ertaga, taxm.)</span><span class="v">${rec.temp}°C</span></div>
@@ -990,14 +995,14 @@ function fmtFull(t){ const d=new Date(t); return p2(d.getMonth()+1)+'/'+p2(d.get
 function p2(n){ return ('0'+n).slice(-2); }
 
 /* ---- Tavsiyalar ---- */
-function renderTav(L,B){ B.innerHTML=`<div class="empty"><div class="ic">🤖</div>
+function renderTav(L,B){ B.innerHTML=`<div class="empty"><div class="ic" style="color:var(--primary)">${icon('sparkles',40)}</div>
   <div class="t">Sun'iy intellekt tavsiyalari</div>
   <div>Ko'lingizdan ma'lumotlar to'plangach, bu yerda kislorod,<br>ozuqa va aeratsiya bo'yicha shaxsiy tavsiyalar chiqadi.</div>
   <div style="margin-top:18px;font-size:12px;color:var(--ink-faint);">Tez orada ishga tushadi</div></div>`; }
 
 /* ---- Tarix ---- */
 function renderTar(L,B){ const data=lakeHistory(L,'24s').slice().reverse().slice(0,40);
-  if(!data.length){ B.innerHTML=`<div class="empty"><div class="ic">⏳</div><div class="t">Ma'lumot hali yetarli emas</div><div>Qurilma yangi ulangan. O'lchovlar to'planishi bilan tarix shu yerda chiqadi.</div></div>`; return; }
+  if(!data.length){ B.innerHTML=`<div class="empty"><div class="ic" style="color:var(--warn)">${icon('clock',40)}</div><div class="t">Ma'lumot hali yetarli emas</div><div>Qurilma yangi ulangan. O'lchovlar to'planishi bilan tarix shu yerda chiqadi.</div></div>`; return; }
   B.innerHTML=`<div class="sec-h">So'nggi yozuvlar (24 soat)</div><div class="card" style="padding:6px 14px;">
     ${data.map(d=>{ const c=zoneCol('do',d.do);
       return `<div class="kv"><span class="k">${p2(new Date(d.t).getHours())}:${p2(new Date(d.t).getMinutes())}</span>
@@ -1095,7 +1100,7 @@ function delMeasure(ts){ const L=getLake(currentLake), s=L.settings;
 function critLakes(){ return LAKES.filter(L=>statusOf(L)==='olim'); }
 function renderNotif(){ const C=document.getElementById('content');
   const olim=LAKES.filter(L=>statusOf(L)==='olim'), yomon=LAKES.filter(L=>statusOf(L)==='yomon');
-  if(!olim.length&&!yomon.length){ C.innerHTML=`<div class="empty"><div class="ic">✅</div>
+  if(!olim.length&&!yomon.length){ C.innerHTML=`<div class="empty"><div class="ic" style="color:var(--good)">${icon('check',40)}</div>
     <div class="t">Hammasi joyida</div><div>Hech qaysi ko'lda muammo yo'q.</div></div>`; return; }
   C.innerHTML=olim.map(L=>notifRow('🔴','#FBE3E0',"O'lim xavfi", L.name+' — DO '+lakeNow(L).do+' mg/L','hozir')).join('')+
     yomon.map(L=>notifRow('🟠','#FCE6D6','Yomon — past kislorod', L.name+' — DO '+lakeNow(L).do+' mg/L','hozir')).join(''); }
@@ -1114,13 +1119,13 @@ function renderProfile(){ const C=document.getElementById('content');
       <div class="s"><div class="n">${LAKES.length}</div><div class="l">Faol qurilma</div></div>
       <div class="s"><div class="n">${LAKES.filter(isProblem).length}</div><div class="l">Ogohlantirish</div></div></div>
     <div class="sec-h">Hisob</div>
-    <div class="menu-item" onclick="show('personal')"><div class="ic">👤</div><div class="t">Shaxsiy ma'lumotlar</div><div class="ar">›</div></div>
-    <div class="menu-item" onclick="show('lakes')"><div class="ic">🌊</div><div class="t">Mening ko'llarim</div><div class="ar">›</div></div>
-    <div class="menu-item" onclick="show('devices')"><div class="ic">📟</div><div class="t">Faol qurilmalar</div><div class="ar">›</div></div>
+    <div class="menu-item" onclick="show('personal')"><div class="ic">${icon('user',20)}</div><div class="t">Shaxsiy ma'lumotlar</div><div class="ar">›</div></div>
+    <div class="menu-item" onclick="show('lakes')"><div class="ic">${icon('waves',20)}</div><div class="t">Mening ko'llarim</div><div class="ar">›</div></div>
+    <div class="menu-item" onclick="show('devices')"><div class="ic">${icon('cpu',20)}</div><div class="t">Faol qurilmalar</div><div class="ar">›</div></div>
     <div class="sec-h">Ilova</div>
-    <div class="menu-item" onclick="show('appsettings')"><div class="ic">⚙️</div><div class="t">Ilova sozlamalari</div><div class="ar">›</div></div>
-    <div class="menu-item" onclick="show('support')"><div class="ic">🛟</div><div class="t">Qo'llab-quvvatlash</div><div class="ar">›</div></div>
-    <div class="menu-item" onclick="show('pin')"><div class="ic">🔒</div><div class="t">Xavfsizlik</div><div class="ar">›</div></div>
+    <div class="menu-item" onclick="show('appsettings')"><div class="ic">${icon('gear',20)}</div><div class="t">Ilova sozlamalari</div><div class="ar">›</div></div>
+    <div class="menu-item" onclick="show('support')"><div class="ic">${icon('lifebuoy',20)}</div><div class="t">Qo'llab-quvvatlash</div><div class="ar">›</div></div>
+    <div class="menu-item" onclick="show('pin')"><div class="ic">${icon('lock',20)}</div><div class="t">Xavfsizlik</div><div class="ar">›</div></div>
     <button class="btn ghost" style="margin-top:18px;color:#DC4B3E;border-color:#F2C9C4" onclick="logout()">↩ Chiqish (logout)</button>`; }
 function activePhoto(){ if(USER&&USER.photos&&USER.photos.length) return USER.photos[USER.photoIdx||0]; return null; }
 function avatarHTML(sz){ const p=activePhoto(); return p
@@ -1224,8 +1229,8 @@ function resizeImg(src,size,cb){ const img=new Image(); img.onload=()=>{ const c
 /* ===== ILOVA SOZLAMALARI ===== */
 function renderAppSettings(){ document.getElementById('content').innerHTML=`
   <div class="sec-h">Umumiy</div>
-  <div class="opt" onclick="show('lang')"><div class="ic" style="font-size:19px;width:24px;text-align:center">🌐</div><div class="t">Til</div><div class="val">${LANG_LABEL[getLang()]}</div><div class="ar" style="color:var(--ink-faint);margin-left:8px">›</div></div>
-  <div class="opt" onclick="show('pin')"><div class="ic" style="font-size:19px;width:24px;text-align:center">🔒</div><div class="t">Parol / PIN o'zgartirish</div><div class="val">${getPin()?'Yoniq':'O‘chiq'}</div><div class="ar" style="color:var(--ink-faint);margin-left:8px">›</div></div>
+  <div class="opt" onclick="show('lang')"><div class="ic" style="font-size:19px;width:24px;text-align:center;color:var(--primary)">${icon('globe',19)}</div><div class="t">Til</div><div class="val">${LANG_LABEL[getLang()]}</div><div class="ar" style="color:var(--ink-faint);margin-left:8px">›</div></div>
+  <div class="opt" onclick="show('pin')"><div class="ic" style="font-size:19px;width:24px;text-align:center;color:var(--primary)">${icon('lock',19)}</div><div class="t">Parol / PIN o'zgartirish</div><div class="val">${getPin()?'Yoniq':'O‘chiq'}</div><div class="ar" style="color:var(--ink-faint);margin-left:8px">›</div></div>
   <div class="sec-h">Hisob</div>
   <button class="btn ghost sm" style="color:#DC4B3E;border-color:#F2C9C4" onclick="logout()">Chiqish (logout)</button>`; }
 function renderLang(){ const cur=getLang(); document.getElementById('content').innerHTML=`
@@ -1256,7 +1261,7 @@ function removePin(){ if(!confirm('PIN o‘chirilsinmi?')) return; localStorage.
 
 /* ===== FAOL QURILMALAR / QO'LLAB-QUVVATLASH ===== */
 function renderDevices(){ const C=document.getElementById('content');
-  if(!LAKES.length){ C.innerHTML=`<div class="empty"><div class="ic">📟</div><div class="t">Qurilma yo'q</div><div>Ko'l qo'shsangiz, qurilma shu yerda chiqadi.</div></div>`; return; }
+  if(!LAKES.length){ C.innerHTML=`<div class="empty"><div class="ic" style="color:var(--primary)">${icon('cpu',40)}</div><div class="t">Qurilma yo'q</div><div>Ko'l qo'shsangiz, qurilma shu yerda chiqadi.</div></div>`; return; }
   C.innerHTML=`<div class="sec-h">${LAKES.length} ta qurilma</div>`+LAKES.map(L=>`
     <div class="card lake-card">
       <div class="lake-ring" style="border:3px solid #1E9E6A;background:#1E9E6A14;font-size:18px">📟</div>
@@ -1268,9 +1273,9 @@ function renderSupport(){ document.getElementById('content').innerHTML=`
     <div style="font-weight:600;margin-bottom:6px">Smart Lake qo'llab-quvvatlash</div>
     <div style="color:var(--ink-soft);font-size:13.5px">Savol yoki muammo bo'lsa biz bilan bog'laning.</div>
   </div>
-  <div class="opt" style="margin-top:12px"><div class="t">📞 Telefon</div><div class="val">+998 90 000 00 00</div></div>
-  <div class="opt"><div class="t">✈️ Telegram</div><div class="val">@smartlake_support</div></div>
-  <div class="opt"><div class="t">✉️ Email</div><div class="val">help@smartlake.uz</div></div>`; }
+  <div class="opt" style="margin-top:12px"><div class="t">${icon('phone',16)} Telefon</div><div class="val">+998 90 000 00 00</div></div>
+  <div class="opt"><div class="t">${icon('send',16)} Telegram</div><div class="val">@smartlake_support</div></div>
+  <div class="opt"><div class="t">${icon('mail',16)} Email</div><div class="val">help@smartlake.uz</div></div>`; }
 
 /* ===== HELPERS ===== */
 function getLake(id){ return LAKES.find(L=>L.id===id); }
