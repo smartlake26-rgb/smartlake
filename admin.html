@@ -498,15 +498,18 @@ function deviceAdd(){ const farmers=dbGet('farmers')||[];
     if(fr){ const lakes=dbGet('lakes')||[]; lakes.push({id,name:lake,farmerId:fr.id,region:fr.region}); dbSet('lakes',lakes); }
     audit('Qurilma qo\'shildi: '+id+(fr?(' → '+fr.ism+' '+fr.fam):'')); toast('Qurilma qo\'shildi'); closeModal(); renderDevices(); buildNav(); }}]);
 }
-function assignDevice(id){ const farmers=dbGet('farmers')||[];
-  modal('Qurilmani fermerga biriktirish — '+id, `
-    <div class="field"><label>Fermer</label><select id="as-farmer">${farmers.map(f=>`<option value="${f.id}">${esc(f.ism)} ${esc(f.fam)} · ${f.region}</option>`).join('')}</select></div>
-    <div class="field"><label>Ko'l nomi</label><input id="as-lake" placeholder="masalan: 5-ko'l"></div>`,
-    [{t:'Biriktirish',cls:'btn',fn:()=>{ const fid=v('as-farmer'); const fr=(dbGet('farmers')||[]).find(f=>f.id===fid); if(!fr){toast('Fermer tanlang');return;}
-      const lake=v('as-lake')||'Yangi ko\'l'; const list=dbGet('devices')||[]; const d=list.find(z=>z.chipId===id);
-      d.farmerId=fr.id; d.lake=lake; d.region=fr.region; d.status='active'; dbSet('devices',list);
-      const lakes=dbGet('lakes')||[]; if(!lakes.some(l=>l.id===id)) lakes.push({id,name:lake,farmerId:fr.id,region:fr.region}); dbSet('lakes',lakes);
-      audit('Qurilma biriktirildi: '+id+' → '+fr.ism+' '+fr.fam); toast('Biriktirildi'); closeModal(); renderDevices(); }}]);
+function assignDevice(id){
+  /* Biriktirish DOIM fermer so'rovi orqali — admin qo'lda ko'l nomi yozmaydi (chalkashmasligi uchun) */
+  const req = fbReady ? fbLiveRequests().find(r=>String(r.chip||'').toUpperCase()===String(id).toUpperCase()) : null;
+  if(req){
+    bindFromRequest(req);
+    fbApproveReq(req._key);
+    audit('Qurilma biriktirildi (fermer so\'rovi): '+id+' -> '+(req.farmer||''));
+    toast('Tasdiqlandi — fermer "'+(req.lake||id)+'" ko\'lini qo\'shgan');
+    closeModal&&closeModal(); renderDevices(); buildNav&&buildNav();
+  } else {
+    toast('Bu qurilma uchun fermer hali so\'rov yubormagan. Fermer ilovadan ko\'lni qo\'shsin.');
+  }
 }
 function saveDevices(){ dbSet('devices',dbGet('devices')); }/* eski */
 
@@ -543,7 +546,38 @@ function renderApprovals(){ let a=dbGet('approvals')||[]; if(CUR.role==='region'
     </tbody></table></div>
     <div style="font-size:12.5px;color:var(--ink-soft)">Tasdiqlash begona/o'g'irlangan qurilmalar ulanmasligi uchun. Tasdiqlangach qurilma fermerga biriktiriladi.</div>`;
 }
-function approveLive(key){ const r=REQS[key]||{}; fbApproveReq(key); audit('Ko\'l tasdiqlandi: '+(r.chip||'')+' ('+(r.lake||'')+')'); toast('Tasdiqlandi — fermerga yuborildi'); renderApprovals(); buildNav(); }
+/* === Fermer SO'ROVIDAN admin paneliga yozish — ko'l nomi DOIM fermer yozgani === */
+function bindFromRequest(r){
+  if(!r || !r.chip) return null;
+  const chip=String(r.chip).toUpperCase(), lakeName=(r.lake||chip), region=(r.region||'');
+  /* Fermer (admin dashboard uchun) — uid yoki ism+telefon bo'yicha topiladi, bo'lmasa yaratiladi */
+  const farmers=dbGet('farmers')||[];
+  let fr = (r.uid && farmers.find(f=>f.uid===r.uid))
+        || farmers.find(f=>((f.ism+' '+f.fam).trim().toLowerCase()===String(r.farmer||'').trim().toLowerCase()) && (f.phone||'')===(r.phone||''));
+  if(!fr){
+    const parts=String(r.farmer||'Fermer').trim().split(/\s+/);
+    fr={id:rid('F'), uid:r.uid||'', ism:parts[0]||'Fermer', fam:parts.slice(1).join(' '), region:region, tuman:'', phone:r.phone||'', status:'active', joined:Date.now()};
+    farmers.push(fr); dbSet('farmers',farmers);
+  } else if(r.uid && !fr.uid){ fr.uid=r.uid; dbSet('farmers',farmers); }
+  /* Qurilma — bor bo'lsa biriktiriladi, yo'q bo'lsa yaratiladi */
+  const devices=dbGet('devices')||[];
+  let d=devices.find(x=>String(x.chipId).toUpperCase()===chip);
+  if(d){ d.farmerId=fr.id; d.lake=lakeName; if(region) d.region=region; d.status='active'; }
+  else { d=makeDevice(chip, fr.id, lakeName, region); d.real=true; devices.unshift(d); }
+  dbSet('devices',devices);
+  /* Ko'l — id = qurilma chip, nom = FERMER yozgani */
+  const lakes=dbGet('lakes')||[];
+  let lk=lakes.find(l=>String(l.id).toUpperCase()===chip);
+  if(lk){ lk.name=lakeName; lk.farmerId=fr.id; if(region) lk.region=region; }
+  else lakes.push({id:chip, name:lakeName, farmerId:fr.id, region:region});
+  dbSet('lakes',lakes);
+  return fr;
+}
+function approveLive(key){ const r=REQS[key]||{};
+  bindFromRequest(r);                 /* admin paneliga fermer nomi bilan yoziladi (chalkashmaydi) */
+  fbApproveReq(key);                  /* /registry/<chip>/approved=true -> fermer ilovasi ochiladi */
+  audit('Ko\'l tasdiqlandi: '+(r.chip||'')+' ('+(r.lake||'')+')');
+  toast('Tasdiqlandi — fermer ilovasi ochildi'); renderApprovals(); buildNav(); }
 function rejectLive(key){ const r=REQS[key]||{}; if(!confirm('So\'rov rad etilsinmi? '+(r.chip||''))) return; fbRejectReq(key); audit('Ko\'l so\'rovi rad etildi: '+(r.chip||'')); toast('Rad etildi'); renderApprovals(); buildNav(); }
 function approve(id,ok){ const a=dbGet('approvals')||[]; const x=a.find(y=>y.id===id); if(!x) return;
   x.status=ok?'approved':'rejected'; dbSet('approvals',a);
