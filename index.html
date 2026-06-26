@@ -240,6 +240,7 @@
       <div class="field"><label>Parol</label><input id="au-pass" type="password" autocomplete="current-password" placeholder="kamida 6 belgi"></div>
       <button class="btn" id="au-submit" onclick="authSubmit()">Kirish</button>
       <div id="au-err" style="color:var(--crit);font-size:12px;text-align:center;margin-top:8px;min-height:14px"></div>
+      <div id="au-forgot" style="text-align:center;margin-top:6px"><a href="#" onclick="farmerForgotPass();return false;" style="font-size:12.5px;color:#1E9E6A;text-decoration:none">Parolni unutdingizmi?</a></div>
     </div>
   </div>
 
@@ -409,17 +410,11 @@ function lakeNow(L){
   return n;
 }
 function lakeHistory(L, range){
+  /* Faqat HAQIQIY tarix (/nodes/<id>/history). Soxta/demo ma'lumot to'qilmaydi. */
   const [n,step]=RCONF[range]; const now=Date.now();
-  const lv=liveFor(L); const real=(lv && HIST[L.id] && HIST[L.id].length) ? HIST[L.id] : null;
-  if(real){
-    const from=now-(n-1)*step;
-    const pts=real.filter(p=>p.t>=from && isFinite(p.do));
-    if(pts.length>=2) return pts;   // yetarli real nuqta bor
-  }
-  const arr=[];
-  for(let i=n-1;i>=0;i--){ const t=now-i*step; arr.push(Object.assign({t}, calcAt(L,t))); }
-  const cur=lakeNow(L); arr[arr.length-1]={t:now, do:cur.do, ph:cur.ph, temp:cur.temp};
-  return arr;
+  const from=now-(n-1)*step;
+  const all=(HIST[L.id]&&HIST[L.id].length)?HIST[L.id]:[];
+  return all.filter(p=>p.t>=from && isFinite(p.do));
 }
 function statusLevel(doVal){
   if(doVal>6)  return {key:'yaxshi',   label:'Yaxshi',      col:'#1E9E6A'};
@@ -554,7 +549,8 @@ function setAuthMode(m){ authMode=m;
   const t1=document.getElementById('au-tab-login'), t2=document.getElementById('au-tab-reg');
   if(t1){ t1.className=m==='login'?'btn':'btn ghost'; t1.style.flex='1'; }
   if(t2){ t2.className=m==='register'?'btn':'btn ghost'; t2.style.flex='1'; }
-  const e=document.getElementById('au-err'); if(e) e.textContent='';
+  const e=document.getElementById('au-err'); if(e){ e.textContent=''; e.style.color='var(--crit)'; }
+  const fg=document.getElementById('au-forgot'); if(fg) fg.style.display = m==='register'?'none':'block';
 }
 function authErr(e){ const c=(e&&e.code)||'';
   if(c.indexOf('email-already')>=0) return "Bu email allaqachon ro'yxatdan o'tgan";
@@ -564,6 +560,15 @@ function authErr(e){ const c=(e&&e.code)||'';
   if(c.indexOf('invalid-email')>=0) return "Email noto'g'ri";
   if(c.indexOf('network')>=0) return "Internet aloqasi yo'q";
   return 'Xatolik yuz berdi'; }
+function farmerForgotPass(){
+  const err=document.getElementById('au-err'); const email=val('au-email');
+  if(!email){ err.style.color='var(--crit)'; err.textContent='Avval emailingizni kiriting, keyin bosing'; return; }
+  if(!fbAuth){ err.style.color='var(--crit)'; err.textContent="Bu rejimda parol tiklash mavjud emas"; return; }
+  err.style.color='var(--ink-soft)'; err.textContent='Yuborilmoqda...';
+  fbAuth.sendPasswordResetEmail(email)
+    .then(()=>{ err.style.color='#1E9E6A'; err.textContent='Parolni tiklash havolasi '+email+' ga yuborildi. Pochtangizni tekshiring.'; })
+    .catch(e=>{ err.style.color='var(--crit)'; err.textContent=authErr(e); });
+}
 function authSubmit(){
   const err=document.getElementById('au-err');
   const email=val('au-email'); const pass=(document.getElementById('au-pass')||{}).value||'';
@@ -894,6 +899,16 @@ function drawChart(L){
   const dpr=window.devicePixelRatio||1, W=cv.clientWidth, H=300;
   cv.width=W*dpr; cv.height=H*dpr; const ctx=cv.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0);
   ctx.clearRect(0,0,W,H);
+  if(!data || data.length<2){
+    chGeom=null; chIdx=null;
+    ctx.textAlign='center';
+    ctx.fillStyle='#5E736E'; ctx.font='600 14px system-ui,-apple-system,sans-serif';
+    ctx.fillText("Ma'lumot hali yetarli emas", W/2, H/2-6);
+    ctx.fillStyle='#92A29E'; ctx.font='12px system-ui,-apple-system,sans-serif';
+    ctx.fillText("Qurilma yangi ulangan — bu oraliq vaqt o'tishi bilan to'ldiriladi", W/2, H/2+16);
+    ctx.textAlign='left';
+    return;
+  }
   const padL=6,padR=26,padT=12,padB=22, plotH=H-padT-padB, plotW=W-padL-padR;
   const X=i=>padL+i/(data.length-1)*plotW;
   const Y=(p,v)=>{ const P=PARAMS[p]; let r=(v-P.dmin)/(P.dmax-P.dmin); r=Math.max(0,Math.min(1,r)); return padT+(1-r)*plotH; };
@@ -970,6 +985,7 @@ function renderTav(L,B){ B.innerHTML=`<div class="empty"><div class="ic">🤖</d
 
 /* ---- Tarix ---- */
 function renderTar(L,B){ const data=lakeHistory(L,'24s').slice().reverse().slice(0,40);
+  if(!data.length){ B.innerHTML=`<div class="empty"><div class="ic">⏳</div><div class="t">Ma'lumot hali yetarli emas</div><div>Qurilma yangi ulangan. O'lchovlar to'planishi bilan tarix shu yerda chiqadi.</div></div>`; return; }
   B.innerHTML=`<div class="sec-h">So'nggi yozuvlar (24 soat)</div><div class="card" style="padding:6px 14px;">
     ${data.map(d=>{ const c=zoneCol('do',d.do);
       return `<div class="kv"><span class="k">${p2(new Date(d.t).getHours())}:${p2(new Date(d.t).getMinutes())}</span>

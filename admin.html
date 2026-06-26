@@ -174,6 +174,7 @@ let fbDb=null, fbReady=false; const LIVE={}, LIVE_GW={};
 let REQS={};            // /requests — fermerlardan kelgan ko'l tasdiq so'rovlari
 let FB_USERS={};         // /users — ro'yxatdan o'tgan real fermerlar (akkauntlar)
 let ADMIN_ROLES={};      // /adminRoles — super admin bergan rollar (email bo'yicha)
+let REGISTRY={};         // /registry — tasdiqlangan ko'llar (chip -> {approved,lake,farmer,region})
 const LIVE_FRESH_MS=15*60*1000;
 function fbInit(){
   try{
@@ -195,6 +196,7 @@ function fbInit(){
     fbDb.ref('requests').on('value', snap=>{ REQS=snap.val()||{}; refreshFB(); buildNav&&CUR&&buildNav(); }, ()=>{});
     fbDb.ref('users').on('value', snap=>{ FB_USERS=snap.val()||{}; refreshFB(); }, ()=>{});
     fbDb.ref('adminRoles').on('value', snap=>{ ADMIN_ROLES=snap.val()||{}; if(CUR&&CUR.role==='super'&&page==='settings') renderSettings(); }, ()=>{});
+    fbDb.ref('registry').on('value', snap=>{ REGISTRY=snap.val()||{}; refreshFB(); }, ()=>{});
   }catch(e){ fbBadge(false); }
 }
 function fbFresh(ts){ return typeof ts==='number' && (Date.now()-ts)<=LIVE_FRESH_MS; }
@@ -233,6 +235,9 @@ function fbLiveRequests(){ return Object.keys(REQS||{}).map(k=>Object.assign({_k
 /* Chip bo'yicha fermer yuborgan (hali tasdiqlanmagan) so'rovni topadi — ko'l/fermer nomini ko'rsatish uchun */
 function reqForChip(chip){ const c=String(chip||'').toUpperCase();
   const ks=Object.keys(REQS||{}); for(const k of ks){ const r=REQS[k]; if(r && String(r.chip||'').toUpperCase()===c) return r; } return null; }
+/* Tasdiqlangan ko'l (registry) — boshqa brauzerda ham ko'rinadi */
+function regForChip(chip){ const c=String(chip||'').toUpperCase();
+  const ks=Object.keys(REGISTRY||{}); for(const k of ks){ if(String(k).toUpperCase()===c){ const r=REGISTRY[k]; if(r && r.approved) return r; } } return null; }
 function fbBadge(on){ let b=document.getElementById('fb-badge');
   if(!b){ b=document.createElement('div'); b.id='fb-badge';
     b.style.cssText='position:fixed;left:10px;bottom:10px;z-index:9999;font:600 11px/1.4 var(--sans);padding:5px 11px;border-radius:20px;opacity:.95;box-shadow:0 2px 10px rgba(0,0,0,.18)';
@@ -337,6 +342,8 @@ function applyRelay(d){ if(d.relay==='on'){ d.do=+Math.min(8.5,(d.do||4)+2.5).to
 /* ============ AUTH (Firebase email/parol) ============ */
 const SUPER_ADMIN_EMAIL = "smartlake26@gmail.com";   // <-- SUPER ADMIN (kod ichida)
 function adminEmailKey(e){ return String(e||'').trim().toLowerCase().replace(/[.#$\/\[\]]/g,'_'); }
+/* Region menejeri uchun: bir nechta hududni qo'llab-quvvatlaydi */
+function inMyRegion(r){ if(!CUR||CUR.role!=='region') return true; const rs=(CUR.regions&&CUR.regions.length)?CUR.regions:(CUR.region?[CUR.region]:[]); return rs.includes(r); }
 let _adminVerifyApp=null;
 /* Parolni ASOSIY sessiyani buzmasdan tekshirish uchun ikkilamchi Firebase ilovasi */
 function verifyAdminCreds(email, pass){
@@ -359,13 +366,13 @@ function resolveAdminRoleByEmail(email){
     if(e===SUPER_ADMIN_EMAIL){ resolve({role:'super',region:''}); return; }
     if(!fbDb){ resolve(null); return; }
     fbDb.ref('adminRoles/'+adminEmailKey(e)).once('value')
-      .then(snap=>{ const r=snap.val(); resolve(r&&r.role?{role:r.role,region:r.region||''}:null); })
+      .then(snap=>{ const r=snap.val(); if(r&&r.role){ const regions=Array.isArray(r.regions)?r.regions:(r.region?[r.region]:[]); resolve({role:r.role, region:regions[0]||'', regions}); } else resolve(null); })
       .catch(()=>resolve(null));
   });
 }
 function enterAdminAs(email, info){
   const e=String(email||'').trim().toLowerCase();
-  CUR={ email:e, name:(e.split('@')[0]||'admin'), role:info.role, region:info.region||'' };
+  CUR={ email:e, name:(e.split('@')[0]||'admin'), role:info.role, region:info.region||'', regions:(info.regions&&info.regions.length?info.regions:(info.region?[info.region]:[])) };
   dbSet('adminEmail', e);
   enterAdmin();
 }
@@ -385,7 +392,7 @@ function enterAdmin(){
   document.getElementById('login').style.display='none';
   document.getElementById('app').style.display='grid';
   document.getElementById('su-name').textContent=CUR.name;
-  document.getElementById('su-role').textContent=ROLES[CUR.role]+(CUR.region?(' · '+CUR.region):'');
+  document.getElementById('su-role').textContent=ROLES[CUR.role]+((CUR.regions&&CUR.regions.length)?(' · '+CUR.regions.join(', ')):(CUR.region?(' · '+CUR.region):''));
   document.getElementById('tb-name').textContent=CUR.name+' ('+ROLES[CUR.role]+')';
   buildNav();
   const first=SECTIONS.find(s=>can(s.id)); go(first?first.id:'devices');
@@ -406,9 +413,9 @@ function forgotPass(){
 }
 /* ============ NAV / ROUTER ============ */
 function buildNav(){ const nav=document.getElementById('nav');
-  const pend=(dbGet('approvals')||[]).filter(a=>a.status==='pending').length + (fbReady?fbLiveRequests().filter(r=>CUR.role!=='region'||(r.region||'')===CUR.region).length:0);
+  const pend=(dbGet('approvals')||[]).filter(a=>a.status==='pending').length + (fbReady?fbLiveRequests().filter(r=>CUR.role!=='region'||inMyRegion(r.region||'')).length:0);
   const al=getAlerts().filter(a=>!a.ack).length;
-  const gwOff=(dbGet('gateways')||[]).filter(g=>!g.online && (CUR.role!=='region'||g.region===CUR.region)).length;
+  const gwOff=(dbGet('gateways')||[]).filter(g=>!g.online && (CUR.role!=='region'||inMyRegion(g.region))).length;
   nav.innerHTML=SECTIONS.filter(s=>can(s.id)).map(s=>{
     let b=''; if(s.id==='approvals'&&pend) b=`<span class="badge">${pend}</span>`;
     if(s.id==='alerts'&&al) b=`<span class="badge">${al}</span>`;
@@ -428,7 +435,7 @@ function go(id){ if(!can(id)) return; page=id;
 let devFilter={q:'',gw:'',status:''};
 function renderDevices(){
   let d=dbGet('devices')||[]; const farmers=dbGet('farmers')||[]; const gws=dbGet('gateways')||[];
-  if(CUR.role==='region') d=d.filter(x=>x.region===CUR.region);
+  if(CUR.role==='region') d=d.filter(x=>inMyRegion(x.region));
   const f=d.filter(x=> (!devFilter.q || (x.chipId+x.lake).toLowerCase().includes(devFilter.q.toLowerCase()))
     && (!devFilter.gw||x.gwId===devFilter.gw) && (!devFilter.status||x.status===devFilter.status));
   const fname=id=>{ const fr=farmers.find(y=>y.id===id); return fr?fr.ism+' '+fr.fam:'—'; };
@@ -444,9 +451,9 @@ function renderDevices(){
       ${CUR.role!=='region'?'<button class="btn" onclick="deviceAdd()">+ Qurilma</button>':''}
     </div>
     <div class="panel"><table><thead><tr><th>Chip ID</th><th>Ko'l / Fermer</th><th>Shlyuz</th><th>RSSI / SNR</th><th>DO</th><th>Oxirgi</th><th>Holat</th><th></th></tr></thead><tbody>
-    ${f.length?f.map(x=>{ const rq=x.farmerId?null:reqForChip(x.chipId); const _lake=x.farmerId?x.lake:((rq&&rq.lake)||x.lake); const _farmer=x.farmerId?fname(x.farmerId):((rq&&rq.farmer)?rq.farmer:''); return `<tr>
+    ${f.length?f.map(x=>{ const reg=x.farmerId?null:regForChip(x.chipId); const rq=(x.farmerId||reg)?null:reqForChip(x.chipId); const _lake=x.farmerId?x.lake:((reg&&reg.lake)||(rq&&rq.lake)||x.lake); const _farmer=x.farmerId?fname(x.farmerId):((reg&&reg.farmer)||(rq&&rq.farmer)||''); const _pending=!x.farmerId&&!reg&&!!rq; return `<tr>
       <td class="mono">${x.chipId}<div style="font-size:11px;color:var(--ink-faint)">${x.fw||'—'}</div></td>
-      <td>${esc(_lake)}<div style="font-size:11px;color:var(--ink-soft)">${_farmer?esc(_farmer):'<span style="color:var(--ink-faint)">—</span>'}${(!x.farmerId&&rq)?' <span style="color:var(--warn)">· kutilmoqda</span>':''}</div></td>
+      <td>${esc(_lake)}<div style="font-size:11px;color:var(--ink-soft)">${_farmer?esc(_farmer):'<span style="color:var(--ink-faint)">—</span>'}${_pending?' <span style="color:var(--warn)">· kutilmoqda</span>':''}</div></td>
       <td><span class="pill p-blue">${x.gwId||'—'}</span></td>
       <td class="mono">${x.rssi!=null?(x.rssi+' dBm'):'—'}<div style="font-size:11px;color:var(--ink-faint)">${x.snr!=null?('SNR '+x.snr+' dB'):''}</div></td>
       <td class="mono">${x.do?x.do:'—'}</td>
@@ -465,7 +472,7 @@ function devStatusPill(s){ return s==='active'?'<span class="pill p-good">Onlayn
 /* ============ SHLYUZLAR (LoRa -> WiFi/MQTT) ============ */
 function renderGateways(){
   let gws=dbGet('gateways')||[]; const devs=dbGet('devices')||[];
-  if(CUR.role==='region') gws=gws.filter(g=>g.region===CUR.region);
+  if(CUR.role==='region') gws=gws.filter(g=>inMyRegion(g.region));
   const cnt=id=>devs.filter(d=>d.gwId===id).length;
   const onlNodes=id=>devs.filter(d=>d.gwId===id && d.status==='active').length;
   C().innerHTML=`
@@ -562,8 +569,8 @@ function assignDevice(id){
 function saveDevices(){ dbSet('devices',dbGet('devices')); }/* eski */
 
 /* ============ KO'L TASDIG'I ============ */
-function renderApprovals(){ let a=dbGet('approvals')||[]; if(CUR.role==='region') a=a.filter(x=>x.region===CUR.region);
-  const live = fbReady ? fbLiveRequests().filter(r=>CUR.role!=='region'||(r.region||'')===CUR.region).sort((x,y)=>(y.ts||0)-(x.ts||0)) : [];
+function renderApprovals(){ let a=dbGet('approvals')||[]; if(CUR.role==='region') a=a.filter(x=>inMyRegion(x.region));
+  const live = fbReady ? fbLiveRequests().filter(r=>CUR.role!=='region'||inMyRegion(r.region||'')).sort((x,y)=>(y.ts||0)-(x.ts||0)) : [];
   const livePanel = live.length ? `
     <div class="panel"><div class="panel-h"><h2>🟢 Yangi so'rovlar (fermer ilovasidan, jonli)</h2></div>
     <table><thead><tr><th>Fermer</th><th>Chip ID</th><th>Ko'l</th><th>Viloyat</th><th>Vaqt</th><th></th></tr></thead><tbody>
@@ -648,9 +655,9 @@ let usrFilter={q:'',region:''};
 function fbFarmers(){ return Object.keys(FB_USERS||{}).map(uid=>{ const u=FB_USERS[uid]||{}; const pr=u.profile||{};
   return {uid, ism:pr.ism||'', fam:pr.fam||'', phone:pr.phone||'', email:pr.email||'', region:pr.vil||'', tum:pr.tum||'', joined:pr.joined||0, lakeCount:Object.keys(u.lakes||{}).length}; }); }
 function renderUsers(){ let f=dbGet('farmers')||[]; const dev=dbGet('devices')||[];
-  if(CUR.role==='region') f=f.filter(x=>x.region===CUR.region);
+  if(CUR.role==='region') f=f.filter(x=>inMyRegion(x.region));
   let real = fbReady ? fbFarmers() : [];
-  if(CUR.role==='region') real=real.filter(x=>x.region===CUR.region);
+  if(CUR.role==='region') real=real.filter(x=>inMyRegion(x.region));
   const realPanel = real.length ? `
     <div class="panel"><div class="panel-h"><h2>🟢 Ro'yxatdan o'tgan fermerlar (akkauntlar, jonli)</h2></div>
     <table><thead><tr><th>Fermer</th><th>Email / Telefon</th><th>Viloyat</th><th>Ko'llari</th></tr></thead><tbody>
@@ -810,7 +817,7 @@ function feedEdit(id){ const feeds=dbGet('feeds')||[]; const ex=id?feeds.find(f=
 }
 
 /* ============ OGOHLANTIRISHLAR (qurilmalardan jonli) ============ */
-function renderAlerts(){ let a=getAlerts(); if(CUR.role==='region') a=a.filter(x=>x.region===CUR.region);
+function renderAlerts(){ let a=getAlerts(); if(CUR.role==='region') a=a.filter(x=>inMyRegion(x.region));
   C().innerHTML=`
     ${stats([['Faol',a.filter(x=>!x.ack).length],['Tasdiqlangan',a.filter(x=>x.ack).length]])}
     <div class="panel"><table><thead><tr><th>Turi</th><th>Ko'l / Fermer</th><th>Qiymat</th><th>Viloyat</th><th>Vaqt (oy-kun soat:daq)</th><th></th></tr></thead><tbody>
@@ -854,8 +861,8 @@ function barBlock(title, pairs, unit, exportLbl){ const max=Math.max(...pairs.ma
     ${pairs.map(([r,n])=>`<div class="bar-row"><div class="lab">${r}</div><div class="track"><div class="fill" style="width:${n/max*100}%"></div></div><div class="val">${n}${unit||''}</div></div>`).join('')}
   </div></div>`; }
 function renderAnalytics(){ const dev=dbGet('devices')||[]; let farmers=dbGet('farmers')||[];
-  if(CUR.role==='region'){ farmers=farmers.filter(f=>f.region===CUR.region); }
-  const dlist=CUR.role==='region'?dev.filter(d=>d.region===CUR.region):dev;
+  if(CUR.role==='region'){ farmers=farmers.filter(f=>inMyRegion(f.region)); }
+  const dlist=CUR.role==='region'?dev.filter(d=>inMyRegion(d.region)):dev;
   const byF={}, byD={}, byFeed={};
   farmers.forEach(f=>byF[f.region]=(byF[f.region]||0)+1);
   dlist.forEach(d=>{ byD[d.region]=(byD[d.region]||0)+1;
@@ -984,19 +991,28 @@ function renderSettings(){ const s=dbGet('settings')||{}; const admins=dbGet('ad
           Super admin: <b class="mono">${SUPER_ADMIN_EMAIL}</b> — kod ichida belgilangan, o'zgartirilmaydi.<br>
           Boshqa foydalanuvchilarga email orqali rol bering. Foydalanuvchi avval Firebase'da ro'yxatdan o'tgan bo'lishi kerak.
         </div>
-        <div class="row3">
-          <div class="field"><label>Email</label><input id="ar-email" type="email" placeholder="ism@email.com"></div>
-          <div class="field"><label>Rol</label><select id="ar-role">
+        ${(function(){ const ru=(fbReady?fbFarmers():[]).filter(u=>u.email); return ru.length ? `
+        <div class="row2">
+          <div class="field"><label>Foydalanuvchi (ro'yxatdan o'tganlar)</label>
+            <select id="ar-email"><option value="">— tanlang —</option>${ru.map(u=>`<option value="${esc((u.email||'').toLowerCase())}">${esc(u.ism)} ${esc(u.fam)} · ${esc(u.email)}</option>`).join('')}</select></div>
+          <div class="field"><label>Rol</label><select id="ar-role" onchange="document.getElementById('ar-regwrap').style.display=this.value==='region'?'block':'none'">
             <option value="operator">Operator</option>
             <option value="region">Region menejeri</option>
             <option value="support">Qo'llab-quvvatlash</option>
             <option value="analyst">Analitik</option>
           </select></div>
-          <div class="field"><label>Viloyat (region uchun)</label><select id="ar-reg"><option value="">—</option>${REGIONS.map(r=>`<option>${r}</option>`).join('')}</select></div>
+        </div>
+        <div class="field" id="ar-regwrap" style="display:none">
+          <label>Hududlar (bir nechta tanlash mumkin)</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px 16px;padding:8px 2px">
+            ${REGIONS.map(r=>`<label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:500;cursor:pointer"><input type="checkbox" class="ar-reg-cb" value="${esc(r)}"> ${esc(r)}</label>`).join('')}
+          </div>
         </div>
         <button class="btn" onclick="assignRole()">Rol berish</button>
+        <div id="ar-err" style="font-size:12.5px;margin-top:8px;min-height:14px;color:var(--crit)"></div>`
+        : `<div style="padding:14px;background:#FFF6E8;border:1px solid #F0D9A8;border-radius:10px;font-size:13px;color:#8A6D1F">Hozircha ro'yxatdan o'tgan foydalanuvchi yo'q. Avval foydalanuvchi ilovada ro'yxatdan o'tsin — keyin shu yerda unga rol bera olasiz.</div>`; })()}
         <table style="margin-top:16px"><thead><tr><th>Email</th><th>Rol</th><th>Viloyat</th><th></th></tr></thead><tbody>
-          ${Object.keys(ADMIN_ROLES||{}).length ? Object.keys(ADMIN_ROLES).map(k=>{ const r=ADMIN_ROLES[k]||{}; return `<tr><td class="mono">${esc(r.email||k)}</td><td><span class="pill p-blue">${ROLES[r.role]||r.role}</span></td><td>${esc(r.region||'—')}</td><td style="text-align:right"><button class="btn mini" onclick="removeRole('${k}')">O'chirish</button></td></tr>`; }).join('') : `<tr><td colspan="4"><div class="empty">Hali rol berilgan foydalanuvchi yo'q</div></td></tr>`}
+          ${Object.keys(ADMIN_ROLES||{}).length ? Object.keys(ADMIN_ROLES).map(k=>{ const r=ADMIN_ROLES[k]||{}; return `<tr><td class="mono">${esc(r.email||k)}</td><td><span class="pill p-blue">${ROLES[r.role]||r.role}</span></td><td>${esc((Array.isArray(r.regions)&&r.regions.length)?r.regions.join(', '):(r.region||'—'))}</td><td style="text-align:right"><button class="btn mini" onclick="removeRole('${k}')">O'chirish</button></td></tr>`; }).join('') : `<tr><td colspan="4"><div class="empty">Hali rol berilgan foydalanuvchi yo'q</div></td></tr>`}
         </tbody></table>
       </div></div>`;
 }
@@ -1004,13 +1020,19 @@ function saveSettings(){ const s=dbGet('settings')||{}; Object.assign(s,{tbHost:
   dbSet('settings',s); audit('Sozlamalar saqlandi'); toast('Saqlandi'); }
 /* ============ ROL BERISH (super admin) — Firebase /adminRoles ============ */
 function assignRole(){
-  const email=v('ar-email').trim().toLowerCase(), role=v('ar-role'), region=v('ar-reg');
-  if(!email||email.indexOf('@')<0){ toast('To\'g\'ri email kiriting'); return; }
-  if(email===SUPER_ADMIN_EMAIL){ toast('Bu super admin — rol berish shart emas'); return; }
-  if(!fbDb){ toast('Firebase ulanmagan'); return; }
-  fbDb.ref('adminRoles/'+adminEmailKey(email)).set({ email, role, region:region||'', ts:Date.now() })
-    .then(()=>{ audit('Rol berildi: '+email+' -> '+ROLES[role]); toast('Rol berildi'); v2('ar-email',''); })
-    .catch(()=>toast('Xato — saqlanmadi'));
+  const sel=document.getElementById('ar-email'); const email=(sel?sel.value:'').trim().toLowerCase(), role=v('ar-role');
+  const regions=Array.from(document.querySelectorAll('.ar-reg-cb:checked')).map(c=>c.value);
+  const errEl=document.getElementById('ar-err');
+  const setErr=m=>{ if(errEl){errEl.style.color='var(--crit)';errEl.textContent=m;} else toast(m); };
+  if(!email){ setErr('Foydalanuvchini tanlang'); return; }
+  if(email===SUPER_ADMIN_EMAIL){ setErr('Bu super admin — rol berish shart emas'); return; }
+  const registered=(fbReady?fbFarmers():[]).some(u=>(u.email||'').toLowerCase()===email);
+  if(!registered){ setErr("Bu foydalanuvchi ro'yxatdan o'tmagan"); return; }
+  if(role==='region' && !regions.length){ setErr('Region menejeri uchun kamida bitta hudud tanlang'); return; }
+  if(!fbDb){ setErr('Firebase ulanmagan'); return; }
+  fbDb.ref('adminRoles/'+adminEmailKey(email)).set({ email, role, regions:(role==='region'?regions:[]), region:(role==='region'?(regions[0]||''):''), ts:Date.now() })
+    .then(()=>{ audit('Rol berildi: '+email+' -> '+ROLES[role]); toast('Rol berildi'); if(errEl){errEl.style.color='var(--good)';errEl.textContent='Rol berildi: '+email;} })
+    .catch(()=>setErr('Xato — saqlanmadi'));
 }
 function removeRole(key){
   if(!confirm('Rol olib tashlansinmi?')) return;
