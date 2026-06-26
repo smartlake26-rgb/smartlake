@@ -994,7 +994,9 @@ function renderSettings(){ const s=dbGet('settings')||{}; const admins=dbGet('ad
         ${(function(){ const ru=(fbReady?fbFarmers():[]).filter(u=>u.email); return ru.length ? `
         <div class="row2">
           <div class="field"><label>Foydalanuvchi (ro'yxatdan o'tganlar)</label>
-            <select id="ar-email"><option value="">— tanlang —</option>${ru.map(u=>`<option value="${esc((u.email||'').toLowerCase())}">${esc(u.ism)} ${esc(u.fam)} · ${esc(u.email)}</option>`).join('')}</select></div>
+            <input id="ar-search" placeholder="Ism, familiya yoki email bo'yicha qidirish..." oninput="arFilter()" style="margin-bottom:8px">
+            <select id="ar-email" size="6"><option value="">— tanlang —</option>${ru.map(u=>`<option value="${esc((u.email||'').toLowerCase())}">${esc(u.ism)} ${esc(u.fam)} · ${esc(u.email)}</option>`).join('')}</select>
+            <div class="hint" id="ar-count" style="font-size:11.5px;color:var(--ink-faint);margin-top:4px">${ru.length} ta foydalanuvchi</div></div>
           <div class="field"><label>Rol</label><select id="ar-role" onchange="document.getElementById('ar-regwrap').style.display=this.value==='region'?'block':'none'">
             <option value="operator">Operator</option>
             <option value="region">Region menejeri</option>
@@ -1019,6 +1021,16 @@ function renderSettings(){ const s=dbGet('settings')||{}; const admins=dbGet('ad
 function saveSettings(){ const s=dbGet('settings')||{}; Object.assign(s,{tbHost:v('s-tb'),tbToken:v('s-tk'),loraBand:v('s-lora'),weather:v('s-w'),defMinDo:+v('s-min'),defFarq:+v('s-farq'),defKritik:+v('s-krit')});
   dbSet('settings',s); audit('Sozlamalar saqlandi'); toast('Saqlandi'); }
 /* ============ ROL BERISH (super admin) — Firebase /adminRoles ============ */
+function arFilter(){
+  const si=document.getElementById('ar-search'); const q=(si?si.value:'').trim().toLowerCase();
+  const sel=document.getElementById('ar-email'); if(!sel) return;
+  const all=(fbReady?fbFarmers():[]).filter(u=>u.email);
+  const ru=all.filter(u=> !q || ((u.ism+' '+u.fam+' '+u.email).toLowerCase().includes(q)));
+  const cur=sel.value;
+  sel.innerHTML='<option value="">— tanlang —</option>'+ru.map(u=>`<option value="${esc((u.email||'').toLowerCase())}">${esc(u.ism)} ${esc(u.fam)} · ${esc(u.email)}</option>`).join('');
+  if(ru.some(u=>(u.email||'').toLowerCase()===cur)) sel.value=cur;
+  const cnt=document.getElementById('ar-count'); if(cnt) cnt.textContent=ru.length+' ta foydalanuvchi'+(q?' (filtrlangan)':'');
+}
 function assignRole(){
   const sel=document.getElementById('ar-email'); const email=(sel?sel.value:'').trim().toLowerCase(), role=v('ar-role');
   const regions=Array.from(document.querySelectorAll('.ar-reg-cb:checked')).map(c=>c.value);

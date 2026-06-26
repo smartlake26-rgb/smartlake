@@ -840,12 +840,12 @@ function renderMon(L,B){
       <div class="kv"><span class="k">Joriy o'rtacha vazn</span><span class="v">${b.avgG} g</span></div>
       <div class="kv"><span class="k">Umumiy massa</span><span class="v big">${b.totalKg.toLocaleString('ru-RU')} kg</span></div>
       <div style="font-size:11.5px;color:var(--ink-faint);margin-top:8px;">Boshlang'ich ${b.initKg} kg + o'sish (yem ÷ FCR).</div>`
-      : `<div style="text-align:center;color:var(--ink-soft);padding:6px 0">Baliq soni, vazni va yem miqdorini<br>«Sozlamalar» bo'limida kiriting — massa avtomatik hisoblanadi.</div>`}
+      : `<div style="text-align:center;color:var(--ink-soft);padding:6px 0 12px">Baliq soni, vazni va yem miqdorini kiriting — umumiy massa avtomatik hisoblanadi.</div><button class="btn sm" style="width:100%" onclick="setTab('set')">⚙ Sozlamalarni ochish</button>`}
     </div>
 
     <div class="sec-h">Ertangi yem tavsiyasi</div>
     ${(()=>{ const rec=recFeed(L);
-      if(rec.none) return `<div class="card"><div style="text-align:center;color:var(--ink-soft);padding:6px 0">${rec.none==='type'?"«Sozlamalar»da yem turini tanlang.":"«Sozlamalar»da baliq ma'lumotlarini kiriting."}</div></div>`;
+      if(rec.none) return `<div class="card"><div style="text-align:center;color:var(--ink-soft);padding:6px 0 12px">${rec.none==='type'?"Yem turini tanlang — kunlik yem jadval bo'yicha hisoblanadi.":"Baliq ma'lumotlarini kiriting."}</div><button class="btn sm" style="width:100%" onclick="setTab('set')">⚙ Sozlamalarni ochish</button></div>`;
       return `<div class="card">
         <div class="kv"><span class="k">Yem turi</span><span class="v" style="font-size:13px">${rec.feedName}</span></div>
         <div class="kv"><span class="k">Suv harorati (ertaga, taxm.)</span><span class="v">${rec.temp}°C</span></div>
