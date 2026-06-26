@@ -24,8 +24,10 @@
 //      VCC->3.3V (5V EMAS!) | GND->GND | ANTENNA 433MHz (antennasiz yoqmang!)
 //  --- HOLAT LCD (ixtiyoriy 16x2 I2C): SDA->21 | SCL->22 ---
 //
-//  >>> BIRINCHI YOQILGANDA: WiFi "AquaGW-XXXXXX" tarmog'iga ulanib,
-//      telefon orqali WiFi + Firebase (API key, DB URL, email, parol) kiritiladi.
+//  >>> FIREBASE sozlamalari pastda KOD ICHIDA (hamma qurilma uchun bir xil).
+//      Qurilmaga faqat WiFi sozlanadi: "AquaGW-XXXXXX" tarmog'iga ulanib,
+//      telefon orqali WiFi nomi va paroli kiritiladi. Qurilma o'z chip ID'si
+//      bilan o'zini tanitadi -> /nodes/AQxxxxxx, /gateway/AquaGW-xxxxxx.
 // ================================================================
 
 #include <WiFi.h>
@@ -41,6 +43,22 @@
 #include <Firebase_ESP_Client.h>
 #include "addons/TokenHelper.h"
 #include "addons/RTDBHelper.h"
+
+// ================================================================
+//  >>>>>>  FIREBASE SOZLAMALARI — HAMMA QURILMA UCHUN BIR XIL  <<<<<<
+//  Bu 4 qiymatni BIR MARTA to'ldiring, so'ng SHU kodni barcha
+//  qurilmalarga yuklang. Har qurilma o'z chip ID'si bilan farqlanadi.
+// ----------------------------------------------------------------
+//   FB_API_KEY  : Firebase Console > Project Settings > General >
+//                 "Web API Key" (AIza... bilan boshlanadi)
+//   FB_DB_URL   : Realtime Database sahifasidagi to'liq URL
+//   FB_EMAIL    : Authentication > Users da yaratgan DEVICE user emaili
+//   FB_PASSWORD : o'sha device user paroli
+// ================================================================
+#define FB_API_KEY   "BU_YERGA_WEB_API_KEY"      // <-- TO'LDIRING
+#define FB_DB_URL    "https://smartlake-6ce23-default-rtdb.europe-west1.firebasedatabase.app"
+#define FB_EMAIL     "device@smartlake.uz"       // <-- yaratgan device user bilan BIR XIL bo'lsin
+#define FB_PASSWORD  "BU_YERGA_DEVICE_PAROL"     // <-- TO'LDIRING
 
 // ================================================================
 //  KOMPILYATSIYA SOZLAMALARI
@@ -102,12 +120,8 @@ static const uint32_t BROADCAST_ID = 0xFFFFFFFFUL;
 #define ST_QOLRELE    0x10
 
 // ================================================================
-//  FIREBASE sozlamalari (NVS'dan, portal orqali to'ldiriladi)
+//  (Firebase sozlamalari endi yuqorida KOD ICHIDA — FB_API_KEY va h.k.)
 // ================================================================
-static char fbApiKey[48] = "";
-static char fbDbUrl[96]  = "";
-static char fbEmail[48]  = "";
-static char fbPass[40]   = "";
 
 // Noyob sozlash WiFi nomi/paroli (MAC'dan, setup'da to'ldiriladi)
 static char apNom[24]   = "AquaGW-Setup";
@@ -527,15 +541,17 @@ void buyruqlarniTekshir() {
 //  ============   FIREBASE init   ============
 // ================================================================
 void firebaseBoshla() {
-  if (fbApiKey[0] == '\0' || fbDbUrl[0] == '\0' || fbEmail[0] == '\0') {
-    Serial.println("[FB] sozlamalar to'liq emas — portaldan kiriting");
+  // Sozlamalar kod ichida (FB_API_KEY ...). Placeholder qolib ketmaganini tekshiramiz.
+  if (strcmp(FB_API_KEY, "BU_YERGA_WEB_API_KEY") == 0 ||
+      strcmp(FB_PASSWORD, "BU_YERGA_DEVICE_PAROL") == 0) {
+    Serial.println("[FB] DIQQAT: FB_API_KEY / FB_PASSWORD to'ldirilmagan — kodni tahrirlang!");
     fbBoshlandi = false;
     return;
   }
-  fbconfig.api_key      = fbApiKey;
-  fbconfig.database_url = fbDbUrl;
-  fbauth.user.email     = fbEmail;
-  fbauth.user.password  = fbPass;
+  fbconfig.api_key      = FB_API_KEY;
+  fbconfig.database_url = FB_DB_URL;
+  fbauth.user.email     = FB_EMAIL;
+  fbauth.user.password  = FB_PASSWORD;
   fbconfig.token_status_callback = tokenStatusCallback;  // addons/TokenHelper.h
 
   Firebase.reconnectWiFi(true);
@@ -543,30 +559,19 @@ void firebaseBoshla() {
   fbdo.setResponseSize(4096);
   Firebase.begin(&fbconfig, &fbauth);
   fbBoshlandi = true;
-  Serial.printf("[FB] boshlandi | DB: %s\n", fbDbUrl);
+  Serial.printf("[FB] boshlandi | DB: %s\n", FB_DB_URL);
 }
 
 // ================================================================
 //  ============   WiFi + SOZLAMALAR (NVS)   ============
 // ================================================================
 void sozlamalarniYukla() {
-  prefs.getString("apikey", fbApiKey, sizeof(fbApiKey));
-  prefs.getString("dburl",  fbDbUrl,  sizeof(fbDbUrl));
-  prefs.getString("email",  fbEmail,  sizeof(fbEmail));
-  prefs.getString("pass",   fbPass,   sizeof(fbPass));
+  // Firebase sozlamalari endi kod ichida (FB_API_KEY ...). Bu yerda yuklash kerak emas.
 }
 
-// Sozlash portali (lokal WiFiManager — joriy qiymatlarni ko'rsatadi).
+// Sozlash portali (faqat WiFi — Firebase kod ichida).
 bool sozlashPortali(bool cheksiz) {
   WiFiManager wm;
-  WiFiManagerParameter p_apikey("apikey", "Firebase API key",  fbApiKey, 47);
-  WiFiManagerParameter p_dburl ("dburl",  "Database URL",      fbDbUrl,  95);
-  WiFiManagerParameter p_email ("email",  "Qurilma email",     fbEmail,  47);
-  WiFiManagerParameter p_pass  ("pass",   "Qurilma parol",     fbPass,   39);
-  wm.addParameter(&p_apikey);
-  wm.addParameter(&p_dburl);
-  wm.addParameter(&p_email);
-  wm.addParameter(&p_pass);
   wm.setConnectTimeout(20);
   wm.setConfigPortalTimeout(cheksiz ? 0 : PORTAL_TIMEOUT_S);
 
@@ -581,23 +586,10 @@ bool sozlashPortali(bool cheksiz) {
   bool ok = wm.startConfigPortal(apNom, apParol);
   esp_task_wdt_add(NULL);
 
-  // Kiritilgan Firebase qiymatlarini saqlash
-  strncpy(fbApiKey, p_apikey.getValue(), sizeof(fbApiKey)-1);
-  strncpy(fbDbUrl,  p_dburl.getValue(),  sizeof(fbDbUrl)-1);
-  strncpy(fbEmail,  p_email.getValue(),  sizeof(fbEmail)-1);
-  strncpy(fbPass,   p_pass.getValue(),   sizeof(fbPass)-1);
-  fbApiKey[sizeof(fbApiKey)-1]=0; fbDbUrl[sizeof(fbDbUrl)-1]=0;
-  fbEmail[sizeof(fbEmail)-1]=0;   fbPass[sizeof(fbPass)-1]=0;
-
-  prefs.putString("apikey", fbApiKey);
-  prefs.putString("dburl",  fbDbUrl);
-  prefs.putString("email",  fbEmail);
-  prefs.putString("pass",   fbPass);
-
   if (ok) {
     prefs.putBool("wifiok", true);
-    firebaseBoshla();                        // yangi sozlama bilan qayta ulanamiz
-    Serial.println("[WiFi] ulandi | Firebase qayta boshlandi");
+    firebaseBoshla();                        // WiFi ulangach Firebase'ni boshlaymiz
+    Serial.println("[WiFi] ulandi | Firebase boshlandi");
   } else {
     Serial.println("[WiFi] portal vaqti tugadi/yopildi");
   }
