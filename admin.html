@@ -263,64 +263,42 @@ const REGIONS=["Andijon","Buxoro","Farg'ona","Jizzax","Xorazm","Namangan","Navoi
 function rid(p){ return p+Math.random().toString(36).slice(2,7).toUpperCase(); }
 function chip(){ return 'AQ'+Math.floor(Math.random()*0xFFFFFF).toString(16).toUpperCase().padStart(6,'0'); }
 function seed(){
-  if(dbGet('seeded') && dbGet('gateways')) return;
-  const admins=[
-    {id:rid('A'),login:'superadmin',pass:'1234',name:'Bosh admin',role:'super',region:''},
-    {id:rid('A'),login:'operator',pass:'1234',name:'Operator Aziz',role:'operator',region:''},
-    {id:rid('A'),login:'region',pass:'1234',name:'Toshkent menejeri',role:'region',region:'Toshkent vil.'},
-    {id:rid('A'),login:'support',pass:'1234',name:'Yordam xizmati',role:'support',region:''},
-  ];
-  const names=[['Aziz','Karimov'],['Bekzod','Toshev'],['Dilshod','Rahimov'],['Olim','Yusupov'],['Sardor','Aliyev'],['Jasur','Ergashev'],['Komil','Nazarov'],['Rustam','Qodirov'],['Shavkat','Murodov'],['Anvar','Saidov'],['Farrux','Hakimov'],['Ulug\'bek','Tursunov']];
-  const farmers=names.map((n,i)=>({id:rid('F'),ism:n[0],fam:n[1],region:REGIONS[i%REGIONS.length],tuman:'Markaz',phone:'+99890'+(1000000+i*73717),status:i%7===0?'suspended':'active',joined:Date.now()-i*5*86400000}));
-  const sts=['good','good','good','warn','carrot','crit','good','off'];
-  /* SHLYUZLAR (LoRa 433 MHz -> WiFi/MQTT ko'priklari). Har bir tugun (node) bitta shlyuzga ulanadi. */
-  const gwRegions=['Toshkent vil.','Samarqand','Andijon','Buxoro'];
-  const gateways=gwRegions.map((r,gi)=>({ id:'GW-'+(1001+gi), name:r+' shlyuzi', region:r,
-    host:'gw'+(gi+1)+'.smartlake.uz', online: gi!==3, nodeCount:0,
-    lastSeen: Date.now()-Math.floor(Math.random()*12)*60000, fw:'gw-v1.0', band:'433 MHz', sf:9 }));
-  function pickGw(region){ return gateways.find(x=>x.region===region) || gateways[0]; }
-  const devices=[]; const lakes=[];
-  farmers.forEach((f,i)=>{ const nd=1+(i%2);
-    for(let k=0;k<nd;k++){ const id=chip(); const st=sts[(i+k)%sts.length];
-      const gw=pickGw(f.region); gw.nodeCount++;
-      const offline = (st==='off' || !gw.online);
-      const rssi = offline ? null : -(60+Math.floor(Math.random()*55));   /* -60..-115 dBm */
-      const snr  = offline ? null : +(3+Math.random()*9).toFixed(1);        /* 3..12 dB */
-      const lname=(10+i)+'-ko\'l';
-      const seedN=(parseInt(id.slice(2),16)%997)/7+1;
-      const stockCount=2000+Math.floor(rnd(seedN)*6000);
-      const curCount=Math.round(stockCount*(0.9+rnd(seedN+1)*0.08));
-      const avgG=200+Math.floor(rnd(seedN+2)*900);
-      const oW=20+Math.floor(rnd(seedN+3)*15);
-      const stockDate=Date.now()-(120+i*9)*86400000;
-      const initKg=curCount*avgG/1000;
-      const feedGiven=Math.round(initKg*(1.6+rnd(seedN+4)*1.6));
-      devices.push({chipId:id, fw:'v13 (LoRa)', gwId:gw.id, rssi, snr,
-        lastSeen:Date.now()-Math.floor(Math.random()*40)*60000,farmerId:f.id,lake:lname,region:f.region,
-        status: offline?'offline':'active', minDo:5,farq:2,kritik:3, relay:'auto', do: st==='off'?0:+(2+Math.random()*6).toFixed(1),
-        ph:+(6.6+Math.random()*2).toFixed(1), temp:18+Math.floor(Math.random()*14), aerator: st!=='off'&&Math.random()>.5,
-        fish:{count:curCount, avgG, feedType:'hualong'},
-        seed:seedN, aerSoni:1+(i%2), aerKw:2.2, tarif:600, stockCount, oWeight:oW, fcr:1.5, stockDate, feedGiven});
-      lakes.push({id,name:lname,farmerId:f.id,region:f.region}); }});
-  const approvals=[
-    {id:rid('R'),farmer:'Yangi Fermer',phone:'+998901112233',chip:chip(),lake:'1-ko\'l',region:'Samarqand',date:Date.now()-3600000,status:'pending'},
-    {id:rid('R'),farmer:'Sardor Aliyev',phone:'+998935557788',chip:chip(),lake:'7-ko\'l',region:'Andijon',date:Date.now()-7200000,status:'pending'},
-    {id:rid('R'),farmer:'Test Fermer',phone:'+998977770099',chip:chip(),lake:'3-ko\'l',region:'Buxoro',date:Date.now()-26*3600000,status:'pending'},
-  ];
-  const feeds=[{ id:'hualong', name:'HUALONG SILIAO', active:true,
-    sizes:['20–100 g','100–300 g','300–600 g','600 g–1.2 kg','1.2–2 kg'],
-    temps:[{t:12,r:[0.5,0.75,0.75,0.75,0.75],times:['12:00']},{t:15,r:[1,1,1.5,1.3,1.0],times:['10:00','14:00']},
-           {t:18,r:[2,2,2,1.5,1.5],times:['10:00','15:00']},{t:22,r:[3,3.5,3,2,2],times:['09:00','12:00','16:00']},
-           {t:24,r:[4,4,3.5,3,2.5],times:['08:00','12:00','17:00']},{t:27,r:[5,3.5,4,4,3],times:['08:00','11:00','14:00','17:00']},
-           {t:30,r:[4,3,2.5,2.5,3],times:['08:00','11:00','15:00','18:00']},{t:33,r:[3,2,2,2,1.75],times:['08:00','11:00','15:00','18:00']}]}];
-  const tk=(i,subj,st,h,m)=>{ const f=farmers[i]; return {id:rid('T'),farmerId:f.id,farmer:f.ism+' '+f.fam,phone:f.phone,subject:subj,status:st,date:Date.now()-h*3600000,msgs:m}; };
-  const tickets=[ tk(0,'Qurilma ulanmayapti','open',2,[{who:'Fermer',t:'LoRa signal yo\'q (shlyuzga ulanmayapti)'}]),
-    tk(3,'Yem hisobi noto\'g\'ri','open',30,[{who:'Fermer',t:'Massa katta chiqyapti'}]),
-    tk(1,'Parol tiklash','closed',72,[]) ];
-  const settings={tbHost:'demo.thingsboard.io',tbToken:'',loraBand:'433 MHz (SX1278 / SF9)',weather:'Open-Meteo',defMinDo:5,defFarq:2,defKritik:3};
-  dbSet('admins',admins); dbSet('farmers',farmers); dbSet('devices',devices); dbSet('lakes',lakes); dbSet('gateways',gateways);
-  dbSet('approvals',approvals); dbSet('feeds',feeds); dbSet('tickets',tickets);
-  dbSet('alertState',{}); dbSet('announce',[]); dbSet('audit',[]); dbSet('settings',settings); dbSet('seeded',1);
+  /* ====== DEMO MA'LUMOTLAR OLIB TASHLANDI ======
+     Tizim BO'SH boshlanadi. Faqat tizimga kirish uchun admin akkaunt,
+     yem turi (HUALONG) va standart sozlamalar qoldirilgan.
+     'seedver' oshirilgani uchun eski demo ma'lumotlar bir marta tozalanadi. */
+  if(dbGet('seedver')===10) return;
+
+  /* Admin akkaunt — bularsiz panelga kirib bo'lmaydi (login/parol: superadmin / 1234) */
+  if(!(dbGet('admins')||[]).length){
+    dbSet('admins',[
+      {id:rid('A'),login:'superadmin',pass:'1234',name:'Bosh admin',role:'super',region:''},
+    ]);
+  }
+
+  /* Yem turlari — bu demo emas, tizim konfiguratsiyasi (kerak bo'lsa qoldiramiz) */
+  if(!(dbGet('feeds')||[]).length){
+    dbSet('feeds',[{ id:'hualong', name:'HUALONG SILIAO', active:true,
+      sizes:['20–100 g','100–300 g','300–600 g','600 g–1.2 kg','1.2–2 kg'],
+      temps:[{t:12,r:[0.5,0.75,0.75,0.75,0.75],times:['12:00']},{t:15,r:[1,1,1.5,1.3,1.0],times:['10:00','14:00']},
+             {t:18,r:[2,2,2,1.5,1.5],times:['10:00','15:00']},{t:22,r:[3,3.5,3,2,2],times:['09:00','12:00','16:00']},
+             {t:24,r:[4,4,3.5,3,2.5],times:['08:00','12:00','17:00']},{t:27,r:[5,3.5,4,4,3],times:['08:00','11:00','14:00','17:00']},
+             {t:30,r:[4,3,2.5,2.5,3],times:['08:00','11:00','15:00','18:00']},{t:33,r:[3,2,2,2,1.75],times:['08:00','11:00','15:00','18:00']}]}]);
+  }
+
+  /* Standart sozlamalar */
+  if(!dbGet('settings')){
+    dbSet('settings',{tbHost:'',tbToken:'',loraBand:'433 MHz (SX1278 / SF9)',weather:'Open-Meteo',defMinDo:5,defFarq:2,defKritik:3});
+  }
+
+  /* === DEMO KO'LLAR / FERMERLAR / QURILMALAR / SHLYUZLAR — BARCHASI BO'SH === */
+  dbSet('farmers',[]); dbSet('devices',[]); dbSet('lakes',[]); dbSet('gateways',[]);
+  dbSet('approvals',[]); dbSet('tickets',[]);
+  if(!dbGet('alertState')) dbSet('alertState',{});
+  if(!dbGet('announce'))   dbSet('announce',[]);
+  if(!dbGet('audit'))      dbSet('audit',[]);
+
+  dbSet('seedver',10); dbSet('seeded',1);
 }
 
 /* ============ STATE ============ */
