@@ -451,7 +451,9 @@ function statusLevel(doVal){
 }
 function statusOf(L){ return statusLevel(lakeNow(L).do).key; }
 function isProblem(L){ const k=statusOf(L); return k==='yomon'||k==='olim'; }
-function aerOn(L){ const v=lakeNow(L).do, s=L.settings; return L.mode==='on'?true:v<s.minDo; }
+function isBlocked(L){ return !!(L&&REG[L.id]&&REG[L.id].blocked===true); }
+function rssiColor(rssi){ return rssi>-100?'#1E9E6A':rssi>-110?'#E0922F':'#DC4B3E'; }
+function aerOn(L){ const lv=liveFor(L); if(lv&&typeof lv.aer!=='undefined') return !!(+lv.aer); if(isBlocked(L)) return false; const doVal=lakeNow(L).do,s=L.settings; return L.mode==='on'?true:doVal<s.minDo; }
 /* ===== LoRa SHLYUZ ALOQASI (demo) — gateway RSSI tushunchasiga mos ===== */
 function linkOf(L){
   const lv=liveFor(L);
@@ -481,8 +483,10 @@ function biomass(L){ const s=L.settings;
   else { baseDate=s.stockDate||(Date.now()-90*86400000); baseAvg=s.oWeight||0; cnt=s.baliqSoni||0; }
   const initKg=cnt*baseAvg/1000;
   const log=(s.feedLog||[]).slice().sort((a,b)=>a.date-b.date);
-  const integ=from=>{ let c=0; for(let i=0;i<log.length;i++){ const start=Math.max(log[i].date,from), end=i<log.length-1?log[i+1].date:Date.now(); if(end>start) c+=log[i].kg*((end-start)/86400000); } return c; };
-  const cumSince=integ(baseDate), cumAll=integ(s.stockDate||baseDate);
+  /* feedLog = har kunda HAQIQATAN berilgan kg (sanalar bo'yicha summa) */
+  const stockFrom=s.stockDate||0;
+  const cumAll=log.filter(e=>e.date>=stockFrom).reduce((s,e)=>s+e.kg,0);
+  const cumSince=log.filter(e=>e.date>=baseDate).reduce((s,e)=>s+e.kg,0);
   const totalKg=initKg+cumSince/(s.fcr||1.5); const avgG=cnt>0?totalKg*1000/cnt:0;
   return {cnt, initKg:+initKg.toFixed(1), totalKg:+totalKg.toFixed(1), avgG:Math.round(avgG),
     cum:+cumAll.toFixed(1), measured:ms.length>0, lastM: ms.length?ms[ms.length-1]:null}; }
@@ -677,7 +681,7 @@ function showScreen(id){ document.querySelectorAll('.screen').forEach(s=>s.class
 function show(v, lakeId){
   view=v; if(lakeId!==undefined) currentLake=lakeId;
   delShowId=null;
-  if(v==='lake') curTab='mon';
+  if(v==='lake'){ curTab='mon'; tarFrom=null; tarTo=null; }
   setNav(v);
   const isSub=['lake','addlake','personal','appsettings','lang','pin','devices','support'].includes(v);
   document.getElementById('tb-back').style.display=isSub?'block':'none';
@@ -719,21 +723,24 @@ function renderLakes(){
         <div style="font-size:26px">⛅</div>
         <div style="flex:1"><div style="font-size:12px;opacity:.85">Ertangi ob-havo · ${esc(USER.vil)}</div>
         <div style="font-weight:600;font-size:15px;font-family:var(--mono)">~${WEATHER.avg}°C <span style="opacity:.8;font-weight:400">(max ${Math.round(WEATHER.max)}° / min ${Math.round(WEATHER.min)}°)</span></div></div></div>`
-    : (weatherTried? `<div style="font-size:11.5px;color:var(--ink-faint);margin-bottom:10px">Ob-havo olinmadi — joriy suv harorati ishlatiladi.</div>` : '');
+    : (weatherTried? `<div style="font-size:11.5px;color:var(--ink-faint);margin-bottom:10px">⚠ Ob-havo olinmadi — joriy suv harorati ishlatiladi.</div>` : '<div style="height:4px"></div>');
   C.innerHTML=`<div class="sec-h">${LAKES.length} ta ko'l</div>${wbanner}<div style="font-size:11.5px;color:var(--ink-faint);margin:-4px 2px 10px">⋮⋮ ushlab tortib tartiblang · bir marta bossangiz o'chirish chiqadi</div><div id="lake-list">`+LAKES.map((L,idx)=>{
+    const lv=liveFor(L), blk=isBlocked(L), off=(!blk&&fbReady&&!lv);
     const n=lakeNow(L), st=statusLevel(n.do), on=aerOn(L), rec=recFeed(L), lk=linkOf(L), pend=!lakeApproved(L);
-    const feedTxt = rec.none==='type' ? "Yem turini tanlang" : rec.none==='data' ? "Baliq ma'lumotini kiriting" : `🍚 Ertaga ~<b>${rec.kg} kg</b> yem`;
+    const fCol=blk||off?'#DC4B3E':st.col;
+    const fDO=blk||off?'--':n.do;
+    const feedTxt=(blk||off)?'':(rec.none==='type'?"Yem turini tanlang":rec.none==='data'?"Baliq ma'lumotini kiriting":`🍚 Ertaga ~<b>${rec.kg} kg</b> yem`);
     return `<div class="card lake-card" data-id="${L.id}">
       <div class="lake-row">
-        <div class="lake-ring" onclick="show('lake','${L.id}')" style="border:3px solid ${st.col}; background:${st.col}14;">${n.do}</div>
+        <div class="lake-ring" onclick="show('lake','${L.id}')" style="border:3px solid ${fCol}; background:${fCol}14; color:${blk||off?'#DC4B3E':'inherit'}">${fDO}</div>
         <div class="nm" onclick="show('lake','${L.id}')"><div class="t">${esc(L.name)}</div>
-          <div class="s">DO ${n.do} · pH ${n.ph} · ${n.temp}°C</div>
+          <div class="s" style="${blk||off?'color:#DC4B3E':''}">${blk?'🔒 Bloklangan':off?'⚠ Oflayn':('DO '+fDO+' · pH '+n.ph+' · '+n.temp+'°C')}</div>
           <div style="margin-top:6px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
             ${pend?`<span class="pill" style="background:#E0922F1f;color:#E0922F">⏳ Tasdiq kutilmoqda</span>`:''}
-            <span class="pill" style="background:${st.col}1f;color:${st.col}">${st.label}</span>
-            <span class="pill ${on?'aer-on':'aer-off'}">Aerator ${on?'YONIQ':'O‘CHIQ'}</span>
-            <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--ink-faint);white-space:nowrap">${lk.online?linkBars(lk.bars):'<span style="color:var(--warn)">⚠ Oflayn</span>'} 🕐 ${tm}</span></div>
-          <div style="margin-top:5px;font-size:12px;color:${rec.none?'var(--ink-faint)':'var(--primary)'}">${feedTxt}</div></div>
+            ${blk?'<span class="pill crit">🔒 Bloklangan</span>':off?'<span class="pill crit">📡 Oflayn</span>':`<span class="pill" style="background:${st.col}1f;color:${st.col}">${st.label}</span>`}
+            ${!blk&&!off?`<span class="pill ${on?'aer-on':'aer-off'}">Aerator ${on?'YONIQ':'O’CHIQ'}</span>`:''}
+            <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--ink-faint);white-space:nowrap">${lk.online?`<span style="color:${rssiColor(lk.rssi)};font-family:var(--mono);font-size:11px">${lk.rssi}dBm</span>`:`<span style="color:var(--warn)">⚠ Oflayn</span>`} 🕐 ${tm}</span></div>
+          <div style="margin-top:5px;font-size:12px;color:${rec.none?'var(--ink-faint)':'var(--primary)'}">${!blk&&!off?feedTxt:''}</div></div>
         <div class="drag" data-drag>⋮⋮</div>
       </div>
       ${delShowId===L.id?`<div class="del-bar"><button class="del-btn" onclick="deleteLake('${L.id}')">🗑 O'chirish</button><button class="del-cancel" onclick="toggleDel('${L.id}')">Bekor</button></div>`:''}
@@ -792,7 +799,7 @@ function addLake(){
   }
   const name = nm || id;   // ko'l nomi ixtiyoriy
   LAKES.push({id,name,mode:'auto',seed:Math.random()*100, status: fbReady?'pending':'demo',
-    settings:{minDo:5,farq:2,kritik:3,suvMaydoni:0,aerSoni:1,aerKw:2.2,tarif:600,
+    settings:{minDo:5,farq:2,kritik:3,suvMaydoni:0,avgDepth:0,aerSoni:1,aerKw:2.2,tarif:600,
       baliqSoni:0,oWeight:0,fcr:1.5,stockDate:0,feedLog:[],kunlikYem:0,feedType:'',measurements:[]}});
   dbSet('lakes',LAKES);
   if(fbReady){ fbSendRequest(id,name); toast(name+' qo‘shildi — admin tasdig‘i kutilmoqda'); }
@@ -828,13 +835,13 @@ function renderMon(L,B){
     <div class="ticker">
       <div class="statusdot"><span class="pill" style="background:${stC}33;color:#fff;">${stT}</span></div>
       <div class="lbl">Erigan kislorod (DO)</div>
-      <div class="big" id="t-do">${n.do}<span class="unit"> mg/L</span></div>
+      <div class="big" id="t-do" style="color:${stC}">${n.do}<span class="unit" style="opacity:.7"> mg/L</span></div>
       <div class="delta" style="color:#7FE3D6;">Min ${L.settings.minDo} · Kritik ${L.settings.kritik} mg/L</div>
       <div class="metarow">
-        <div class="m"><div class="k">pH</div><div class="v" id="t-ph">${n.ph}</div></div>
-        <div class="m"><div class="k">Harorat</div><div class="v" id="t-t">${n.temp}°</div></div>
-        <div class="m"><div class="k">Aerator</div><div class="v" style="color:${on?'#7FE3D6':'#9FB0AC'}">${on?'YONIQ':'O‘CHIQ'}</div></div>
-        <div class="m"><div class="k">Aloqa</div><div class="v" style="color:${lk.online?'#7FE3D6':'#E0922F'};font-size:14px">${lk.online?lk.rssi+'<span style="font-size:10px;opacity:.7"> dBm</span>':'Oflayn'}</div></div>
+        <div class="m"><div class="k">pH</div><div class="v" id="t-ph" style="color:${zoneCol('ph',n.ph)}">${n.ph}</div></div>
+        <div class="m"><div class="k">Harorat</div><div class="v" id="t-t" style="color:${zoneCol('temp',n.temp)}">${n.temp}°</div></div>
+        <div class="m"><div class="k">Aerator</div><div class="v" style="color:${on?'#4ADE80':'#9FB0AC'}">${on?'YONIQ':'O’CHIQ'}</div></div>
+        <div class="m"><div class="k">Aloqa</div><div class="v" style="color:${lk.online?rssiColor(lk.rssi):'#E0922F'};font-size:14px">${lk.online?lk.rssi+'<span style="font-size:10px;opacity:.7"> dBm</span>":'Oflayn'}</div></div>
       </div>
     </div>
 
@@ -882,7 +889,7 @@ function renderMon(L,B){
         ${rec.kg>0?`<div class="kv"><span class="k">Necha marta · har safar</span><span class="v">${rec.n} marta · ${rec.perFeed} kg</span></div>
         <div class="kv" style="border:none;padding-top:10px"><span class="k">Berish vaqtlari</span><span class="v" style="font-size:13px">${rec.times.join('  ')}</span></div>`:''}
         ${rec.note?`<div style="margin-top:8px;color:var(--warn);font-size:12.5px;font-weight:600">⚠ ${rec.note}</div>`:''}
-        ${rec.kg>0?`<button class="btn sm" style="margin-top:12px" onclick="logFedToday(${rec.kg})">✓ Bugun shu miqdorni berdim (${rec.kg} kg)</button>`:''}
+        ${rec.kg>0?`<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="btn sm" onclick="logFedToday(${rec.kg})">✓ Tasdiqlayman (${rec.kg} kg)</button><button class="btn sm ghost" onclick="logFedCustom(${rec.kg})">Boshqa miqdor...</button></div>`:''}
         ${WEATHER?'':`<div style="margin-top:8px;font-size:11.5px;color:var(--ink-faint)">Ob-havo olinmadi — joriy suv harorati ishlatildi.</div>`}
       </div>`; })()}
 
@@ -895,26 +902,47 @@ function logFedToday(kg){ const L=getLake(currentLake), s=L.settings; s.feedLog=
   const today=new Date(); today.setHours(0,0,0,0); const td=today.getTime();
   const i=s.feedLog.findIndex(e=>{const d=new Date(e.date); d.setHours(0,0,0,0); return d.getTime()===td;});
   if(i>=0) s.feedLog[i].kg=kg; else s.feedLog.push({date:Date.now(), kg});
-  s.kunlikYem=kg; dbSet('lakes',LAKES); toast('Bugungi yem qayd etildi'); renderTab(); }
+  s.kunlikYem=kg; dbSet('lakes',LAKES); toast('Bugungi yem qayd etildi: '+kg+' kg'); renderTab(); }
+function logFedCustom(recKg){
+  const inp=prompt('Haqiqatan berilgan yem miqdori (kg):', recKg||'');
+  if(inp===null) return;
+  const kg=+(String(inp).replace(',','.'));
+  if(!(kg>0)){ toast("Noto'g'ri miqdor"); return; }
+  logFedToday(kg);
+}
 function setRange(r){ curRange=r; chIdx=null; renderTab(); }
 function updateTickerLive(){ const L=getLake(currentLake); if(!L) return; const n=lakeNow(L), on=aerOn(L);
-  let e=document.getElementById('t-do'); if(e){ e.innerHTML=`${n.do}<span class="unit"> mg/L</span>`; }
-  e=document.getElementById('t-ph'); if(e){ e.textContent=n.ph; e._orig=undefined; }
-  e=document.getElementById('t-t'); if(e){ e.textContent=n.temp+'°'; e._orig=undefined; } }
+  const lvl2=statusLevel(n.do);
+  let e=document.getElementById('t-do'); if(e){ e.style.color=lvl2.col; e.innerHTML=`${n.do}<span class="unit" style="opacity:.7"> mg/L</span>`; }
+  e=document.getElementById('t-ph'); if(e){ e.style.color=zoneCol('ph',n.ph); e.textContent=n.ph; e._orig=undefined; }
+  e=document.getElementById('t-t'); if(e){ e.style.color=zoneCol('temp',n.temp); e.textContent=n.temp+'°'; e._orig=undefined; } }
 function setMode(m){ const L=getLake(currentLake); L.mode=m; dbSet('lakes',LAKES);
   if(liveFor(L)) fbSendCmd(L.id, {aer: m==='on'?1:0});
   document.querySelectorAll('.relay button').forEach(b=>b.classList.remove('on'));
   const el=document.querySelector(`.relay button[data-m="${m}"]`); if(el) el.classList.add('on');
   toast(m==='auto'?'Buyruq yuborildi: Avtomatik':'Buyruq yuborildi: Majburan yoqish'); }
 let energyRange='kun';
+function calcAerHours(L,days){
+  const hist=HIST[L.id]||[];
+  if(!hist.length) return null;
+  const since=Date.now()-days*86400000;
+  const recent=hist.filter(p=>p.t>=since&&isFinite(p.do));
+  if(recent.length<2) return null;
+  const minDo=L.settings.minDo||5; let aerMs=0;
+  for(let i=0;i<recent.length-1;i++){
+    const doVal=recent[i].do, dt=recent[i+1].t-recent[i].t;
+    if(L.mode==='on'||doVal<minDo) aerMs+=dt;
+  }
+  return aerMs/3600000;
+}
 function energy(L,range){ range=range||energyRange; const s=L.settings;
   const days={kun:1,hafta:7,oy:30,'3oy':90}[range]||1;
-  const dailyH=4+rnd(L.seed)*7;
-  const soat=+(dailyH*days).toFixed(days===1?1:0);
+  const aerH=calcAerHours(L,days);
+  const soat=aerH!==null?+aerH.toFixed(days===1?1:0):+(days*8).toFixed(0);
   const kw=+(s.aerSoni*s.aerKw).toFixed(1);
   const kwh=+(soat*kw).toFixed(days===1?1:0);
   const som=Math.round(kwh*s.tarif).toLocaleString('ru-RU');
-  return {soat,kw,kwh,som}; }
+  return {soat,kw,kwh,som,fromReal:aerH!==null}; }
 function energyCardHTML(L){ const e=energy(L,energyRange);
   const lbl={kun:'Bugun',hafta:'Bu hafta',oy:'Bu oy','3oy':'3 oyda'}[energyRange];
   const pills=[['kun','Kun'],['hafta','Hafta'],['oy','Oy'],['3oy','3 oy']];
@@ -924,7 +952,7 @@ function energyCardHTML(L){ const e=energy(L,energyRange);
     <div class="kv"><span class="k">Umumiy quvvat</span><span class="v">${e.kw} kW</span></div>
     <div class="kv"><span class="k">Sarflangan energiya</span><span class="v big">${e.kwh} kWh</span></div>
     <div class="kv"><span class="k">Taxminiy to'lov</span><span class="v big">${e.som} so'm</span></div>
-    <div style="font-size:11.5px;color:var(--ink-faint);margin-top:8px;">Quvvat va tarifni «Sozlamalar» bo'limida kiriting.</div></div>`; }
+    <div style="font-size:11.5px;color:var(--ink-faint);margin-top:8px;">${e.fromReal?'Haqiqiy qurilma ma\'lumotlari asosida hisoblandi.':'Quvvat va tarifni «Sozlamalar» bo\'limida kiriting.'}</div></div>`; }
 function setEnergyRange(r){ energyRange=r; const old=document.getElementById('energy-card');
   if(old){ old.outerHTML=energyCardHTML(getLake(currentLake)); applyLang(); } }
 
@@ -1023,16 +1051,49 @@ function renderTav(L,B){ B.innerHTML=`<div class="empty"><div class="ic" style="
   <div style="margin-top:18px;font-size:12px;color:var(--ink-faint);">Tez orada ishga tushadi</div></div>`; }
 
 /* ---- Tarix ---- */
-function renderTar(L,B){ const data=lakeHistory(L,'24s').slice().reverse().slice(0,40);
-  if(!data.length){ B.innerHTML=`<div class="empty"><div class="ic" style="color:var(--warn)">${icon('clock',40)}</div><div class="t">Ma'lumot hali yetarli emas</div><div>Qurilma yangi ulangan. O'lchovlar to'planishi bilan tarix shu yerda chiqadi.</div></div>`; return; }
-  B.innerHTML=`<div class="sec-h">So'nggi yozuvlar (24 soat)</div><div class="card" style="padding:6px 14px;">
-    ${data.map(d=>{ const c=zoneCol('do',d.do);
-      return `<div class="kv"><span class="k">${p2(new Date(d.t).getHours())}:${p2(new Date(d.t).getMinutes())}</span>
-        <span class="v"><span style="color:${c}">DO ${d.do.toFixed(1)}</span> · pH ${d.ph.toFixed(1)} · ${Math.round(d.temp)}°</span></div>`; }).join('')}</div>`; }
+let tarFrom=null, tarTo=null;
+function renderTar(L,B){
+  if(!tarFrom) tarFrom=dateInputVal(Date.now()-7*86400000);
+  if(!tarTo) tarTo=dateInputVal(Date.now());
+  const fromMs=new Date(tarFrom).getTime();
+  const toMs=new Date(tarTo).getTime()+86399999;
+  const all=(HIST[L.id]&&HIST[L.id].length)?HIST[L.id]:[];
+  const data=all.filter(p=>p.t>=fromMs&&p.t<=toMs&&isFinite(p.do)).slice().reverse().slice(0,300);
+  B.innerHTML=`
+    <div style="display:flex;gap:8px;margin-bottom:14px;align-items:flex-end;flex-wrap:wrap">
+      <div class="field" style="flex:1;margin:0;min-width:110px"><label>Dan</label><input type="date" id="tar-from" value="${tarFrom}" onchange="tarFrom=this.value;renderTab()"></div>
+      <div class="field" style="flex:1;margin:0;min-width:110px"><label>Gacha</label><input type="date" id="tar-to" value="${tarTo}" onchange="tarTo=this.value;renderTab()"></div>
+      <button class="btn sm" style="margin-bottom:0" onclick="exportTarCSV('${L.id}',${fromMs},${toMs})">📥 CSV</button>
+    </div>
+    ${data.length?`
+    <div class="sec-h">${data.length} ta yozuv · ${tarFrom} – ${tarTo}</div>
+    <div class="card" style="padding:6px 14px;">
+      ${data.map(d=>{ const c=zoneCol('do',d.do); const dt=new Date(d.t);
+        const dtStr=p2(dt.getMonth()+1)+'/'+p2(dt.getDate())+'/'+dt.getFullYear()+' '+p2(dt.getHours())+':'+p2(dt.getMinutes());
+        return '<div class="kv"><span class="k" style="font-size:11.5px">'+dtStr+'</span>'+
+          '<span class="v"><span style="color:'+c+'">DO '+d.do.toFixed(1)+'</span> · pH '+d.ph.toFixed(1)+' · '+Math.round(d.temp)+'°</span></div>'; }).join('')}
+    </div>`:`<div class="empty"><div class="ic" style="color:var(--warn)">${icon('clock',40)}</div><div class="t">Ma'lumot topilmadi</div><div>Tanlangan sana oralig'ida ma'lumot yo'q.</div></div>`}
+  `;
+}
+function exportTarCSV(lid,fromMs,toMs){
+  const L=getLake(lid); const all=(HIST[lid]&&HIST[lid].length)?HIST[lid]:[];
+  const data=all.filter(p=>p.t>=fromMs&&p.t<=toMs&&isFinite(p.do));
+  if(!data.length){ toast("Eksport qilish uchun ma'lumot yo'q"); return; }
+  const rows=[['Sana','Vaqt','DO (mg/L)','pH','Harorat (°C)','Status']];
+  data.forEach(d=>{ const dt=new Date(d.t);
+    rows.push([p2(dt.getMonth()+1)+'/'+p2(dt.getDate())+'/'+dt.getFullYear(), p2(dt.getHours())+':'+p2(dt.getMinutes()), d.do.toFixed(1), d.ph.toFixed(1), Math.round(d.temp), d.do>=5?'Yaxshi':d.do>=3?'Qoniqarli':'Yomon']); });
+  const csv='\ufeff'+rows.map(r=>r.join(',')).join('\r\n');
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+  a.download=(L?L.name:lid)+'_tarix.csv'; a.click(); toast('CSV yuklab olindi'); }
 
 /* ---- Sozlamalar ---- */
 function renderSet(L,B){ const s=L.settings; const b=biomass(L);
   B.innerHTML=`
+    <div class="sec-h">Ko'l nomi</div>
+    <div class="card">
+      <div class="field" style="margin-bottom:0"><label>Ko'l nomi</label>
+        <input id="set-name" value="${esc(L.name)}" placeholder="masalan: 7-ko'l"></div>
+    </div>
     <div class="sec-h">Kislorod chegaralari</div>
     <div class="card"><div class="row2">
       <div class="field"><label>Min DO (mg/L)</label><input id="set-min" type="number" value="${s.minDo}"></div>
@@ -1040,9 +1101,12 @@ function renderSet(L,B){ const s=L.settings; const b=biomass(L);
       <div class="field" style="margin-bottom:0"><label>Kritik DO (mg/L)</label><input id="set-krit" type="number" value="${s.kritik}">
         <div class="hint">Shu qiymatdan pasaysa SMS + qo'ng'iroq va bildirishnoma chiqadi.</div></div></div>
     <div class="sec-h">Ko'l va aerator</div>
-    <div class="card"><div class="row2">
+    <div class="card">
+      <div class="row2">
       <div class="field"><label>Suv maydoni (m²)</label><input id="set-maydon" type="number" value="${s.suvMaydoni||''}" placeholder="0"></div>
-      <div class="field"><label>Aerator soni</label><input id="set-asoni" type="number" value="${s.aerSoni}"></div></div>
+      <div class="field"><label>O'rtacha chuqurlik (m)</label><input id="set-depth" type="number" step="0.1" value="${s.avgDepth||''}" placeholder="masalan: 2.5"></div></div>
+      <div class="row2">
+      <div class="field"><label>Aerator soni</label><input id="set-asoni" type="number" value="${s.aerSoni}"></div>
       <div class="row2">
       <div class="field"><label>Bitta quvvati (kW)</label><input id="set-akw" type="number" step="0.1" value="${s.aerKw}"></div>
       <div class="field"><label>Tarif (so'm/kWh)</label><input id="set-tarif" type="number" value="${s.tarif}"></div></div></div>
@@ -1096,12 +1160,15 @@ function renderSet(L,B){ const s=L.settings; const b=biomass(L);
     </div>`; }
 function saveSet(){ const L=getLake(currentLake), s=L.settings;
   s.minDo=+val('set-min')||5; s.farq=+val('set-farq')||2; s.kritik=+val('set-krit')||3;
-  s.suvMaydoni=+val('set-maydon')||0; s.aerSoni=+val('set-asoni')||1; s.aerKw=+val('set-akw')||2.2; s.tarif=+val('set-tarif')||600;
+  s.suvMaydoni=+val('set-maydon')||0; s.avgDepth=+val('set-depth')||0; s.aerSoni=+val('set-asoni')||1; s.aerKw=+val('set-akw')||2.2; s.tarif=+val('set-tarif')||600;
   s.baliqSoni=+val('set-soni')||0; s.oWeight=+val('set-ow')||0; s.fcr=+val('set-fcr')||1.5;
   const dstr=val('set-date'); if(dstr) s.stockDate=new Date(dstr).getTime();
   if(!s.stockDate) s.stockDate=Date.now()-90*86400000;
   s.feedType=val('set-feed');
-  dbSet('lakes',LAKES); toast('Saqlandi · chegaralar qurilmaga yuborildi'); setTab('mon'); }
+  const newName=val('set-name').trim(); if(newName){ L.name=newName; setTop(L.name,'ID: '+L.id); }
+  dbSet('lakes',LAKES);
+  if(fbDb&&L.id){ fbSendCmd(L.id,{minDo:s.minDo,farq:s.farq,kritik:s.kritik,aer:lakeNow(L).do<s.minDo?1:0}); }
+  toast('Saqlandi · chegaralar qurilmaga yuborildi'); setTab('mon'); }
 function addFeedEntry(){ const L=getLake(currentLake), s=L.settings; const kg=+val('feed-kg'); const dstr=val('feed-date');
   if(!(kg>0)){ toast('Kunlik yem miqdorini kiriting'); return; }
   const date=dstr? new Date(dstr).getTime() : Date.now(); s.feedLog=s.feedLog||[];
