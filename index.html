@@ -430,7 +430,9 @@ function calcAt(L, tms){
 }
 function lakeNow(L){
   const lv=liveFor(L);
-  if(lv){ return { do:+(+lv.do).toFixed(1), ph:+(+lv.ph).toFixed(1), temp:+(+lv.t).toFixed(1) }; }
+  if(lv){ return {do:+(+lv.do).toFixed(1),ph:+(+lv.ph).toFixed(1),temp:+(+lv.t).toFixed(1),aer:+lv.aer||0,live:true}; }
+  /* Real qurilma lekin ma'lumot kelmayapti (oflayn/bloklangan) -> -- ko'rsatamiz */
+  if(fbReady && L.status!=='demo') return {offline:true,do:null,ph:null,temp:null};
   const n=calcAt(L, Date.now());
   if(L.mode==='on') n.do=+(n.do+1.2).toFixed(1);
   n.do=+(n.do+Math.sin(Date.now()/9000+L.seed)*0.2).toFixed(1);
@@ -449,9 +451,14 @@ function statusLevel(doVal){
   if(doVal>=2) return {key:'yomon',    label:'Yomon',       col:'#E2660A'};
   return            {key:'olim',     label:"O'lim xavfi", col:'#DC4B3E'};
 }
-function statusOf(L){ return statusLevel(lakeNow(L).do).key; }
+function statusOf(L){ const n=lakeNow(L); if(n.offline) return 'oflayn'; return statusLevel(n.do).key; }
 function isProblem(L){ const k=statusOf(L); return k==='yomon'||k==='olim'; }
-function aerOn(L){ const v=lakeNow(L).do, s=L.settings; return L.mode==='on'?true:v<s.minDo; }
+function aerOn(L){
+  const lv=liveFor(L);
+  if(lv && typeof lv.aer!=='undefined') return !!(+lv.aer);
+  const n=lakeNow(L); if(n.offline) return false;
+  return L.mode==='on'?true:(n.do||0)<(L.settings.minDo||5);
+}
 /* ===== LoRa SHLYUZ ALOQASI (demo) — gateway RSSI tushunchasiga mos ===== */
 function linkOf(L){
   const lv=liveFor(L);
@@ -471,6 +478,37 @@ function linkBars(bars,onCol){ onCol=onCol||'#1E9E6A';
   return '<span style="display:inline-flex;align-items:flex-end;gap:1px;height:11px;vertical-align:-1px">'+
     [1,2,3].map(i=>`<span style="display:inline-block;width:3px;height:${3+i*3}px;border-radius:1px;background:${i<=bars?onCol:'#C7D3CF'}"></span>`).join('')+'</span>';
 }
+/* LoRa uchun RSSI sifat darajalari (adabiyot: SX1278 433 MHz) */
+function rssiColor(rssi){ if(rssi>=-80) return '#1E9E6A'; if(rssi>=-100) return '#E0922F'; return '#DC4B3E'; }
+function rssiLabel(rssi){ if(rssi>=-80) return 'Yaxshi'; if(rssi>=-100) return 'Qoniqarli'; return 'Yomon'; }
+/* ===== AYRATOR ISHLASH VAQTINI KUZATISH (real Firebase ma'lumotiga asosan) ===== */
+const AER_RUN_STATE={};
+function aerTrackTick(L){
+  const lv=liveFor(L); if(!lv) return;
+  const isOn=!!(+lv.aer), now=Date.now();
+  if(!AER_RUN_STATE[L.id]) AER_RUN_STATE[L.id]={wasOn:false,lastTs:now};
+  const ar=AER_RUN_STATE[L.id];
+  const elapsed=Math.min(now-ar.lastTs,60000);
+  if(ar.wasOn&&isOn&&elapsed>500){
+    const key='aerRun_'+L.id;
+    let s=dbGet(key)||{todayMs:0,weekMs:0,monthMs:0,totalMs:0,lastDay:'',lastW:'',lastM:''};
+    const td=new Date().toDateString();
+    const tw=new Date(); tw.setDate(tw.getDate()-tw.getDay()); const twStr=tw.toDateString();
+    const tmStr=new Date().getFullYear()+'-'+new Date().getMonth();
+    if(s.lastDay!==td){s.todayMs=0;s.lastDay=td;}
+    if(s.lastW!==twStr){s.weekMs=0;s.lastW=twStr;}
+    if(s.lastM!==tmStr){s.monthMs=0;s.lastM=tmStr;}
+    s.todayMs+=elapsed;s.weekMs+=elapsed;s.monthMs+=elapsed;s.totalMs+=elapsed;
+    dbSet(key,s);
+  }
+  ar.wasOn=isOn;ar.lastTs=now;
+}
+function getAerRunH(L,range){
+  const key='aerRun_'+L.id;
+  const s=dbGet(key)||{todayMs:0,weekMs:0,monthMs:0,totalMs:0};
+  const ms={kun:s.todayMs||0,hafta:s.weekMs||0,oy:s.monthMs||0,'3oy':s.totalMs||0}[range]||0;
+  return +(ms/3600000).toFixed(2);
+}
 function nowHHMM(){ const d=new Date(); return p2(d.getHours())+':'+p2(d.getMinutes()); }
 function dateInputVal(ms){ const d=new Date(ms||Date.now()); return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate()); }
 /* Baliq massasi: (oxirgi o'lchov yoki boshlang'ich) + (yem / FCR) */
@@ -481,7 +519,17 @@ function biomass(L){ const s=L.settings;
   else { baseDate=s.stockDate||(Date.now()-90*86400000); baseAvg=s.oWeight||0; cnt=s.baliqSoni||0; }
   const initKg=cnt*baseAvg/1000;
   const log=(s.feedLog||[]).slice().sort((a,b)=>a.date-b.date);
-  const integ=from=>{ let c=0; for(let i=0;i<log.length;i++){ const start=Math.max(log[i].date,from), end=i<log.length-1?log[i+1].date:Date.now(); if(end>start) c+=log[i].kg*((end-start)/86400000); } return c; };
+  const integ=from=>{
+    let c=0;
+    for(let i=0;i<log.length;i++){
+      const start=Math.max(log[i].date,from);
+      const end=i<log.length-1?log[i+1].date:Date.now();
+      const days=(end-start)/86400000;
+      if(days>0) c+=log[i].kg*days;
+      else if(i===log.length-1) c+=log[i].kg; /* bugungi yozuv = 1 kun */
+    }
+    return c;
+  };
   const cumSince=integ(baseDate), cumAll=integ(s.stockDate||baseDate);
   const totalKg=initKg+cumSince/(s.fcr||1.5); const avgG=cnt>0?totalKg*1000/cnt:0;
   return {cnt, initKg:+initKg.toFixed(1), totalKg:+totalKg.toFixed(1), avgG:Math.round(avgG),
@@ -512,7 +560,7 @@ function feedRate(id, tempC, avgG){ const f=feedTypeById(id); if(!f) return null
 /* Ertangi yem tavsiyasi (suv harorati × o'lcham × massa, kislorod tuzatishi bilan) */
 function recFeed(L){ const s=L.settings; if(!s.feedType) return {none:'type'};
   const b=biomass(L); if(!b.cnt||!b.totalKg) return {none:'data'};
-  const temp = WEATHER? WEATHER.avg : lakeNow(L).temp;
+  const _ln=lakeNow(L); const temp=WEATHER?WEATHER.avg:(_ln.offline?22:(_ln.temp||22));
   const fr=feedRate(s.feedType, temp, b.avgG); if(!fr) return {none:'type'};
   let kg=b.totalKg*fr.rate/100, note=''; const doNow=lakeNow(L).do;
   if(doNow<2){ kg=0; note="Kislorod juda past — bugun yem bermang"; }
@@ -529,11 +577,21 @@ const REGION_COORDS={"Andijon":[40.78,72.34],"Buxoro":[39.77,64.42],"Farg'ona":[
   "Toshkent viloyati":[41.00,69.40],"Toshkent shahri":[41.31,69.24]};
 function regionCoords(v){ return REGION_COORDS[v]||[41.31,69.24]; }
 async function fetchWeather(){ weatherTried=true;
-  try{ const [lat,lng]=regionCoords(USER&&USER.vil);
-    const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}&daily=temperature_2m_max,temperature_2m_min&timezone=auto&forecast_days=2`;
+  try{
+    let lat,lng,byGps=false;
+    const gp=await new Promise(resolve=>{
+      if(navigator.geolocation){
+        navigator.geolocation.getCurrentPosition(p=>resolve(p.coords),()=>resolve(null),{timeout:4000,maximumAge:300000});
+      }else resolve(null);
+    });
+    if(gp&&gp.latitude){lat=gp.latitude;lng=gp.longitude;byGps=true;}
+    else [lat,lng]=regionCoords(USER&&USER.vil);
+    const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&current=temperature_2m&timezone=auto&forecast_days=2`;
     const r=await fetch(url); const j=await r.json();
-    const mx=j.daily.temperature_2m_max[1], mn=j.daily.temperature_2m_min[1];
-    WEATHER={ max:mx, min:mn, avg:Math.round((mx+mn)/2), date:j.daily.time[1] };
+    const mx=j.daily.temperature_2m_max[1],mn=j.daily.temperature_2m_min[1];
+    const prec=j.daily.precipitation_sum?j.daily.precipitation_sum[1]:0;
+    const curT=j.current?j.current.temperature_2m:null;
+    WEATHER={max:mx,min:mn,avg:Math.round((mx+mn)/2),date:j.daily.time[1],precip:prec,curTemp:curT,byGps};
   }catch(e){ WEATHER=null; }
   if(view==='lakes') renderLakes(); else if(view==='lake'&&curTab==='mon') renderTab();
 }
@@ -562,6 +620,7 @@ function enterApp(){ showScreen('s-main'); suppressPush=true; show('lakes'); sup
 function checkLock(){ if(val('lock-pin')===getPin()){ enterApp(); } else { const e=document.getElementById('lock-err'); if(e)e.textContent='PIN noto‘g‘ri'; } }
 function liveTick(){
   if(!document.getElementById('s-main').classList.contains('active')) return;
+  LAKES.forEach(L=>aerTrackTick(L));
   if(view==='lakes' && !isDragging) renderLakes();
   if(view==='lake'&&curTab==='mon') updateTickerLive();
   updateBell(); applyLang();
@@ -716,23 +775,24 @@ function renderLakes(){
   const tm=nowHHMM();
   const wbanner = WEATHER
     ? `<div style="background:linear-gradient(120deg,#0E7C6B,#15AEC2);color:#fff;border-radius:14px;padding:12px 14px;margin-bottom:14px;display:flex;align-items:center;gap:12px">
-        <div style="font-size:26px">⛅</div>
-        <div style="flex:1"><div style="font-size:12px;opacity:.85">Ertangi ob-havo · ${esc(USER.vil)}</div>
-        <div style="font-weight:600;font-size:15px;font-family:var(--mono)">~${WEATHER.avg}°C <span style="opacity:.8;font-weight:400">(max ${Math.round(WEATHER.max)}° / min ${Math.round(WEATHER.min)}°)</span></div></div></div>`
+        <div style="font-size:26px">${WEATHER.precip>5?'🌧':'⛅'}</div>
+        <div style="flex:1"><div style="font-size:12px;opacity:.85">Ertangi ob-havo ${WEATHER.byGps?'📍 GPS':'· '+esc((USER||{}).vil||'')}</div>
+        <div style="font-weight:600;font-size:15px;font-family:var(--mono)">~${WEATHER.avg}°C <span style="opacity:.8;font-weight:400">(max ${Math.round(WEATHER.max)}° / min ${Math.round(WEATHER.min)}°${WEATHER.precip>0?' · 🌧 '+WEATHER.precip.toFixed(1)+'mm':''})</span></div>
+        ${WEATHER.curTemp!=null?`<div style="font-size:11.5px;opacity:.85">Hozir: ${Math.round(WEATHER.curTemp)}°C</div>`:''}</div></div>`
     : (weatherTried? `<div style="font-size:11.5px;color:var(--ink-faint);margin-bottom:10px">Ob-havo olinmadi — joriy suv harorati ishlatiladi.</div>` : '');
   C.innerHTML=`<div class="sec-h">${LAKES.length} ta ko'l</div>${wbanner}<div style="font-size:11.5px;color:var(--ink-faint);margin:-4px 2px 10px">⋮⋮ ushlab tortib tartiblang · bir marta bossangiz o'chirish chiqadi</div><div id="lake-list">`+LAKES.map((L,idx)=>{
-    const n=lakeNow(L), st=statusLevel(n.do), on=aerOn(L), rec=recFeed(L), lk=linkOf(L), pend=!lakeApproved(L);
+    const n=lakeNow(L),off=!!n.offline,st=off?{col:'#DC4B3E',label:'Oflayn'}:statusLevel(n.do),on=aerOn(L),rec=recFeed(L),lk=linkOf(L),pend=!lakeApproved(L);
     const feedTxt = rec.none==='type' ? "Yem turini tanlang" : rec.none==='data' ? "Baliq ma'lumotini kiriting" : `🍚 Ertaga ~<b>${rec.kg} kg</b> yem`;
     return `<div class="card lake-card" data-id="${L.id}">
       <div class="lake-row">
-        <div class="lake-ring" onclick="show('lake','${L.id}')" style="border:3px solid ${st.col}; background:${st.col}14;">${n.do}</div>
+        <div class="lake-ring" onclick="show('lake','${L.id}')" style="border:3px solid ${st.col}; background:${st.col}14;">${off?'<span style="color:#DC4B3E;font-weight:700">--</span>':n.do}</div>
         <div class="nm" onclick="show('lake','${L.id}')"><div class="t">${esc(L.name)}</div>
-          <div class="s">DO ${n.do} · pH ${n.ph} · ${n.temp}°C</div>
+          <div class="s">${off?'<span style="color:#DC4B3E">-- · -- · --°C</span>':`DO ${n.do} · pH ${n.ph} · ${n.temp}°C`}</div>
           <div style="margin-top:6px; display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
             ${pend?`<span class="pill" style="background:#E0922F1f;color:#E0922F">⏳ Tasdiq kutilmoqda</span>`:''}
             <span class="pill" style="background:${st.col}1f;color:${st.col}">${st.label}</span>
             <span class="pill ${on?'aer-on':'aer-off'}">Aerator ${on?'YONIQ':'O‘CHIQ'}</span>
-            <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--ink-faint);white-space:nowrap">${lk.online?linkBars(lk.bars):'<span style="color:var(--warn)">⚠ Oflayn</span>'} 🕐 ${tm}</span></div>
+            <span style="margin-left:auto;display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--ink-faint);white-space:nowrap">${lk.online?linkBars(lk.bars,rssiColor(lk.rssi)):'<span style="color:var(--warn)">⚠ Oflayn</span>'} 🕐 ${tm}</span></div>
           <div style="margin-top:5px;font-size:12px;color:${rec.none?'var(--ink-faint)':'var(--primary)'}">${feedTxt}</div></div>
         <div class="drag" data-drag>⋮⋮</div>
       </div>
@@ -822,19 +882,22 @@ function renderTab(){ const L=getLake(currentLake), B=document.getElementById('t
 
 /* ---- Monitoring ---- */
 function renderMon(L,B){
-  const n=lakeNow(L), lvl=statusLevel(n.do), on=aerOn(L), b=biomass(L), lk=linkOf(L);
+  const n=lakeNow(L);
+  const off=!!n.offline;
+  const lvl=off?{col:'#DC4B3E',label:'Oflayn'}:statusLevel(n.do);
+  const on=aerOn(L), b=biomass(L), lk=linkOf(L);
   const stC=lvl.col, stT=lvl.label;
   B.innerHTML=`
     <div class="ticker">
       <div class="statusdot"><span class="pill" style="background:${stC}33;color:#fff;">${stT}</span></div>
       <div class="lbl">Erigan kislorod (DO)</div>
-      <div class="big" id="t-do">${n.do}<span class="unit"> mg/L</span></div>
+      <div class="big" id="t-do">${off?'<span style="color:#DC4B3E;font-size:36px">--</span>':n.do+'<span class="unit"> mg/L</span>'}</div>
       <div class="delta" style="color:#7FE3D6;">Min ${L.settings.minDo} · Kritik ${L.settings.kritik} mg/L</div>
       <div class="metarow">
-        <div class="m"><div class="k">pH</div><div class="v" id="t-ph">${n.ph}</div></div>
-        <div class="m"><div class="k">Harorat</div><div class="v" id="t-t">${n.temp}°</div></div>
+        <div class="m"><div class="k">pH</div><div class="v" id="t-ph" style="${off?'color:#DC4B3E':''}">${off?'--':n.ph}</div></div>
+        <div class="m"><div class="k">Harorat</div><div class="v" id="t-t" style="${off?'color:#DC4B3E':''}">${off?'--':n.temp+'°'}</div></div>
         <div class="m"><div class="k">Aerator</div><div class="v" style="color:${on?'#7FE3D6':'#9FB0AC'}">${on?'YONIQ':'O‘CHIQ'}</div></div>
-        <div class="m"><div class="k">Aloqa</div><div class="v" style="color:${lk.online?'#7FE3D6':'#E0922F'};font-size:14px">${lk.online?lk.rssi+'<span style="font-size:10px;opacity:.7"> dBm</span>':'Oflayn'}</div></div>
+        <div class="m"><div class="k">Aloqa</div><div class="v" style="color:${lk.online?rssiColor(lk.rssi):'#E0922F'};font-size:14px">${lk.online?lk.rssi+'<span style="font-size:10px;opacity:.7"> dBm ('+rssiLabel(lk.rssi)+')</span>':'Oflayn'}</div></div>
       </div>
     </div>
 
@@ -891,11 +954,20 @@ function renderMon(L,B){
   drawChart(L); bindChart();
 }
 /* Monitoringdan tezkor: bugun shu kunlik miqdorni berdim deb belgilash */
-function logFedToday(kg){ const L=getLake(currentLake), s=L.settings; s.feedLog=s.feedLog||[];
+function logFedToday(recKg){
+  const L=getLake(currentLake),s=L.settings;
+  const ans=prompt('Bugun necha kg yem berildi?\n(Tavsiya: '+recKg+' kg — bekor qilsangiz shu yoziladi)',recKg);
+  let kg=recKg;
+  if(ans!==null){ const p=parseFloat(ans); if(!isNaN(p)&&p>=0) kg=p; }
+  recordFeedLog(L,s,kg);
+}
+function recordFeedLog(L,s,kg){
+  s.feedLog=s.feedLog||[];
   const today=new Date(); today.setHours(0,0,0,0); const td=today.getTime();
-  const i=s.feedLog.findIndex(e=>{const d=new Date(e.date); d.setHours(0,0,0,0); return d.getTime()===td;});
-  if(i>=0) s.feedLog[i].kg=kg; else s.feedLog.push({date:Date.now(), kg});
-  s.kunlikYem=kg; dbSet('lakes',LAKES); toast('Bugungi yem qayd etildi'); renderTab(); }
+  const i=s.feedLog.findIndex(e=>{const d=new Date(e.date);d.setHours(0,0,0,0);return d.getTime()===td;});
+  if(i>=0) s.feedLog[i].kg=kg; else s.feedLog.push({date:Date.now(),kg});
+  s.kunlikYem=kg; dbSet('lakes',LAKES); toast('Yem qayd etildi: '+kg+' kg'); renderTab();
+}
 function setRange(r){ curRange=r; chIdx=null; renderTab(); }
 function updateTickerLive(){ const L=getLake(currentLake); if(!L) return; const n=lakeNow(L), on=aerOn(L);
   let e=document.getElementById('t-do'); if(e){ e.innerHTML=`${n.do}<span class="unit"> mg/L</span>`; }
@@ -908,11 +980,9 @@ function setMode(m){ const L=getLake(currentLake); L.mode=m; dbSet('lakes',LAKES
   toast(m==='auto'?'Buyruq yuborildi: Avtomatik':'Buyruq yuborildi: Majburan yoqish'); }
 let energyRange='kun';
 function energy(L,range){ range=range||energyRange; const s=L.settings;
-  const days={kun:1,hafta:7,oy:30,'3oy':90}[range]||1;
-  const dailyH=4+rnd(L.seed)*7;
-  const soat=+(dailyH*days).toFixed(days===1?1:0);
+  const soat=getAerRunH(L,range); /* Real ishlagan vaqt */
   const kw=+(s.aerSoni*s.aerKw).toFixed(1);
-  const kwh=+(soat*kw).toFixed(days===1?1:0);
+  const kwh=+(soat*kw).toFixed(2);
   const som=Math.round(kwh*s.tarif).toLocaleString('ru-RU');
   return {soat,kw,kwh,som}; }
 function energyCardHTML(L){ const e=energy(L,energyRange);
@@ -924,7 +994,8 @@ function energyCardHTML(L){ const e=energy(L,energyRange);
     <div class="kv"><span class="k">Umumiy quvvat</span><span class="v">${e.kw} kW</span></div>
     <div class="kv"><span class="k">Sarflangan energiya</span><span class="v big">${e.kwh} kWh</span></div>
     <div class="kv"><span class="k">Taxminiy to'lov</span><span class="v big">${e.som} so'm</span></div>
-    <div style="font-size:11.5px;color:var(--ink-faint);margin-top:8px;">Quvvat va tarifni «Sozlamalar» bo'limida kiriting.</div></div>`; }
+    ${e.soat===0?`<div style="font-size:11.5px;color:var(--ink-faint);margin-top:8px;">ℹ️ Ayrator hali ishlamagan yoki qurilma ulanmagan. Real ma'lumot qurilmadan kelishi bilan shu yerda ko'rinadi.</div>`:'<div style="font-size:11.5px;color:var(--ink-faint);margin-top:8px;">Quvvat va tarifni «Sozlamalar» bo\'limida kiriting.</div>'}
+    </div>`; }
 function setEnergyRange(r){ energyRange=r; const old=document.getElementById('energy-card');
   if(old){ old.outerHTML=energyCardHTML(getLake(currentLake)); applyLang(); } }
 
@@ -1023,29 +1094,106 @@ function renderTav(L,B){ B.innerHTML=`<div class="empty"><div class="ic" style="
   <div style="margin-top:18px;font-size:12px;color:var(--ink-faint);">Tez orada ishga tushadi</div></div>`; }
 
 /* ---- Tarix ---- */
-function renderTar(L,B){ const data=lakeHistory(L,'24s').slice().reverse().slice(0,40);
-  if(!data.length){ B.innerHTML=`<div class="empty"><div class="ic" style="color:var(--warn)">${icon('clock',40)}</div><div class="t">Ma'lumot hali yetarli emas</div><div>Qurilma yangi ulangan. O'lchovlar to'planishi bilan tarix shu yerda chiqadi.</div></div>`; return; }
-  B.innerHTML=`<div class="sec-h">So'nggi yozuvlar (24 soat)</div><div class="card" style="padding:6px 14px;">
-    ${data.map(d=>{ const c=zoneCol('do',d.do);
-      return `<div class="kv"><span class="k">${p2(new Date(d.t).getHours())}:${p2(new Date(d.t).getMinutes())}</span>
-        <span class="v"><span style="color:${c}">DO ${d.do.toFixed(1)}</span> · pH ${d.ph.toFixed(1)} · ${Math.round(d.temp)}°</span></div>`; }).join('')}</div>`; }
+function fmtHDate(t){
+  const d=new Date(t);
+  return p2(d.getMonth()+1)+'/'+p2(d.getDate())+'/'+d.getFullYear()+' '+p2(d.getHours())+':'+p2(d.getMinutes());
+}
+function renderTar(L,B){
+  const toD=dateInputVal(Date.now()), frD=dateInputVal(Date.now()-7*86400000);
+  B.innerHTML=`
+    <div class="card" style="margin-bottom:12px;padding:14px">
+      <div class="row2" style="margin-bottom:10px">
+        <div class="field" style="margin:0"><label>Dan</label><input type="date" id="tar-from" value="${frD}"></div>
+        <div class="field" style="margin:0"><label>Gacha</label><input type="date" id="tar-to" value="${toD}"></div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn sm" onclick="renderHistData()">Ko'rish</button>
+        <button class="btn sm ghost" onclick="exportHistPDF()">📄 PDF</button>
+        <button class="btn sm ghost" onclick="exportHistCSV()">📊 CSV</button>
+      </div>
+    </div><div id="tar-data"></div>`;
+  renderHistData();
+}
+function renderHistData(){
+  const L=getLake(currentLake); if(!L) return;
+  const fe=document.getElementById('tar-from'),te=document.getElementById('tar-to');
+  if(!fe||!te) return;
+  const fr=new Date(fe.value).getTime(),to=new Date(te.value).getTime()+86400000;
+  const BD=document.getElementById('tar-data'); if(!BD) return;
+  const data=(HIST[L.id]||[]).filter(d=>d.t>=fr&&d.t<=to).slice().reverse();
+  if(!data.length){
+    BD.innerHTML=`<div class="empty"><div class="ic" style="color:var(--warn)">${icon('clock',40)}</div><div class="t">Bu oraliqda ma'lumot yo'q</div><div>Qurilmadan ma'lumot kelishi bilan tarix to'ldiriladi.</div></div>`;
+    return;
+  }
+  const SHOW=120;
+  BD.innerHTML=`<div class="sec-h">${data.length} ta o'lchov</div><div class="card" style="padding:6px 14px;">
+    ${data.slice(0,SHOW).map(d=>{
+      const c=zoneCol('do',d.do);
+      return `<div class="kv"><span class="k" style="font-size:11px;color:var(--ink-soft);font-family:var(--mono)">${fmtHDate(d.t)}</span>
+        <span class="v"><span style="color:${c}">DO ${d.do.toFixed(1)}</span> · pH ${d.ph.toFixed(1)} · ${Math.round(d.temp)}°</span></div>`;
+    }).join('')}
+    ${data.length>SHOW?`<div style="text-align:center;font-size:11.5px;color:var(--ink-faint);padding:8px">+${data.length-SHOW} ta yozuv PDF/CSV da chiqadi</div>`:''}
+  </div>`;
+}
+function exportHistPDF(){
+  const L=getLake(currentLake); if(!L) return;
+  const fe=document.getElementById('tar-from'),te=document.getElementById('tar-to'); if(!fe||!te) return;
+  const fr=new Date(fe.value).getTime(),to=new Date(te.value).getTime()+86400000;
+  const data=(HIST[L.id]||[]).filter(d=>d.t>=fr&&d.t<=to).slice().reverse();
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${L.name} — Tarix</title>
+    <style>body{font-family:Arial,sans-serif;font-size:12px;margin:20px}
+    h2{color:#0E7C6B}p{color:#5E736E;margin-bottom:12px}
+    table{width:100%;border-collapse:collapse}
+    th{background:#0E7C6B;color:#fff;padding:7px 10px;text-align:left;font-size:11px}
+    td{padding:5px 10px;border-bottom:1px solid #eee}
+    tr:nth-child(even)td{background:#f9f9f9}
+    .g{color:#1E9E6A}.y{color:#E0922F}.r{color:#DC4B3E}</style></head><body>
+    <h2>${L.name} (${L.id})</h2>
+    <p>Sana: ${fe.value} — ${te.value} | Jami: ${data.length} ta o'lchov | ${fmtHDate(Date.now())}</p>
+    <table><thead><tr><th>Sana/Vaqt (OY/KUN/YIL SOAT:MIN)</th><th>DO (mg/L)</th><th>pH</th><th>Harorat (°C)</th></tr></thead><tbody>
+    ${data.map(d=>{
+      const cl=d.do>=5?'g':d.do>=3?'y':'r';
+      return `<tr><td>${fmtHDate(d.t)}</td><td class="${cl}">${d.do.toFixed(1)}</td><td>${d.ph.toFixed(1)}</td><td>${Math.round(d.temp)}</td></tr>`;
+    }).join('')}</tbody></table></body></html>`;
+  const w=window.open('','_blank');
+  if(w){w.document.write(html);w.document.close();setTimeout(()=>w.print(),400);}
+  else toast('Pop-up bloklangan — brauzer ruxsatini bering');
+}
+function exportHistCSV(){
+  const L=getLake(currentLake); if(!L) return;
+  const fe=document.getElementById('tar-from'),te=document.getElementById('tar-to'); if(!fe||!te) return;
+  const fr=new Date(fe.value).getTime(),to=new Date(te.value).getTime()+86400000;
+  const data=(HIST[L.id]||[]).filter(d=>d.t>=fr&&d.t<=to).slice().reverse();
+  let csv='Sana/Vaqt,DO (mg/L),pH,Harorat (C)\n';
+  data.forEach(d=>{csv+=fmtHDate(d.t)+','+d.do.toFixed(1)+','+d.ph.toFixed(1)+','+Math.round(d.temp)+'\n';});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'}));
+  a.download=(L.name||L.id)+'_tarix.csv'; a.click(); URL.revokeObjectURL(a.href); toast('CSV yuklandi');
+}
 
 /* ---- Sozlamalar ---- */
 function renderSet(L,B){ const s=L.settings; const b=biomass(L);
   B.innerHTML=`
+    <div class="sec-h">Ko'l nomi</div>
+    <div class="card">
+      <div class="field" style="margin-bottom:0"><label>Ko'l nomi</label><input id="set-name" value="${esc(L.name)}">
+        <div class="hint">Nomni o'zgartirish ro'yxatda va boshqaruvda darhol yangilanadi.</div></div>
+    </div>
     <div class="sec-h">Kislorod chegaralari</div>
     <div class="card"><div class="row2">
       <div class="field"><label>Min DO (mg/L)</label><input id="set-min" type="number" value="${s.minDo}"></div>
       <div class="field"><label>Farq (mg/L)</label><input id="set-farq" type="number" value="${s.farq}"></div></div>
       <div class="field" style="margin-bottom:0"><label>Kritik DO (mg/L)</label><input id="set-krit" type="number" value="${s.kritik}">
-        <div class="hint">Shu qiymatdan pasaysa SMS + qo'ng'iroq va bildirishnoma chiqadi.</div></div></div>
+        <div class="hint">Shu qiymatdan pasaysa bildirishnoma. Saqlashda qurilmaga ham yuboriladi.</div></div></div>
     <div class="sec-h">Ko'l va aerator</div>
     <div class="card"><div class="row2">
       <div class="field"><label>Suv maydoni (m²)</label><input id="set-maydon" type="number" value="${s.suvMaydoni||''}" placeholder="0"></div>
-      <div class="field"><label>Aerator soni</label><input id="set-asoni" type="number" value="${s.aerSoni}"></div></div>
+      <div class="field"><label>O'rtacha chuqurlik (m)</label><input id="set-depth" type="number" step="0.1" value="${s.avgDepth||''}" placeholder="masalan: 1.5"></div></div>
       <div class="row2">
-      <div class="field"><label>Bitta quvvati (kW)</label><input id="set-akw" type="number" step="0.1" value="${s.aerKw}"></div>
-      <div class="field"><label>Tarif (so'm/kWh)</label><input id="set-tarif" type="number" value="${s.tarif}"></div></div></div>
+      <div class="field"><label>Aerator soni</label><input id="set-asoni" type="number" value="${s.aerSoni}"></div>
+      <div class="field"><label>Bitta quvvati (kW)</label><input id="set-akw" type="number" step="0.1" value="${s.aerKw}"></div></div>
+      <div class="row2">
+      <div class="field"><label>Tarif (so'm/kWh)</label><input id="set-tarif" type="number" value="${s.tarif}"></div>
+      </div></div>
     <div class="sec-h">Baliq (boshlang'ich)</div>
     <div class="card">
       <div class="row2">
@@ -1095,13 +1243,25 @@ function renderSet(L,B){ const s=L.settings; const b=biomass(L);
         return '<div style="margin-top:10px">'+ms.slice(0,5).map(m=>`<div class="kv"><span class="k">${dateInputVal(m.date)}</span><span class="v">${m.avgG} g${m.cnt?(' · '+m.cnt+' dona'):''} <span style="color:var(--crit);cursor:pointer;margin-left:8px" onclick="delMeasure(${m.date})">×</span></span></div>`).join('')+'</div>'; })()}
     </div>`; }
 function saveSet(){ const L=getLake(currentLake), s=L.settings;
+  const nm=val('set-name'); if(nm&&nm!==L.name){L.name=nm;setTop(L.name,'ID: '+L.id);}
   s.minDo=+val('set-min')||5; s.farq=+val('set-farq')||2; s.kritik=+val('set-krit')||3;
-  s.suvMaydoni=+val('set-maydon')||0; s.aerSoni=+val('set-asoni')||1; s.aerKw=+val('set-akw')||2.2; s.tarif=+val('set-tarif')||600;
+  s.suvMaydoni=+val('set-maydon')||0; s.avgDepth=+val('set-depth')||0;
+  s.aerSoni=+val('set-asoni')||1; s.aerKw=+val('set-akw')||2.2; s.tarif=+val('set-tarif')||600;
   s.baliqSoni=+val('set-soni')||0; s.oWeight=+val('set-ow')||0; s.fcr=+val('set-fcr')||1.5;
   const dstr=val('set-date'); if(dstr) s.stockDate=new Date(dstr).getTime();
   if(!s.stockDate) s.stockDate=Date.now()-90*86400000;
   s.feedType=val('set-feed');
-  dbSet('lakes',LAKES); toast('Saqlandi · chegaralar qurilmaga yuborildi'); setTab('mon'); }
+  dbSet('lakes',LAKES);
+  if(liveFor(L)){
+    fbSendCmd(L.id,{cmd:'setThreshold',minDo:s.minDo,kritik:s.kritik,farq:s.farq});
+    toast('Saqlandi · chegaralar qurilmaga yuborildi');
+    const n=lakeNow(L);
+    if(!n.offline&&n.do!==null&&n.do<s.kritik){
+      fbSendCmd(L.id,{aer:1});
+      setTimeout(()=>toast('⚠ Kritik DO! Aerator majburan yoqildi'),2500);
+    }
+  } else toast('Saqlandi');
+  setTab('mon'); }
 function addFeedEntry(){ const L=getLake(currentLake), s=L.settings; const kg=+val('feed-kg'); const dstr=val('feed-date');
   if(!(kg>0)){ toast('Kunlik yem miqdorini kiriting'); return; }
   const date=dstr? new Date(dstr).getTime() : Date.now(); s.feedLog=s.feedLog||[];

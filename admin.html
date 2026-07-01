@@ -184,6 +184,26 @@ function dbSet(k,v){ mem[k]=v; try{localStorage.setItem('sla_'+k,JSON.stringify(
 
 /* ============ FIREBASE — JONLI MA'LUMOT (fermer ilovasi bilan bir xil baza) ============ */
 let fbDb=null, fbAuth=null, fbReady=false; const LIVE={}, LIVE_GW={};
+let ADM_WX=null,admWxTried=false;
+async function fetchAdminWeather(){
+  admWxTried=true;
+  try{
+    let lat=41.31,lng=69.24,byGps=false;
+    const gp=await new Promise(resolve=>{
+      if(navigator.geolocation)navigator.geolocation.getCurrentPosition(p=>resolve(p.coords),()=>resolve(null),{timeout:4000,maximumAge:300000});
+      else resolve(null);
+    });
+    if(gp&&gp.latitude){lat=gp.latitude;lng=gp.longitude;byGps=true;}
+    const url=`https://api.open-meteo.com/v1/forecast?latitude=${lat.toFixed(4)}&longitude=${lng.toFixed(4)}&daily=temperature_2m_max,temperature_2m_min,precipitation_sum&current=temperature_2m,wind_speed_10m&timezone=auto&forecast_days=2`;
+    const r=await fetch(url);const j=await r.json();
+    const mx=j.daily.temperature_2m_max[1],mn=j.daily.temperature_2m_min[1];
+    ADM_WX={max:mx,min:mn,avg:Math.round((mx+mn)/2),date:j.daily.time[1],
+      precip:j.daily.precipitation_sum?j.daily.precipitation_sum[1]:0,
+      curTemp:j.current?j.current.temperature_2m:null,
+      wind:j.current?j.current.wind_speed_10m:null,byGps};
+  }catch(e){ADM_WX=null;}
+  if(page==='devices') renderDevices();
+}
 let REQS={};            // /requests — fermerlardan kelgan ko'l tasdiq so'rovlari
 let FB_USERS={};         // /users — ro'yxatdan o'tgan real fermerlar (akkauntlar)
 let ADMIN_ROLES={};      // /adminRoles — super admin bergan rollar (email bo'yicha)
@@ -493,8 +513,16 @@ function renderDevices(){
   const onl=d.filter(x=>x.status==='active'); const rs=onl.filter(x=>x.rssi!=null);
   const avgRssi= rs.length? Math.round(rs.reduce((a,x)=>a+x.rssi,0)/rs.length)+' dBm':'—';
   const gwCount=new Set(d.map(x=>x.gwId).filter(Boolean)).size;
+  if(!admWxTried) fetchAdminWeather();
+  const wxBanner=ADM_WX?`<div style="background:linear-gradient(120deg,#0B2C28,#0E7C6B);color:#fff;border-radius:12px;padding:11px 16px;margin-bottom:16px;display:flex;align-items:center;gap:14px">
+    <div style="font-size:22px">${ADM_WX.precip>5?'🌧':'⛅'}</div>
+    <div><div style="font-size:11px;opacity:.8">Ertangi ob-havo ${ADM_WX.byGps?'📍 GPS':'(viloyat)'}</div>
+    <div style="font-weight:600;font-family:var(--mono);font-size:13px">${ADM_WX.avg}°C  <span style="opacity:.75;font-weight:400">max ${Math.round(ADM_WX.max)}° / min ${Math.round(ADM_WX.min)}°${ADM_WX.precip>0?' · '+ADM_WX.precip.toFixed(1)+'mm':''}</span></div>
+    ${ADM_WX.curTemp!=null?`<div style="font-size:11px;opacity:.8">Hozir: ${Math.round(ADM_WX.curTemp)}°C${ADM_WX.wind?' · 🌬 '+ADM_WX.wind.toFixed(0)+' km/h':''}</div>`:''}</div></div>`
+    :'';
   C().innerHTML=`
     ${stats([['Jami',d.length],['Onlayn',onl.length],['Oflayn',d.filter(x=>x.status==='offline').length],['Shlyuzlar',gwCount],['O\'rtacha RSSI',avgRssi]])}
+    ${wxBanner}
     <div class="toolbar">
       <input class="grow" placeholder="Chip ID yoki ko'l bo'yicha qidirish" oninput="devFilter.q=this.value;renderDevices()" value="${devFilter.q}">
       <select onchange="devFilter.gw=this.value;renderDevices()"><option value="">Shlyuz: barchasi</option>${gws.map(g=>`<option value="${g.id}"${sel(devFilter.gw,g.id)}>${g.id} · ${esc(g.region)}</option>`).join('')}</select>
