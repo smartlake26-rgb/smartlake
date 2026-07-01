@@ -318,7 +318,7 @@ function dbSet(k,v){ mem[k]=v; try{localStorage.setItem('sl_'+k, JSON.stringify(
 /* ===== FIREBASE (real-time ma'lumot) =====
    Gateway har ko'l NODE'sini /nodes/<AQid>/latest ga yozadi.
    Ko'lning id'si (AQxxxxxx) NODE id bilan aynan mos kelishi kerak. */
-let LIVE={}, HIST={}, REG={}, fbDb=null, fbAuth=null, fbReady=false, AUTH_UID=null, _loadingCloud=false, _entered=false, _subbed=false, CURRENT_EMAIL=null; const histSubs={};
+let LIVE={}, HIST={}, REG={}, ANNOUNCE=[], fbDb=null, fbAuth=null, fbReady=false, AUTH_UID=null, _loadingCloud=false, _entered=false, _subbed=false, CURRENT_EMAIL=null; const histSubs={};
 const LIVE_FRESH_MS=15*60*1000; // 15 daqiqadan eski bo'lsa shu ko'l "demo"ga qaytadi
 function fbConfigured(){ return typeof firebase!=='undefined' && typeof FIREBASE_CONFIG!=='undefined'
   && FIREBASE_CONFIG.databaseURL && String(FIREBASE_CONFIG.apiKey||'').indexOf('XXXX')<0; }
@@ -351,6 +351,11 @@ function subscribeData(){
   }, ()=>{});
   fbDb.ref('registry').on('value', s=>{ REG=s.val()||{};
     if(document.getElementById('s-main') && document.getElementById('s-main').classList.contains('active') && view==='lakes') renderLakes(); }, ()=>{});
+  /* E'lonlar (admin yuboradi) — viloyat bo'yicha filtrlanadi */
+  fbDb.ref('announcements').limitToLast(50).on('value', s=>{ const v=s.val()||{};
+    ANNOUNCE=Object.keys(v).map(k=>Object.assign({id:k},v[k])).sort((a,b)=>(b.ts||0)-(a.ts||0));
+    if(document.getElementById('s-main') && document.getElementById('s-main').classList.contains('active')){ updateBell(); if(view==='notif') renderNotif(); }
+  }, ()=>{});
 }
 /* Bulutdan shu foydalanuvchi profili + ko'llari (istalgan telefonda bir xil) */
 function loadCloudUser(){
@@ -1279,16 +1284,36 @@ function delMeasure(ts){ const L=getLake(currentLake), s=L.settings;
   s.measurements=(s.measurements||[]).filter(m=>m.date!==ts); dbSet('lakes',LAKES); renderTab(); }
 
 /* ===== NOTIF ===== */
+function myAnnounce(){
+  const vil=(USER&&USER.vil)||'';
+  return (ANNOUNCE||[]).filter(a=>!a.region || a.region===vil);
+}
+function annSeenKey(){ return 'annSeen'; }
+function markAnnounceSeen(){ const ids=(myAnnounce()||[]).map(a=>a.id); dbSet(annSeenKey(), ids); }
+function unseenAnnounceCount(){ const seen=dbGet(annSeenKey())||[]; return (myAnnounce()||[]).filter(a=>seen.indexOf(a.id)<0).length; }
 function critLakes(){ return LAKES.filter(L=>statusOf(L)==='olim'); }
+function annTime(ts){ const d=new Date(ts); const diff=Date.now()-ts;
+  if(diff<3600000) return Math.max(1,Math.floor(diff/60000))+' daq oldin';
+  if(diff<86400000) return Math.floor(diff/3600000)+' soat oldin';
+  return p2(d.getMonth()+1)+'/'+p2(d.getDate())+' '+p2(d.getHours())+':'+p2(d.getMinutes()); }
 function renderNotif(){ const C=document.getElementById('content');
+  markAnnounceSeen(); updateBell();
+  const anns=myAnnounce();
+  const annHTML = anns.length ? `<div class="sec-h">E'lonlar</div>`+anns.map(a=>`
+    <div class="notif" style="border-left:3px solid var(--primary)"><div class="ic" style="background:#DBF4F8">📢</div>
+      <div class="nm"><div class="t">${esc(a.title||'E\'lon')}</div><div class="s">${esc(a.body||'')}</div></div>
+      <div class="tm">${annTime(a.ts||Date.now())}</div></div>`).join('') : '';
   const olim=LAKES.filter(L=>statusOf(L)==='olim'), yomon=LAKES.filter(L=>statusOf(L)==='yomon');
-  if(!olim.length&&!yomon.length){ C.innerHTML=`<div class="empty"><div class="ic" style="color:var(--good)">${icon('check',40)}</div>
-    <div class="t">Hammasi joyida</div><div>Hech qaysi ko'lda muammo yo'q.</div></div>`; return; }
-  C.innerHTML=olim.map(L=>notifRow('🔴','#FBE3E0',"O'lim xavfi", L.name+' — DO '+lakeNow(L).do+' mg/L','hozir')).join('')+
-    yomon.map(L=>notifRow('🟠','#FCE6D6','Yomon — past kislorod', L.name+' — DO '+lakeNow(L).do+' mg/L','hozir')).join(''); }
+  const alertHTML = (olim.length||yomon.length) ?
+    (anns.length?`<div class="sec-h">Ogohlantirishlar</div>`:'')+
+    olim.map(L=>notifRow('🔴','#FBE3E0',"O'lim xavfi", L.name+' — DO '+lakeNow(L).do+' mg/L','hozir')).join('')+
+    yomon.map(L=>notifRow('🟠','#FCE6D6','Yomon — past kislorod', L.name+' — DO '+lakeNow(L).do+' mg/L','hozir')).join('') : '';
+  if(!annHTML && !alertHTML){ C.innerHTML=`<div class="empty"><div class="ic" style="color:var(--good)">${icon('check',40)}</div>
+    <div class="t">Hammasi joyida</div><div>Yangi e'lon yoki ogohlantirish yo'q.</div></div>`; return; }
+  C.innerHTML=annHTML+alertHTML; }
 function notifRow(ic,bg,t,s,tm){ return `<div class="notif"><div class="ic" style="background:${bg}">${ic}</div>
   <div class="nm"><div class="t">${t}</div><div class="s">${esc(s)}</div></div><div class="tm">${tm}</div></div>`; }
-function updateBell(){ const n=LAKES.filter(isProblem).length, d=document.getElementById('bell-dot');
+function updateBell(){ const n=LAKES.filter(isProblem).length + unseenAnnounceCount(); const d=document.getElementById('bell-dot');
   if(!d) return; if(n>0){ d.style.display='flex'; d.textContent=n; } else d.style.display='none'; }
 
 /* ===== PROFILE ===== */

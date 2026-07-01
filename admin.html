@@ -236,6 +236,9 @@ function attachAdminListeners(){
   fbDb.ref('users').on('value', snap=>{ FB_USERS=snap.val()||{}; refreshFB(); }, ()=>{});
   fbDb.ref('admins').on('value', snap=>{ ADMIN_ROLES=snap.val()||{}; if(CUR&&CUR.role==='super'&&page==='settings') renderSettings(); }, ()=>{});
   fbDb.ref('registry').on('value', snap=>{ REGISTRY=snap.val()||{}; refreshFB(); }, ()=>{});
+  fbDb.ref('announcements').on('value', snap=>{ const v=snap.val()||{};
+    const list=Object.keys(v).map(k=>({id:k,title:v[k].title,body:v[k].body,region:v[k].region,channel:v[k].channel,date:v[k].ts||0})).sort((a,b)=>b.date-a.date);
+    dbSet('announce',list); if(page==='announce') renderAnnounce(); }, ()=>{});
 }
 /* Haqiqiy hisob bilan kirish: super admin emaili yoki /admins/<uid> */
 function handleAdminAuth(user){
@@ -504,10 +507,23 @@ function go(id){ if(!can(id)) return; page=id;
 
 /* ============ QURILMALAR ============ */
 let devFilter={q:'',gw:'',status:''};
+/* Qurilma uchun universal qidiruv matni: barcha aloqador maydonlar */
+function devSearchText(x,farmers,gws){
+  const fr=x.farmerId?farmers.find(y=>y.id===x.farmerId):null;
+  const reg=x.farmerId?null:regForChip(x.chipId);
+  const rq=(x.farmerId||reg)?null:reqForChip(x.chipId);
+  const gw=gws.find(g=>g.id===x.gwId);
+  const lake=x.farmerId?x.lake:((reg&&reg.lake)||(rq&&rq.lake)||x.lake||'');
+  const farmer=fr?(fr.ism+' '+fr.fam):((reg&&reg.farmer)||(rq&&rq.farmer)||'');
+  const phone=fr?(fr.phone||''):((rq&&rq.phone)||'');
+  const region=x.region||(reg&&reg.region)||(rq&&rq.region)||(fr&&fr.region)||'';
+  return [x.chipId,x.fw,lake,farmer,phone,x.gwId,gw&&gw.name,region,x.status].filter(Boolean).join(' ').toLowerCase();
+}
 function renderDevices(){
   let d=dbGet('devices')||[]; const farmers=dbGet('farmers')||[]; const gws=dbGet('gateways')||[];
   if(CUR.role==='region') d=d.filter(x=>{ const eff=x.region||((regForChip(x.chipId)||{}).region)||((reqForChip(x.chipId)||{}).region)||''; return inMyRegion(eff); });
-  const f=d.filter(x=> (!devFilter.q || (x.chipId+x.lake).toLowerCase().includes(devFilter.q.toLowerCase()))
+  const q=(devFilter.q||'').toLowerCase().trim();
+  const f=d.filter(x=> (!q || devSearchText(x,farmers,gws).includes(q))
     && (!devFilter.gw||x.gwId===devFilter.gw) && (!devFilter.status||x.status===devFilter.status));
   const fname=id=>{ const fr=farmers.find(y=>y.id===id); return fr?fr.ism+' '+fr.fam:'—'; };
   const onl=d.filter(x=>x.status==='active'); const rs=onl.filter(x=>x.rssi!=null);
@@ -524,13 +540,13 @@ function renderDevices(){
     ${stats([['Jami',d.length],['Onlayn',onl.length],['Oflayn',d.filter(x=>x.status==='offline').length],['Shlyuzlar',gwCount],['O\'rtacha RSSI',avgRssi]])}
     ${wxBanner}
     <div class="toolbar">
-      <input class="grow" placeholder="Chip ID yoki ko'l bo'yicha qidirish" oninput="devFilter.q=this.value;renderDevices()" value="${devFilter.q}">
+      <input class="grow" id="dev-search" placeholder="Qidirish: qurilma kodi, ko'l, fermer ismi, telefon, shlyuz, viloyat..." oninput="devSearchInput(this.value)" value="${devFilter.q}">
       <select onchange="devFilter.gw=this.value;renderDevices()"><option value="">Shlyuz: barchasi</option>${gws.map(g=>`<option value="${g.id}"${sel(devFilter.gw,g.id)}>${g.id} · ${esc(g.region)}</option>`).join('')}</select>
       <select onchange="devFilter.status=this.value;renderDevices()"><option value="">Holat: barchasi</option><option value="active"${sel(devFilter.status,'active')}>Onlayn</option><option value="offline"${sel(devFilter.status,'offline')}>Oflayn</option><option value="blocked"${sel(devFilter.status,'blocked')}>Bloklangan</option></select>
       ${CUR.role!=='region'?'<button class="btn" onclick="deviceAdd()">+ Qurilma</button>':''}
     </div>
     <div class="panel"><table><thead><tr><th>Chip ID</th><th>Ko'l / Fermer</th><th>Shlyuz</th><th>RSSI / SNR</th><th>DO</th><th>Oxirgi</th><th>Holat</th><th></th></tr></thead><tbody>
-    ${f.length?f.map(x=>{ const reg=x.farmerId?null:regForChip(x.chipId); const rq=(x.farmerId||reg)?null:reqForChip(x.chipId); const _lake=x.farmerId?x.lake:((reg&&reg.lake)||(rq&&rq.lake)||x.lake); const _farmer=x.farmerId?fname(x.farmerId):((reg&&reg.farmer)||(rq&&rq.farmer)||''); const _pending=!x.farmerId&&!reg&&!!rq; return `<tr>
+    ${f.length?f.map(x=>{ const reg=x.farmerId?null:regForChip(x.chipId); const rq=(x.farmerId||reg)?null:reqForChip(x.chipId); const _lake=x.farmerId?x.lake:((reg&&reg.lake)||(rq&&rq.lake)||x.lake); const _farmer=x.farmerId?fname(x.farmerId):((reg&&reg.farmer)||(rq&&rq.farmer)||''); const _pending=!x.farmerId&&!reg&&!!rq; return `<tr style="cursor:pointer" onclick="deviceDetail('${x.chipId}')">
       <td class="mono">${x.chipId}<div style="font-size:11px;color:var(--ink-faint)">${x.fw||'—'}</div></td>
       <td>${esc(_lake)}<div style="font-size:11px;color:var(--ink-soft)">${_farmer?esc(_farmer):'<span style="color:var(--ink-faint)">—</span>'}${_pending?' <span style="color:var(--warn)">· kutilmoqda</span>':''}</div></td>
       <td><span class="pill p-blue">${x.gwId||'—'}</span></td>
@@ -538,15 +554,54 @@ function renderDevices(){
       <td class="mono">${x.do?x.do:'—'}</td>
       <td style="font-size:12px;color:var(--ink-soft)">${ago(x.lastSeen)}</td>
       <td>${devStatusPill(x.status)}</td>
-      <td style="text-align:right;white-space:nowrap">
-        ${!x.farmerId?`<button class="btn mini" style="background:#E2F3EB;color:#0F6E47" onclick="assignDevice('${x.chipId}')">Biriktirish</button>`:''}
-        <button class="btn mini" onclick="devConfig('${x.chipId}')">Sozlash</button>
-        <button class="btn mini" onclick="devCmd('${x.chipId}')">Buyruq</button>
-        <button class="btn mini" onclick="devBlock('${x.chipId}')">${x.status==='blocked'?'Faollashtirish':'Bloklash'}</button>
+      <td style="text-align:right;white-space:nowrap;position:relative">
+        <button class="btn mini" onclick="event.stopPropagation();devMenu('${x.chipId}',this)" style="font-size:18px;line-height:1;padding:4px 10px">⋯</button>
       </td></tr>`; }).join(''):`<tr><td colspan="8"><div class="empty">Qurilma topilmadi</div></td></tr>`}
     </tbody></table></div>`;
 }
 function devStatusPill(s){ return s==='active'?'<span class="pill p-good">Onlayn</span>':s==='offline'?'<span class="pill p-grey">Oflayn</span>':'<span class="pill p-crit">Bloklangan</span>'; }
+/* Qidiruv fokusni yo'qotmasligi uchun: faqat jadval yangilanadi, input tegilmaydi */
+let _devSearchT=null;
+function devSearchInput(val){ devFilter.q=val; clearTimeout(_devSearchT); _devSearchT=setTimeout(()=>{
+  const el=document.getElementById('dev-search'); const pos=el?el.selectionStart:null;
+  renderDevices();
+  const el2=document.getElementById('dev-search'); if(el2){ el2.focus(); if(pos!=null){ try{el2.setSelectionRange(pos,pos);}catch(e){} } }
+},250); }
+/* '...' menyusi — biriktirish/sozlash/buyruq/bloklash/o'chirish */
+function devMenu(chip,btn){
+  closeDevMenu();
+  const x=(dbGet('devices')||[]).find(d=>d.chipId===chip); if(!x) return;
+  const m=document.createElement('div'); m.id='dev-menu';
+  m.style.cssText='position:absolute;right:18px;z-index:70;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.18);padding:6px;min-width:180px';
+  const item=(label,fn,danger)=>{ const b=document.createElement('button'); b.textContent=label;
+    b.style.cssText='display:block;width:100%;text-align:left;background:none;border:none;padding:9px 12px;font-size:13px;border-radius:7px;cursor:pointer;color:'+(danger?'#A12C22':'var(--ink)');
+    b.onmouseover=()=>b.style.background=danger?'#FBE3E0':'var(--bg)'; b.onmouseout=()=>b.style.background='none';
+    b.onclick=(e)=>{ e.stopPropagation(); closeDevMenu(); fn(); }; return b; };
+  if(!x.farmerId) m.appendChild(item('Biriktirish',()=>assignDevice(chip)));
+  m.appendChild(item('To\'liq ko\'rish',()=>deviceDetail(chip)));
+  m.appendChild(item('Sozlash (chegaralar)',()=>devConfig(chip)));
+  m.appendChild(item('Buyruq (aerator)',()=>devCmd(chip)));
+  m.appendChild(item(x.status==='blocked'?'Faollashtirish':'Bloklash',()=>devBlock(chip)));
+  m.appendChild(item('🗑 Qurilmani o\'chirish',()=>devDelete(chip),true));
+  const td=btn.closest('td'); td.appendChild(m);
+  setTimeout(()=>document.addEventListener('click',closeDevMenu,{once:true}),0);
+}
+function closeDevMenu(){ const m=document.getElementById('dev-menu'); if(m) m.remove(); }
+/* Qurilmani butunlay o'chirish (super admin/operator) */
+function devDelete(chip){
+  const x=(dbGet('devices')||[]).find(d=>d.chipId===chip); if(!x) return;
+  if(!confirm('Qurilma '+chip+' butunlay o\'chirilsinmi?\nBu qurilma, unga bog\'liq ko\'l va tarix admin panelidan olib tashlanadi.')) return;
+  let devs=(dbGet('devices')||[]).filter(d=>d.chipId!==chip); dbSet('devices',devs);
+  let lakes=(dbGet('lakes')||[]).filter(l=>String(l.id).toUpperCase()!==String(chip).toUpperCase()); dbSet('lakes',lakes);
+  /* Firebase registry'dan ham o'chiramiz (fermer ilovasida ko'l 'tasdiqlanmagan'ga qaytadi) */
+  if(fbDb){ try{ fbDb.ref('registry/'+chip).remove(); }catch(e){} }
+  audit('Qurilma o\'chirildi: '+chip); toast('Qurilma o\'chirildi'); renderDevices(); buildNav();
+}
+/* Qurilmani to'liq ko'rish — fermer ko'radigan barcha narsa (grafik, baliq, yem) */
+function deviceDetail(chip){
+  const d=(dbGet('devices')||[]).find(x=>x.chipId===chip); if(!d) return;
+  lakeDetail(d.farmerId||'', chip, 'devices'); /* mavjud to'liq ko'rinishni ishlatamiz */
+}
 
 /* ============ SHLYUZLAR (LoRa -> WiFi/MQTT) ============ */
 function renderGateways(){
@@ -558,7 +613,7 @@ function renderGateways(){
     ${stats([['Shlyuzlar',gws.length],['Onlayn',gws.filter(g=>g.online).length],['Oflayn',gws.filter(g=>!g.online).length],['Ulangan tugunlar',gws.reduce((a,g)=>a+cnt(g.id),0)]])}
     <div style="font-size:13px;color:var(--ink-soft);margin:2px 2px 12px">Har bir shlyuz 433 MHz LoRa orqali tugunlardan (node) ma'lumot yig'adi va WiFi/MQTT orqali ThingsBoard'ga uzatadi.</div>
     <div class="panel"><table><thead><tr><th>Shlyuz ID</th><th>Joylashuv</th><th>Tugunlar (onlayn)</th><th>LoRa</th><th>Host / Firmware</th><th>Oxirgi</th><th>Holat</th><th></th></tr></thead><tbody>
-    ${gws.length?gws.map(g=>`<tr>
+    ${gws.length?gws.map(g=>`<tr style="cursor:pointer" onclick="gwDevices('${g.id}')">
       <td class="mono">${g.id}<div style="font-size:11px;color:var(--ink-faint)">${esc(g.name)}</div></td>
       <td>${esc(g.region)}</td>
       <td class="mono">${cnt(g.id)} <span style="color:var(--ink-faint)">(${onlNodes(g.id)})</span></td>
@@ -566,11 +621,38 @@ function renderGateways(){
       <td style="font-size:12px"><span class="mono">${esc(g.host||'—')}</span><div style="font-size:11px;color:var(--ink-faint)">${g.fw||'gw-v1.0'}</div></td>
       <td style="font-size:12px;color:var(--ink-soft)">${ago(g.lastSeen)}</td>
       <td>${g.online?'<span class="pill p-good">Onlayn</span>':'<span class="pill p-crit">Oflayn</span>'}</td>
-      <td style="text-align:right;white-space:nowrap">
+      <td style="text-align:right;white-space:nowrap" onclick="event.stopPropagation()">
+        <button class="btn mini" onclick="gwDevices('${g.id}')">Qurilmalar</button>
         <button class="btn mini" onclick="gwConfig('${g.id}')">Sozlash</button>
         ${CUR.role!=='region'?`<button class="btn mini" onclick="gwToggle('${g.id}')">${g.online?'Oflayn':'Onlayn'}</button>`:''}
       </td></tr>`).join(''):`<tr><td colspan="8"><div class="empty">Shlyuz topilmadi</div></td></tr>`}
     </tbody></table></div>`;
+}
+/* Shlyuzga bog'langan qurilmalar ro'yxati; qurilma ustiga bosilsa to'liq ko'rinish */
+function gwDevices(gwId){
+  const g=(dbGet('gateways')||[]).find(x=>x.id===gwId); if(!g) return;
+  const farmers=dbGet('farmers')||[];
+  const devs=(dbGet('devices')||[]).filter(d=>d.gwId===gwId);
+  const fname=id=>{ const fr=farmers.find(y=>y.id===id); return fr?fr.ism+' '+fr.fam:'—'; };
+  C().innerHTML=`
+    <button class="btn mini" onclick="go('gateways')">← Shlyuzlar</button>
+    <div class="panel" style="margin-top:14px"><div class="panel-h"><h2>${g.id} · <span style="font-weight:400;font-size:13px;color:var(--ink-soft)">${esc(g.name||'')}</span></h2>
+      ${g.online?'<span class="pill p-good">Onlayn</span>':'<span class="pill p-crit">Oflayn</span>'}</div>
+      <div class="panel-b" style="padding:18px"><div class="row3">
+        <div class="field" style="margin:0"><label>Joylashuv</label><div>${esc(g.region||'—')}</div></div>
+        <div class="field" style="margin:0"><label>LoRa</label><div class="mono">${g.band||'433 MHz'} · SF${g.sf||9}</div></div>
+        <div class="field" style="margin:0"><label>Ulangan qurilmalar</label><div class="mono">${devs.length}</div></div>
+      </div></div></div>
+    <div class="panel"><div class="panel-h"><h2>Bu shlyuzga bog'langan qurilmalar (${devs.length})</h2></div>
+      <table><thead><tr><th>Chip ID</th><th>Ko'l / Fermer</th><th>RSSI</th><th>DO</th><th>Holat</th><th></th></tr></thead><tbody>
+      ${devs.length?devs.map(d=>`<tr style="cursor:pointer" onclick="deviceDetail('${d.chipId}')">
+        <td class="mono">${d.chipId}</td>
+        <td>${esc(d.lake||'—')}<div style="font-size:11px;color:var(--ink-soft)">${d.farmerId?esc(fname(d.farmerId)):'—'}</div></td>
+        <td class="mono">${d.rssi!=null?(d.rssi+' dBm'):'—'}</td>
+        <td class="mono">${d.do||'—'}</td>
+        <td>${doPill(d.do,d.status)}</td>
+        <td style="text-align:right"><button class="btn mini" onclick="event.stopPropagation();deviceDetail('${d.chipId}')">Ochish</button></td></tr>`).join(''):`<tr><td colspan="6"><div class="empty">Bu shlyuzda qurilma yo'q</div></td></tr>`}
+      </tbody></table></div>`;
 }
 function gwConfig(id){ const g=(dbGet('gateways')||[]).find(x=>x.id===id); if(!g) return;
   modal('Shlyuzni sozlash — '+id, `
@@ -737,27 +819,35 @@ function renderUsers(){ let f=dbGet('farmers')||[]; const dev=dbGet('devices')||
   if(CUR.role==='region') f=f.filter(x=>inMyRegion(x.region));
   let real = fbReady ? fbFarmers() : [];
   if(CUR.role==='region') real=real.filter(x=>inMyRegion(x.region));
+  const _uq=(usrFilter.q||'').toLowerCase().trim(), _ur=usrFilter.region||'';
+  if(_ur) real=real.filter(x=>x.region===_ur);
+  if(_uq) real=real.filter(x=>[x.ism,x.fam,x.phone,x.email,x.region,x.tum].filter(Boolean).join(' ').toLowerCase().includes(_uq));
   const realPanel = real.length ? `
     <div class="panel"><div class="panel-h"><h2><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--good);margin-right:8px;vertical-align:middle"></span>Ro'yxatdan o'tgan fermerlar (akkauntlar, jonli)</h2></div>
-    <table><thead><tr><th>Fermer</th><th>Email / Telefon</th><th>Viloyat</th><th>Ko'llari</th></tr></thead><tbody>
+    <table><thead><tr><th>Fermer</th><th>Email / Telefon</th><th>Viloyat</th><th>Tuman</th><th>Ko'llari</th></tr></thead><tbody>
     ${real.sort((a,b)=>(b.joined||0)-(a.joined||0)).map(x=>`<tr>
       <td>${esc(x.ism)} ${esc(x.fam)}<div style="font-size:11px;color:var(--ink-faint)">ro'yxat: ${x.joined?dt(x.joined):'—'}</div></td>
       <td class="mono" style="font-size:12px">${esc(x.email||'—')}<div style="color:var(--ink-faint)">${esc(x.phone||'')}</div></td>
-      <td>${esc(x.region||'—')}</td><td class="mono">${x.lakeCount}</td></tr>`).join('')}
+      <td>${esc(x.region||'—')}</td><td>${esc(x.tum||'—')}</td><td class="mono">${x.lakeCount}</td></tr>`).join('')}
     </tbody></table>
     <div style="font-size:12px;color:var(--ink-soft);padding:0 18px 12px">Bu fermerlar ilovadan email+parol bilan ro'yxatdan o'tgan. Ma'lumotlari Firebase'da (/users) saqlanadi.</div></div>` : '';
-  const list=f.filter(x=>(!usrFilter.q||(x.ism+x.fam+x.phone).toLowerCase().includes(usrFilter.q.toLowerCase()))&&(!usrFilter.region||x.region===usrFilter.region));
+  const uq=(usrFilter.q||'').toLowerCase().trim();
+  const ur=usrFilter.region||'';
+  const utxt=x=>{ const cnt=dev.filter(dd=>dd.farmerId===x.id).length;
+    const lakeNames=dev.filter(dd=>dd.farmerId===x.id).map(dd=>dd.lake).join(' ');
+    return [x.ism,x.fam,x.phone,x.email,x.region,x.tuman,lakeNames].filter(Boolean).join(' ').toLowerCase(); };
+  const list=f.filter(x=>(!uq||utxt(x).includes(uq))&&(!ur||x.region===ur));
   C().innerHTML=`
     ${stats([['Akkauntlar',real.length],['Demo fermer',f.length],['Faol',f.filter(x=>x.status==='active').length]])}
     ${realPanel}
     <div class="toolbar">
-      <input class="grow" placeholder="Ism yoki telefon bo'yicha qidirish" oninput="usrFilter.q=this.value;renderUsers()" value="${usrFilter.q}">
-      <select onchange="usrFilter.region=this.value;renderUsers()"><option value="">Viloyat: barchasi</option>${REGIONS.map(r=>`<option ${sel(usrFilter.region,r)}>${r}</option>`).join('')}</select>
+      <select onchange="usrFilter.region=this.value;renderUsers()" style="min-width:200px"><option value="">Viloyat bo'yicha tartiblash: barchasi</option>${REGIONS.map(r=>`<option ${sel(usrFilter.region,r)}>${r}</option>`).join('')}</select>
+      <input class="grow" id="usr-search" placeholder="Qidirish: ism, familiya, telefon, email, viloyat, tuman, ko'l..." oninput="usrSearchInput(this.value)" value="${usrFilter.q}">
     </div>
-    <div class="panel"><table><thead><tr><th>Fermer</th><th>Telefon</th><th>Viloyat</th><th>Ko'llari</th><th>Holat</th><th></th></tr></thead><tbody>
+    <div class="panel"><table><thead><tr><th>Fermer</th><th>Telefon</th><th>Viloyat</th><th>Tuman</th><th>Ko'llari</th><th>Holat</th><th></th></tr></thead><tbody>
     ${list.map(x=>{ const cnt=dev.filter(d=>d.farmerId===x.id).length; return `<tr style="cursor:pointer" onclick="userDetail('${x.id}')">
       <td>${esc(x.ism)} ${esc(x.fam)}<div style="font-size:11px;color:var(--ink-faint)">ro'yxat: ${dt(x.joined)}</div></td>
-      <td class="mono">${x.phone}</td><td>${esc(x.region)}</td><td class="mono">${cnt}</td>
+      <td class="mono">${x.phone}</td><td>${esc(x.region)}</td><td>${esc(x.tuman||'—')}</td><td class="mono">${cnt}</td>
       <td>${x.status==='active'?'<span class="pill p-good">Faol</span>':'<span class="pill p-crit">Bloklangan</span>'}</td>
       <td style="text-align:right;white-space:nowrap" onclick="event.stopPropagation()">
         <button class="btn mini" onclick="userDetail('${x.id}')">Ochish</button>
@@ -766,6 +856,13 @@ function renderUsers(){ let f=dbGet('farmers')||[]; const dev=dbGet('devices')||
 }
 function usrToggle(id){ const f=dbGet('farmers')||[]; const x=f.find(y=>y.id===id);
   x.status=x.status==='active'?'suspended':'active'; dbSet('farmers',f); audit((x.status==='active'?'Fermer faollashtirildi':'Fermer bloklandi')+': '+x.ism+' '+x.fam+' ('+x.phone+')'); renderUsers(); }
+/* Fokusni yo'qotmasdan qidirish (1 belgidan keyin to'xtab qolmaydi) */
+let _usrSearchT=null;
+function usrSearchInput(val){ usrFilter.q=val; clearTimeout(_usrSearchT); _usrSearchT=setTimeout(()=>{
+  const el=document.getElementById('usr-search'); const pos=el?el.selectionStart:null;
+  renderUsers();
+  const el2=document.getElementById('usr-search'); if(el2){ el2.focus(); if(pos!=null){ try{el2.setSelectionRange(pos,pos);}catch(e){} } }
+},250); }
 /* --- bitta fermer ichi: ko'llari va qurilma ID'lari --- */
 function userDetail(id){ const x=(dbGet('farmers')||[]).find(y=>y.id===id); const dev=(dbGet('devices')||[]).filter(d=>d.farmerId===id);
   audit('Fermer ko\'rildi: '+x.ism+' '+x.fam);
@@ -793,11 +890,12 @@ function doPill(d,st){ if(st==='offline') return '<span class="pill p-grey">Ofla
   if(d>=6) return '<span class="pill p-good">Yaxshi</span>'; if(d>=4) return '<span class="pill p-warn">Qoniqarli</span>';
   if(d>=2) return '<span class="pill p-carrot">Yomon</span>'; return '<span class="pill p-crit">O\'lim xavfi</span>'; }
 /* --- ko'l ichi: fermer ko'rgan narsalar + tahrirlash --- */
-function lakeDetail(uid,chip){ const d=(dbGet('devices')||[]).find(x=>x.chipId===chip); const rec=recForDevice(d); const bm=aBiomass(d);
+function lakeDetail(uid,chip,src){ const d=(dbGet('devices')||[]).find(x=>x.chipId===chip); if(!d) return; const rec=recForDevice(d); const bm=aBiomass(d);
   audit('Ko\'l ochildi: '+d.lake+' ('+chip+')');
   aChip=chip; aRange='1kun'; aIdx=null;
+  const backBtn = src==='devices' ? `<button class="btn mini" onclick="go('devices')">← Qurilmalar</button>` : `<button class="btn mini" onclick="userDetail('${uid}')">← Fermer</button>`;
   C().innerHTML=`
-    <button class="btn mini" onclick="userDetail('${uid}')">← Fermer</button>
+    ${backBtn}
     <div class="panel" style="margin-top:14px"><div class="panel-h"><h2>${esc(d.lake)} · <span class="mono" style="font-size:13px">${chip}</span></h2>${doPill(d.do,d.status)}</div>
       <div class="panel-b" style="padding:18px">
         <div class="cards" style="margin:0">
@@ -982,13 +1080,29 @@ function renderAnnounce(){ const list=dbGet('announce')||[];
       <div class="field"><label>Matn</label><textarea id="an-b" rows="3" placeholder="Yemni 50% ga kamaytiring..."></textarea></div>
       <button class="btn" onclick="sendAnnounce()">Yuborish</button>
     </div></div>
-    <div class="panel"><div class="panel-h"><h2>Yuborilgan e'lonlar</h2></div><table><thead><tr><th>Sarlavha</th><th>Qamrov</th><th>Kanal</th><th>Vaqt</th></tr></thead><tbody>
-    ${list.length?list.map(x=>`<tr><td>${esc(x.title)}<div style="font-size:11px;color:var(--ink-soft)">${esc(x.body)}</div></td><td>${x.region||'Barcha'}</td><td>${x.channel}</td><td style="font-size:12px;color:var(--ink-soft)">${ago(x.date)}</td></tr>`).join(''):`<tr><td colspan="4"><div class="empty">Hali e'lon yuborilmagan</div></td></tr>`}
+    <div class="panel"><div class="panel-h"><h2>Yuborilgan e'lonlar</h2></div><table><thead><tr><th>Sarlavha</th><th>Qamrov</th><th>Kanal</th><th>Vaqt</th><th></th></tr></thead><tbody>
+    ${list.length?list.map(x=>`<tr><td>${esc(x.title)}<div style="font-size:11px;color:var(--ink-soft)">${esc(x.body)}</div></td><td>${x.region||'Barcha'}</td><td>${x.channel}</td><td style="font-size:12px;color:var(--ink-soft)">${ago(x.date)}</td><td style="text-align:right"><button class="btn mini" onclick="delAnnounce('${x.id}')">O'chirish</button></td></tr>`).join(''):`<tr><td colspan="5"><div class="empty">Hali e'lon yuborilmagan</div></td></tr>`}
     </tbody></table></div>`;
 }
 function sendAnnounce(){ const t=v('an-t'); if(!t){toast('Sarlavha kiriting');return;}
-  const list=dbGet('announce')||[]; list.unshift({id:rid('AN'),title:t,body:v('an-b'),region:v('an-reg'),channel:v('an-ch'),date:Date.now()});
-  dbSet('announce',list); audit('E\'lon yuborildi: '+t); toast('E\'lon yuborildi'); renderAnnounce(); }
+  const region=v('an-reg'), channel=v('an-ch'), body=v('an-b'), ts=Date.now();
+  const list=dbGet('announce')||[]; const id=rid('AN');
+  list.unshift({id,title:t,body,region,channel,date:ts});
+  dbSet('announce',list);
+  /* Firebase'ga yozamiz -> fermer ilovasi bildirishnomada ko'radi */
+  if(fbDb){
+    try{ fbDb.ref('announcements/'+id).set({title:t, body, region:region||'', channel, ts, by:(CUR&&CUR.name)||'admin'}); }
+    catch(e){}
+    audit('E\'lon yuborildi (Firebase): '+t+(region?(' → '+region):' → barcha'));
+    toast('E\'lon fermerlarga yuborildi');
+  } else {
+    audit('E\'lon yuborildi (lokal): '+t); toast('E\'lon saqlandi (Firebase yo\'q)');
+  }
+  renderAnnounce(); }
+function delAnnounce(id){ if(!confirm('E\'lon o\'chirilsinmi?')) return;
+  const list=(dbGet('announce')||[]).filter(x=>x.id!==id); dbSet('announce',list);
+  if(fbDb){ try{ fbDb.ref('announcements/'+id).remove(); }catch(e){} }
+  audit('E\'lon o\'chirildi'); toast('O\'chirildi'); renderAnnounce(); }
 
 /* ============ TO'LOV ============ */
 function renderBilling(){ const farmers=dbGet('farmers')||[];
