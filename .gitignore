@@ -1,14 +1,22 @@
-# OS
-.DS_Store
-Thumbs.db
-
-# Tahrirlovchilar
-.vscode/
-.idea/
+# Bog'liqliklar
+node_modules/
 
 # Vercel
-.vercel
+.vercel/
 
-# Node (agar keyinchalik qo'shilsa)
-node_modules/
-npm-debug.log*
+# Firebase
+.firebase/
+firebase-debug.log
+
+# OS / muharrir
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Arduino build artefaktlari
+firmware/build/
+*.bin
+*.elf
+*.hex
