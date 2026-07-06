@@ -1,9 +1,8 @@
 // ============================================================
 //  features/auth/services/authService.js
-//  Firebase Auth (email/parol) bilan real ishlash.
-//  • register(): akkaunt + minimal /users/{uid} profil hujjati.
-//  • Firebase xato kodlari -> i18n kaliti (jim yutilmaydi).
-//  Boy fermer profili + tenant/ownership -> Sprint-3.
+//  Firebase Authentication (email/parol) — YAGONA auth nuqtasi.
+//  Barcha foydalanuvchilar (fermer/operator/region/super) shu
+//  tizimdan foydalanadi; rol users/{uid} hujjatida (custom claim yo'q).
 // ============================================================
 
 import {
@@ -11,13 +10,15 @@ import {
   signInWithEmailAndPassword,
   signOut as fbSignOut,
   onAuthStateChanged,
+  sendPasswordResetEmail,
+  sendEmailVerification,
+  reload as fbReload,
 } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
-import { auth, db } from '../../../core/firebase.js';
+import { auth } from '../../../core/firebase.js';
 import { AuthError } from '../../../core/errors.js';
 import { logger } from '../../../core/logger.js';
-import { detectLocale } from '../../../core/i18n/index.js';
+import { userService } from '../../users/index.js';
 
 /** Firebase Auth xato kodini i18n kalitiga aylantirish. */
 function mapAuthError(code) {
@@ -38,52 +39,86 @@ function wrap(e, context) {
 
 export const authService = {
   /**
-   * Yangi akkaunt + minimal profil hujjati.
+   * Ro'yxatdan o'tish: Auth akkaunt + users/{uid} hujjati + tasdiq emaili.
+   * @param {string} email
+   * @param {string} password
+   * @param {{ism, fam, vil, tum?, phone?}} profile
+   * @param {string} locale
    * @returns {Promise<import('firebase/auth').User>}
    */
-  async register(email, password) {
+  async register(email, password, profile, locale) {
+    let cred;
     try {
-      const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
-      const uid = cred.user.uid;
-      await setDoc(doc(db, 'users', uid), {
-        email: cred.user.email,
-        locale: detectLocale(),
-        createdAt: serverTimestamp(),
-      });
-      logger.info('Yangi foydalanuvchi yaratildi:', uid);
-      return cred.user;
+      cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
     } catch (e) {
       throw wrap(e, 'register');
     }
+    // Auth akkaunt yaratildi -> Firestore hujjati (rollar shu yerda).
+    await userService.createUser(cred.user.uid, { email: cred.user.email, profile, locale });
+    // Tasdiq emaili (yumshoq rejim — bloklamaydi).
+    try { await sendEmailVerification(cred.user); }
+    catch (e) { logger.warn('Tasdiq emailini yuborib bo\'lmadi:', e && e.code); }
+    logger.info('Ro\'yxatdan o\'tdi:', cred.user.uid);
+    return cred.user;
   },
 
-  /** Kirish. @returns {Promise<import('firebase/auth').User>} */
   async signIn(email, password) {
     try {
       const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
-      logger.info('Foydalanuvchi kirdi:', cred.user.uid);
+      logger.info('Kirdi:', cred.user.uid);
       return cred.user;
     } catch (e) {
       throw wrap(e, 'signIn');
     }
   },
 
-  /** Chiqish. */
   async signOut() {
     try {
       await fbSignOut(auth);
-      logger.info('Foydalanuvchi chiqdi');
+      logger.info('Chiqdi');
     } catch (e) {
       throw wrap(e, 'signOut');
     }
   },
 
-  /** Auth holati o'zgarishiga obuna. Unsubscribe qaytaradi. */
+  /** Parolni tiklash emaili (forgot / settings-da parol o'zgartirish uchun). */
+  async resetPassword(email) {
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+      logger.info('Parol tiklash emaili yuborildi');
+    } catch (e) {
+      throw wrap(e, 'resetPassword');
+    }
+  },
+
+  /** Joriy foydalanuvchiga tasdiq emailini qayta yuborish. */
+  async sendVerification() {
+    const u = auth.currentUser;
+    if (!u) throw new AuthError('sendVerification: foydalanuvchi yo\'q', { messageKey: 'error.auth' });
+    try {
+      await sendEmailVerification(u);
+      logger.info('Tasdiq emaili qayta yuborildi');
+    } catch (e) {
+      throw wrap(e, 'sendVerification');
+    }
+  },
+
+  /** Joriy foydalanuvchi holatini yangilash (emailVerified'ni tekshirish). */
+  async reload() {
+    const u = auth.currentUser;
+    if (!u) return null;
+    try {
+      await fbReload(u);
+      return auth.currentUser;
+    } catch (e) {
+      throw wrap(e, 'reload');
+    }
+  },
+
   onChange(callback) {
     return onAuthStateChanged(auth, callback);
   },
 
-  /** Joriy foydalanuvchi (yoki null). */
   current() {
     return auth.currentUser;
   },
