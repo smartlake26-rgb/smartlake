@@ -1,95 +1,114 @@
 rules_version = '2';
 
 // ============================================================
-//  SmartLake 2.0 — Firestore Security Rules (multi-tenant)
-//  ADR-001: yagona baza. Tenant izolyatsiyasi: har hujjatda
-//  `ownerUid` denormalizatsiya -> egalik tekshiruvi get()siz
-//  (hot yo'l uchun arzon). Admin/rol tekshiruvi (kam uchraydi)
-//  users/{uid}.role dan get() bilan.
-//
-//  Rollar: farmer (standart) · operator · region · super.
-//  Qurilma (gateway): custom claim `device: true` (Sprint-9).
-//  Super admin roli tashqi yo'l bilan seed qilinadi (konsol /
-//  Cloud Function) — foydalanuvchi o'zini KO'TARA OLMAYDI.
+//  SmartLake 2.0 — Firestore Security Rules (Sprint-4)
+//  Multi-tenant + rol + HUDUD (region) bo'yicha to'liq himoya.
+//  ADR: rollar users/{uid}.role da (custom claim yo'q).
+//  Egalik: ownerUid denormalizatsiya (hot yo'lda get()siz).
 // ============================================================
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ---------- Yordamchilar ----------
+    // ---------- Asosiy yordamchilar ----------
     function signedIn() { return request.auth != null; }
     function uid() { return request.auth.uid; }
     function isSelf(u) { return signedIn() && uid() == u; }
+    function userExists() { return exists(/databases/$(database)/documents/users/$(uid())); }
+    function userDoc() { return get(/databases/$(database)/documents/users/$(uid())).data; }
+    function role() { return userDoc().role; }
 
-    function userExists() {
-      return exists(/databases/$(database)/documents/users/$(uid()));
-    }
-    function role() {
-      return get(/databases/$(database)/documents/users/$(uid())).data.role;
-    }
     function isSuper()    { return signedIn() && userExists() && role() == 'super'; }
     function isOperator() { return signedIn() && userExists() && role() == 'operator'; }
     function isRegion()   { return signedIn() && userExists() && role() == 'region'; }
     function isAdmin()    { return isSuper() || isOperator() || isRegion(); }
-
-    // Qurilma (gateway) — cheklangan mashina identifikatori.
-    function isDevice() { return signedIn() && request.auth.token.device == true; }
-
-    // Egalik: berilgan ownerUid joriy foydalanuvchiga tegishlimi.
+    function isDevice()   { return signedIn() && request.auth.token.device == true; }
     function owns(ownerUid) { return signedIn() && ownerUid == uid(); }
 
-    // Faqat ruxsat etilgan maydonlar o'zgarganini tekshirish.
+    // Hudud: region menejeri o'z regions ro'yxatidagi hududlarda ishlaydi.
+    function mgrRegions() { return userExists() ? userDoc().get('regions', []) : []; }
+    function regionCovers(r) { return isRegion() && (r in mgrRegions()); }
+    // Berilgan hudud uchun admin (operator/super har hudud; region — faqat o'ziniki).
+    function adminForRegion(r) { return isSuper() || isOperator() || regionCovers(r); }
+
     function onlyFields(allowed) {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowed);
+    }
+    function validLifecycle(s) {
+      return s in ['factory', 'provisioned', 'assigned', 'active', 'suspended', 'maintenance', 'error', 'retired'];
     }
 
     // ---------- users ----------
     match /users/{u} {
       allow read: if isSelf(u) || isAdmin();
-
-      // Yaratish: faqat o'zi; role majburan 'farmer', status 'active'
-      // (self-escalation va o'zini-suspend-bypass yo'q).
       allow create: if isSelf(u)
         && request.resource.data.role == 'farmer'
         && request.resource.data.status == 'active';
-
-      // Yangilash: o'zi FAQAT profil/til (role/status/regions O'ZGARMAYDI),
-      // yoki super (hammasi).
-      allow update: if (isSelf(u)
-                        && onlyFields(['profile', 'locale', 'updatedAt']))
+      allow update: if (isSelf(u) && onlyFields(['profile', 'locale', 'updatedAt']))
                     || isSuper();
-
       allow delete: if isSuper();
     }
 
     // ---------- devices ----------
     match /devices/{deviceId} {
+      // O'qish: egasi, admin, yoki qurilma. (Fermer BEGONA qurilma
+      //  activationKey'ini KO'RA OLMAYDI — claim'dan oldin egasi emas.)
       allow read: if owns(resource.data.ownerUid) || isAdmin() || isDevice();
-      // Biriktirish/bloklash/o'chirish — faqat admin (fermer emas).
-      allow create, update, delete: if isAdmin();
+
+      // Provisioning (factory->provisioned): FAQAT Super Admin.
+      allow create: if isSuper()
+        && request.resource.data.ownerUid == null
+        && request.resource.data.lifecycle == 'provisioned'
+        && request.resource.data.activationKey is string
+        && request.resource.data.deviceId == deviceId;
+
+      // Yangilash (claim tasdiqlash yoki lifecycle o'zgartirish): admin (hudud bo'yicha).
+      //  Egalik o'g'irlanmaydi: ownerUid o'zgarmaydi YOKI oldin null bo'lgan (birinchi biriktirish).
+      allow update: if adminForRegion(resource.data.region)
+        && validLifecycle(request.resource.data.lifecycle)
+        && (request.resource.data.ownerUid == resource.data.ownerUid
+            || resource.data.ownerUid == null);
+
+      // O'chirish/retire — faqat super (qurilma tarixi saqlanadi).
+      allow delete: if isSuper();
+    }
+
+    // ---------- requests (claim so'rovi — ID = deviceId) ----------
+    match /requests/{reqId} {
+      // O'qish: admin (region — faqat o'z hududi).
+      allow read: if adminForRegion(resource.data.region);
+
+      // Yaratish (fermer): activationKey Firestore ICHIDA tekshiriladi.
+      //  Qurilma egasiz + provisioned + kalit mos bo'lishi shart.
+      //  ID = deviceId -> ikkinchi (double) claim rad etiladi (update bo'lib qoladi).
+      allow create: if signedIn()
+        && reqId == request.resource.data.deviceId
+        && request.resource.data.uid == uid()
+        && request.resource.data.status == 'pending'
+        && exists(/databases/$(database)/documents/devices/$(reqId))
+        && get(/databases/$(database)/documents/devices/$(reqId)).data.ownerUid == null
+        && get(/databases/$(database)/documents/devices/$(reqId)).data.lifecycle == 'provisioned'
+        && get(/databases/$(database)/documents/devices/$(reqId)).data.activationKey == request.resource.data.activationKey;
+
+      // Tasdiqlash/rad etish/o'chirish: admin (hudud bo'yicha — fermer hududi).
+      allow update, delete: if adminForRegion(resource.data.region);
     }
 
     // ---------- lakes ----------
     match /lakes/{lakeId} {
-      allow read: if owns(resource.data.ownerUid) || isAdmin();
-
-      // Yaratish: fermer o'z nomiga; boshda approved = false.
-      allow create: if signedIn()
-        && request.resource.data.ownerUid == uid()
-        && request.resource.data.approved == false;
-
-      // Yangilash: egasi FAQAT ruxsat etilgan maydonlarni (ownerUid/approved
-      // o'zgarmaydi -> o'zini tasdiqlay olmaydi), yoki admin.
+      allow read: if owns(resource.data.ownerUid) || adminForRegion(resource.data.region);
+      // Yaratish: claim tasdiqlashda admin (hudud bo'yicha).
+      allow create: if adminForRegion(request.resource.data.region)
+        && request.resource.data.approved == true;
+      // Yangilash: egasi (cheklangan maydonlar) yoki admin (hudud).
       allow update: if (owns(resource.data.ownerUid)
-                        && onlyFields(['name', 'deviceId', 'region', 'settings', 'updatedAt']))
-                    || isAdmin();
-
-      allow delete: if owns(resource.data.ownerUid) || isAdmin();
+                        && onlyFields(['name', 'settings', 'updatedAt']))
+                    || adminForRegion(resource.data.region);
+      allow delete: if owns(resource.data.ownerUid) || adminForRegion(resource.data.region);
     }
 
     // ---------- telemetry (latest) + history ----------
     match /telemetry/{deviceId} {
       allow read: if owns(resource.data.ownerUid) || isAdmin();
-      // Yozish: FAQAT qurilma (gateway) yoki admin; ownerUid bo'lishi shart.
       allow create, update: if (isDevice() || isAdmin())
         && request.resource.data.ownerUid is string;
       allow delete: if isAdmin();
@@ -105,41 +124,27 @@ service cloud.firestore {
     // ---------- commands ----------
     match /commands/{cmdId} {
       allow read: if owns(resource.data.ownerUid) || isAdmin() || isDevice();
-
-      // Yaratish: fermer FAQAT o'zi egalik qiladigan qurilmaga; status 'pending'.
       allow create: if signedIn()
         && request.resource.data.ownerUid == uid()
         && request.resource.data.status == 'pending'
         && get(/databases/$(database)/documents/devices/$(request.resource.data.deviceId)).data.ownerUid == uid();
-
-      // Bajarilgach yangilash/o'chirish: qurilma yoki admin; egasi o'chirishi ham mumkin.
       allow update: if isDevice() || isAdmin();
       allow delete: if isDevice() || isAdmin() || owns(resource.data.ownerUid);
     }
 
-    // ---------- requests (ko'l tasdiq so'rovi) ----------
-    match /requests/{reqId} {
-      allow read: if isAdmin();
-      allow create: if signedIn()
-        && request.resource.data.uid == uid()
-        && request.resource.data.status == 'pending';
-      allow update, delete: if isAdmin();
-    }
-
     // ---------- announcements ----------
     match /announcements/{annId} {
-      allow read: if signedIn();               // barcha fermer ko'radi
+      allow read: if signedIn();
       allow create, update, delete: if isAdmin();
     }
 
-    // ---------- logs (audit — o'zgarmas) ----------
-    match /logs/{logId} {
+    // ---------- audit (server yozadi — MIJOZ YOZA OLMAYDI) ----------
+    match /audit/{logId} {
       allow read: if isAdmin();
-      allow create: if isAdmin();
-      allow update, delete: if false;
+      allow write: if false;   // Cloud Function (Admin SDK) rules'ni chetlab o'tadi
     }
 
-    // ---------- default: hamma narsa taqiqlangan ----------
+    // ---------- default: taqiq ----------
     match /{document=**} {
       allow read, write: if false;
     }

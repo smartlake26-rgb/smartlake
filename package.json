@@ -4,9 +4,6 @@
   "description": "SmartLake 2.0 — baliq ko'llari uchun real-time monitoring platformasi",
   "type": "module",
   "private": true,
-  "engines": {
-    "node": "22.x"
-  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
