@@ -31,6 +31,12 @@ export const ROLES = Object.freeze({
   SUPER: 'super',                 // super admin
 });
 
+/** Foydalanuvchi statusi (users/{uid}.status). */
+export const USER_STATUS = Object.freeze({
+  ACTIVE: 'active',
+  SUSPENDED: 'suspended',
+});
+
 /** Qurilma statusi (devices/{id}.status). */
 export const DEVICE_STATUS = Object.freeze({
   UNASSIGNED: 'unassigned',
@@ -64,4 +70,4 @@ export const paths = Object.freeze({
   log: (id) => `${COLLECTIONS.LOGS}/${id}`,
 });
 
-export default { COLLECTIONS, SUBCOLLECTIONS, ROLES, DEVICE_STATUS, COMMAND_STATUS, REQUEST_STATUS, paths };
+export default { COLLECTIONS, SUBCOLLECTIONS, ROLES, USER_STATUS, DEVICE_STATUS, COMMAND_STATUS, REQUEST_STATUS, paths };
