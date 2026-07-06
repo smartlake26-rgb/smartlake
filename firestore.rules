@@ -46,13 +46,16 @@ service cloud.firestore {
     match /users/{u} {
       allow read: if isSelf(u) || isAdmin();
 
-      // Yaratish: faqat o'zi; role majburan 'farmer' (self-escalation yo'q).
-      allow create: if isSelf(u) && request.resource.data.role == 'farmer';
+      // Yaratish: faqat o'zi; role majburan 'farmer', status 'active'
+      // (self-escalation va o'zini-suspend-bypass yo'q).
+      allow create: if isSelf(u)
+        && request.resource.data.role == 'farmer'
+        && request.resource.data.status == 'active';
 
-      // Yangilash: o'zi FAQAT profil maydonlarini (role/regions O'ZGARMAYDI),
+      // Yangilash: o'zi FAQAT profil/til (role/status/regions O'ZGARMAYDI),
       // yoki super (hammasi).
       allow update: if (isSelf(u)
-                        && onlyFields(['ism', 'fam', 'vil', 'tum', 'phone', 'locale', 'email', 'updatedAt']))
+                        && onlyFields(['profile', 'locale', 'updatedAt']))
                     || isSuper();
 
       allow delete: if isSuper();
