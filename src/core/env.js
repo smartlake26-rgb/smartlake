@@ -1,13 +1,14 @@
 // ============================================================
-//  core/env.js — Muhit o'zgaruvchilarini o'qish va TEKSHIRISH
-//  Firebase kalitlari .env dan keladi (manba kodda emas).
-//  Zarur o'zgaruvchi yetishmasa — boot vaqtida aniq ConfigError.
+//  core/env.js — Muhit config: committed default + ixtiyoriy override
+//  Firebase web config maxfiy emas -> committed default (build har
+//  doim ishlaydi, hatto .env bo'lmasa ham: masalan Vercel'da).
+//  VITE_FB_* o'zgaruvchilari (bo'lsa) default'ni ustidan yozadi.
 // ============================================================
 
 import { ConfigError } from './errors.js';
+import { DEFAULT_FIREBASE_CONFIG } from './firebaseConfig.default.js';
 
 function raw(key) {
-  // Vite mijoz kodida import.meta.env; Node/test'da process.env.
   if (typeof import.meta !== 'undefined' && import.meta.env && key in import.meta.env) {
     return import.meta.env[key];
   }
@@ -17,45 +18,38 @@ function raw(key) {
   return undefined;
 }
 
-const REQUIRED = [
-  'VITE_FB_API_KEY',
-  'VITE_FB_AUTH_DOMAIN',
-  'VITE_FB_PROJECT_ID',
-  'VITE_FB_APP_ID',
-];
+/** Env qiymati bo'lsa uni, bo'lmasa fallback'ni qaytaradi. */
+function val(key, fallback) {
+  const v = raw(key);
+  return (v == null || String(v).trim() === '') ? fallback : v;
+}
+
+/** Firebase konfiguratsiyasi: default ustiga env override. */
+export const firebaseConfig = Object.freeze({
+  apiKey: val('VITE_FB_API_KEY', DEFAULT_FIREBASE_CONFIG.apiKey),
+  authDomain: val('VITE_FB_AUTH_DOMAIN', DEFAULT_FIREBASE_CONFIG.authDomain),
+  projectId: val('VITE_FB_PROJECT_ID', DEFAULT_FIREBASE_CONFIG.projectId),
+  storageBucket: val('VITE_FB_STORAGE_BUCKET', DEFAULT_FIREBASE_CONFIG.storageBucket),
+  messagingSenderId: val('VITE_FB_MESSAGING_SENDER_ID', DEFAULT_FIREBASE_CONFIG.messagingSenderId),
+  appId: val('VITE_FB_APP_ID', DEFAULT_FIREBASE_CONFIG.appId),
+  measurementId: val('VITE_FB_MEASUREMENT_ID', DEFAULT_FIREBASE_CONFIG.measurementId),
+});
 
 /**
- * Zarur o'zgaruvchilarni tekshiradi. Yetishmayotganlar bo'lsa
- * ConfigError tashlaydi (ro'yxat bilan).
+ * Yakuniy (merge qilingan) config to'liqligini tekshiradi.
+ * Default committed bo'lgani uchun normal holatda hech qachon
+ * xato bermaydi; faqat kimdir default'ni ham, env'ni ham bo'shatsa.
  */
 export function assertEnv() {
-  const missing = REQUIRED.filter((k) => {
-    const v = raw(k);
-    return v == null || String(v).trim() === '';
-  });
+  const required = ['apiKey', 'authDomain', 'projectId', 'appId'];
+  const missing = required.filter((k) => !firebaseConfig[k] || String(firebaseConfig[k]).trim() === '');
   if (missing.length) {
-    throw new ConfigError(
-      `Yetishmayotgan muhit o'zgaruvchilari: ${missing.join(', ')}. ` +
-      `\`.env.example\` ni \`.env\` ga nusxalang.`,
-    );
+    throw new ConfigError(`Firebase config to'liq emas: ${missing.join(', ')}`);
   }
 }
 
-/** Firebase SDK uchun konfiguratsiya obyekti. */
-export const firebaseConfig = Object.freeze({
-  apiKey: raw('VITE_FB_API_KEY'),
-  authDomain: raw('VITE_FB_AUTH_DOMAIN'),
-  projectId: raw('VITE_FB_PROJECT_ID'),
-  storageBucket: raw('VITE_FB_STORAGE_BUCKET'),
-  messagingSenderId: raw('VITE_FB_MESSAGING_SENDER_ID'),
-  appId: raw('VITE_FB_APP_ID'),
-  measurementId: raw('VITE_FB_MEASUREMENT_ID'),
-});
-
-/** Lokal emulatordan foydalanish kerakmi? */
 export const useEmulator = String(raw('VITE_USE_EMULATOR')).toLowerCase() === 'true';
 
-/** DEV rejimimi? */
 export const isDev = typeof import.meta !== 'undefined'
   && import.meta.env
   && import.meta.env.DEV === true;
