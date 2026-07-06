@@ -42,6 +42,13 @@ export class AuthError extends AppError {
   }
 }
 
+/** Holat mashinasi (FSM) qoidasi buzilishi. */
+export class StateError extends AppError {
+  constructor(message, opts = {}) {
+    super(message, { messageKey: 'error.state', code: 'app/state', ...opts });
+  }
+}
+
 /** Ma'lumotlar (Firestore) qatlami xatolari. */
 export class DataError extends AppError {
   constructor(message, opts = {}) {
