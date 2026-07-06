@@ -17,6 +17,8 @@ export const ROUTES = Object.freeze({
   HOME: 'home',
   PROFILE: 'profile',
   SETTINGS: 'settings',
+  CLAIM: 'claim',          // fermer: qurilma qo'shish
+  REQUESTS: 'requests',    // admin: kutilayotgan so'rovlar
 });
 
 /** Admin hisoblangan rollar. */
