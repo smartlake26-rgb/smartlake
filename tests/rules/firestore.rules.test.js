@@ -15,13 +15,14 @@ import {
 import {
   doc, getDoc, setDoc, deleteDoc, addDoc, collection, updateDoc,
 } from 'firebase/firestore';
-import { COLLECTIONS, ROLES } from '../../src/core/collections.js';
+import { COLLECTIONS, ROLES, USER_STATUS } from '../../src/core/collections.js';
 
 let testEnv;
 
 const A = 'farmerA';
 const B = 'farmerB';
 const OP = 'operator1';
+const SUP = 'super1';
 
 function fs(uid, token) {
   return uid ? testEnv.authenticatedContext(uid, token).firestore()
@@ -46,9 +47,11 @@ beforeEach(async () => {
   // Xavfsizlik qoidalarisiz boshlang'ich ma'lumot (seed).
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
-    await setDoc(doc(db, COLLECTIONS.USERS, A), { email: 'a@x.uz', role: ROLES.FARMER });
-    await setDoc(doc(db, COLLECTIONS.USERS, B), { email: 'b@x.uz', role: ROLES.FARMER });
-    await setDoc(doc(db, COLLECTIONS.USERS, OP), { email: 'op@x.uz', role: ROLES.OPERATOR });
+    const prof = { ism: 'X', fam: 'Y', vil: 'Samarqand', tum: '', phone: '' };
+    await setDoc(doc(db, COLLECTIONS.USERS, A), { email: 'a@x.uz', role: ROLES.FARMER, status: USER_STATUS.ACTIVE, locale: 'uz', profile: prof });
+    await setDoc(doc(db, COLLECTIONS.USERS, B), { email: 'b@x.uz', role: ROLES.FARMER, status: USER_STATUS.ACTIVE, locale: 'uz', profile: prof });
+    await setDoc(doc(db, COLLECTIONS.USERS, OP), { email: 'op@x.uz', role: ROLES.OPERATOR, status: USER_STATUS.ACTIVE });
+    await setDoc(doc(db, COLLECTIONS.USERS, SUP), { email: 'sup@x.uz', role: ROLES.SUPER, status: USER_STATUS.ACTIVE });
 
     await setDoc(doc(db, COLLECTIONS.DEVICES, 'AQ0000000A'), { ownerUid: A, status: 'active' });
     await setDoc(doc(db, COLLECTIONS.DEVICES, 'AQ0000000B'), { ownerUid: B, status: 'active' });
@@ -71,13 +74,18 @@ describe('users', () => {
   it('unauth o\'qiy olmaydi', async () => {
     await assertFails(getDoc(doc(fs(null), COLLECTIONS.USERS, A)));
   });
-  it('role=\'super\' bilan o\'zini yarata OLMAYDI', async () => {
-    await assertFails(setDoc(doc(fs('newUser'), COLLECTIONS.USERS, 'newUser'), { email: 'n@x.uz', role: ROLES.SUPER }));
-    await assertSucceeds(setDoc(doc(fs('newUser'), COLLECTIONS.USERS, 'newUser'), { email: 'n@x.uz', role: ROLES.FARMER }));
+  it('role=\'super\' yoki status=\'suspended\' bilan o\'zini yarata OLMAYDI', async () => {
+    await assertFails(setDoc(doc(fs('newUser'), COLLECTIONS.USERS, 'newUser'), { email: 'n@x.uz', role: ROLES.SUPER, status: 'active' }));
+    await assertFails(setDoc(doc(fs('newUser'), COLLECTIONS.USERS, 'newUser'), { email: 'n@x.uz', role: ROLES.FARMER, status: 'suspended' }));
+    await assertSucceeds(setDoc(doc(fs('newUser'), COLLECTIONS.USERS, 'newUser'), { email: 'n@x.uz', role: ROLES.FARMER, status: 'active' }));
   });
-  it('o\'z rolini super ga KO\'TARA OLMAYDI', async () => {
+  it('o\'z rolini/statusini o\'zgartira OLMAYDI, profilni bo\'ladi', async () => {
     await assertFails(updateDoc(doc(fs(A), COLLECTIONS.USERS, A), { role: ROLES.SUPER }));
-    await assertSucceeds(updateDoc(doc(fs(A), COLLECTIONS.USERS, A), { phone: '+998901234567' }));
+    await assertFails(updateDoc(doc(fs(A), COLLECTIONS.USERS, A), { status: 'suspended' }));
+    await assertSucceeds(updateDoc(doc(fs(A), COLLECTIONS.USERS, A), { profile: { ism: 'Yangi', fam: 'Ism', vil: 'Samarqand', tum: '', phone: '' } }));
+  });
+  it('super boshqa foydalanuvchi rolini o\'zgartiradi', async () => {
+    await assertSucceeds(updateDoc(doc(fs(SUP), COLLECTIONS.USERS, A), { role: ROLES.OPERATOR }));
   });
 });
 
