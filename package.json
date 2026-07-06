@@ -1,0 +1,25 @@
+{
+  "name": "smartlake",
+  "version": "2.0.0",
+  "description": "SmartLake 2.0 — baliq ko'llari uchun real-time monitoring platformasi",
+  "type": "module",
+  "private": true,
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "emulators": "firebase emulators:start --only auth,firestore"
+  },
+  "dependencies": {
+    "firebase": "^10.12.2"
+  },
+  "devDependencies": {
+    "vite": "^5.2.0",
+    "vitest": "^1.5.0"
+  }
+}

@@ -1,0 +1,30 @@
+rules_version = '2';
+
+// ============================================================
+//  SmartLake 2.0 — Firestore Security Rules
+//  SPRINT-1: xavfsiz-standart (secure-by-default).
+//  Faqat foydalanuvchi o'z profiliga kira oladi; qolgan hamma
+//  narsa TAQIQLANGAN. Multi-tenant/ownership qoidalari Sprint-2'da
+//  shu asos ustiga qo'shiladi (bu vaqtinchalik emas — bu poydevor).
+// ============================================================
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    // Foydalanuvchi profili — faqat egasi o'qiydi/yozadi.
+    match /users/{uid} {
+      allow read, write: if isSelf(uid);
+    }
+
+    // Aniq ruxsat berilmagan hamma narsa taqiqlanadi.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
