@@ -155,3 +155,46 @@ body {
 .toast.show { opacity: .96; }
 .toast.err { background: var(--crit); }
 .toast.ok { background: var(--good); }
+
+/* --- Sprint-3: select, topbar, settings, banner --- */
+.field select {
+  width: 100%;
+  padding: 12px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  font-size: 15px;
+  font-family: var(--sans);
+  color: var(--ink);
+  background: var(--surface-2);
+  outline: none;
+}
+.field select:focus { border-color: var(--primary); }
+
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  background: var(--primary); color: #fff;
+  padding: 16px 18px; font-weight: 700; font-size: 17px;
+  padding-top: calc(16px + env(safe-area-inset-top));
+}
+
+.set-row {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line-soft);
+}
+.set-row:last-child { border-bottom: none; }
+.set-row select { width: auto; padding: 8px 10px; }
+.set-row .btn { width: auto; padding: 8px 14px; }
+
+.banner {
+  background: #FCF1E0; border: 1px solid #F2D9B0; color: #8A5A12;
+  border-radius: var(--r-sm); padding: 11px 13px; font-size: 13px;
+  margin-bottom: 12px;
+}
+.banner.err { background: #FBE8E6; border-color: #F0C4BE; color: #8A2A20; }
+
+.home-actions { display: flex; flex-direction: column; gap: 10px; width: 100%; max-width: 260px; }
+.role-badge {
+  display: inline-block; background: var(--surface-2); color: var(--primary);
+  border: 1px solid var(--line); border-radius: 20px; padding: 3px 12px;
+  font-size: 12px; font-weight: 600;
+}
