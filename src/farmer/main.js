@@ -19,6 +19,7 @@ import {
   renderAuth, renderProfile, renderSettings,
   AUTH_SCREENS, ROUTES,
 } from '../features/auth/index.js';
+import { renderClaim } from '../features/devices/index.js';
 
 window.addEventListener('error', (ev) => handleError(ev.error || ev.message, 'window.onerror'));
 window.addEventListener('unhandledrejection', (ev) => handleError(ev.reason, 'unhandledrejection'));
@@ -50,6 +51,7 @@ function homeScreen({ router }) {
     el('div', { style: 'font-size:20px;font-weight:800', text: `${t('common.welcome')}, ${s.profile ? s.profile.ism : ''}!` }),
     el('span', { class: 'role-badge', text: t('role.' + (s.role || 'farmer')) }),
     el('div', { class: 'home-actions' }, [
+      el('button', { class: 'btn', text: t('device.claimTitle'), onClick: () => router.go(ROUTES.CLAIM) }),
       el('button', { class: 'btn ghost', text: t('home.profile'), onClick: () => router.go(ROUTES.PROFILE) }),
       el('button', { class: 'btn ghost', text: t('home.settings'), onClick: () => router.go(ROUTES.SETTINGS) }),
     ]),
@@ -78,6 +80,7 @@ async function main() {
     }))
     .define(ROUTES.HOME, () => homeScreen({ router }))
     .define(ROUTES.PROFILE, () => renderProfile({ onBack: () => router.go(ROUTES.HOME) }))
+    .define(ROUTES.CLAIM, () => renderClaim({ onBack: () => router.go(ROUTES.HOME) }))
     .define(ROUTES.SETTINGS, () => renderSettings({
       onBack: () => router.go(ROUTES.HOME),
       onRerender: () => router.go(ROUTES.SETTINGS),
