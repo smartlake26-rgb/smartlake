@@ -19,6 +19,7 @@ import {
   renderAuth, renderSettings,
   AUTH_SCREENS, ROUTES, ADMIN_ROLES,
 } from '../features/auth/index.js';
+import { renderPendingRequests } from '../features/ownership/index.js';
 
 window.addEventListener('error', (ev) => handleError(ev.error || ev.message, 'admin.window.onerror'));
 window.addEventListener('unhandledrejection', (ev) => handleError(ev.reason, 'admin.unhandledrejection'));
@@ -42,6 +43,7 @@ function adminHome({ router }) {
     el('span', { class: 'role-badge', text: t('role.' + s.role) }),
     el('div', { style: 'color:var(--ink-soft);font-size:13px', text: t('auth.loggedInAs', { email: s.email }) }),
     el('div', { class: 'home-actions' }, [
+      el('button', { class: 'btn', text: t('device.pendingTitle'), onClick: () => router.go(ROUTES.REQUESTS) }),
       el('button', { class: 'btn ghost', text: t('home.settings'), onClick: () => router.go(ROUTES.SETTINGS) }),
     ]),
   ]);
@@ -65,6 +67,7 @@ async function main() {
   router
     .define(ROUTES.AUTH, () => renderAuth({ mode: authMode, onSwitch: (m) => { authMode = m; goAuth(); } }))
     .define(ROUTES.HOME, () => adminHome({ router }))
+    .define(ROUTES.REQUESTS, () => renderPendingRequests({ onBack: () => router.go(ROUTES.HOME) }))
     .define(ROUTES.SETTINGS, () => renderSettings({ onBack: () => router.go(ROUTES.HOME), onRerender: () => router.go(ROUTES.SETTINGS) }));
 
   root.replaceChildren(loadingScreen());
