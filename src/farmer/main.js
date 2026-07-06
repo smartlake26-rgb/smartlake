@@ -1,91 +1,102 @@
 // ============================================================
-//  farmer/main.js — Fermer ilovasi boot ildizi
-//  Feature'larni ulaydi: env -> firebase -> global xato tutuvchilar
-//  -> i18n -> auth holati bo'yicha ekran.
-//  Sprint-1: login/register + minimal authenticated shell.
-//  To'liq dashboard -> Sprint-4.
+//  farmer/main.js — Fermer ilovasi boot ildizi (Sprint-3)
+//  Router + authStore + himoyalangan yo'nalishlar.
+//  Auto-login (Firebase sessiya) -> rol/status yuklanadi -> yo'nalish.
+//  To'liq dashboard (ko'llar/monitoring) -> Sprint-4.
 // ============================================================
 
 import '../shared/base.css';
 
-import { el, mount } from '../shared/dom.js';
+import { el } from '../shared/dom.js';
 import { icon } from '../shared/icons.js';
 import { toast } from '../shared/toast.js';
-import { createScreenManager } from '../shared/screen.js';
+import { createRouter } from '../shared/router.js';
 import { logger } from '../core/logger.js';
 import { handleError } from '../core/errors.js';
 import { t, detectLocale, setLocale } from '../core/i18n/index.js';
-import { authService, renderAuth } from '../features/auth/index.js';
+import {
+  authService, authStore, access,
+  renderAuth, renderProfile, renderSettings,
+  AUTH_SCREENS, ROUTES,
+} from '../features/auth/index.js';
 
-// --- Global xato tutuvchilar: hech qanday xato jimgina yo'qolmaydi ---
-window.addEventListener('error', (ev) => {
-  handleError(ev.error || ev.message, 'window.onerror');
-});
-window.addEventListener('unhandledrejection', (ev) => {
-  handleError(ev.reason, 'unhandledrejection');
-});
+window.addEventListener('error', (ev) => handleError(ev.error || ev.message, 'window.onerror'));
+window.addEventListener('unhandledrejection', (ev) => handleError(ev.reason, 'unhandledrejection'));
+
+function loadingScreen() {
+  return el('div', { class: 'app' }, [el('div', { class: 'shell' }, [el('div', { text: t('app.loading') })])]);
+}
 
 function bootError(err) {
   const { messageKey } = handleError(err, 'boot');
-  const root = document.getElementById('root') || document.body;
-  mount(root, el('div', { class: 'app' }, [
-    el('div', { class: 'shell' }, [
-      el('div', { style: 'color:var(--crit);font-weight:700', text: t(messageKey) }),
-    ]),
-  ]));
+  return el('div', { class: 'app' }, [el('div', { class: 'shell' }, [el('div', { style: 'color:var(--crit);font-weight:700', text: t(messageKey) })])]);
 }
 
-/** Kirilgandan keyingi minimal shell (Sprint-1). Sprint-4'da dashboard bo'ladi. */
-function renderShell({ user }) {
+function blockedScreen(messageKey) {
   return el('div', { class: 'app' }, [
     el('div', { class: 'shell' }, [
-      el('div', { style: 'color:var(--primary)', html: icon('waves', 40) }),
-      el('div', { style: 'font-size:20px;font-weight:800', text: `${t('common.welcome')}!` }),
-      el('div', { style: 'color:var(--ink-soft);font-size:13px', text: t('auth.loggedInAs', { email: user.email }) }),
-      el('button', {
-        class: 'btn', style: 'max-width:200px', text: t('common.logout'),
-        onClick: async () => {
-          try { await authService.signOut(); }
-          catch (e) { const { messageKey } = handleError(e, 'shell.logout'); toast(t(messageKey), 'err'); }
-        },
-      }),
+      el('div', { class: 'banner err', text: t(messageKey) }),
+      el('button', { class: 'btn', style: 'max-width:200px', text: t('common.logout'), onClick: () => authService.signOut() }),
     ]),
   ]);
 }
 
+function homeScreen({ router }) {
+  const s = authStore.getState();
+  const children = [];
+  if (!s.emailVerified) children.push(el('div', { class: 'banner', text: t('home.verifyBanner') }));
+  children.push(
+    el('div', { style: 'color:var(--primary)', html: icon('waves', 40) }),
+    el('div', { style: 'font-size:20px;font-weight:800', text: `${t('common.welcome')}, ${s.profile ? s.profile.ism : ''}!` }),
+    el('span', { class: 'role-badge', text: t('role.' + (s.role || 'farmer')) }),
+    el('div', { class: 'home-actions' }, [
+      el('button', { class: 'btn ghost', text: t('home.profile'), onClick: () => router.go(ROUTES.PROFILE) }),
+      el('button', { class: 'btn ghost', text: t('home.settings'), onClick: () => router.go(ROUTES.SETTINGS) }),
+    ]),
+  );
+  return el('div', { class: 'app' }, [el('div', { class: 'shell' }, children)]);
+}
+
 async function main() {
-  // Firebase init (assertEnv ichkarida ishlaydi; ConfigError -> bootError).
-  let screens;
+  const root = document.getElementById('root');
   try {
-    // Dinamik import: firebase.js modul yuklanganda env tekshiruvi bajariladi.
     await import('../core/firebase.js');
     setLocale(detectLocale());
-    const root = document.getElementById('root');
-    screens = createScreenManager(root);
-    screens
-      .register('auth', renderAuth)
-      .register('shell', renderShell);
   } catch (e) {
-    bootError(e);
+    root.replaceChildren(bootError(e));
     return;
   }
 
-  let authMode = 'login';
-  const showAuth = () => screens.show('auth', {
-    mode: authMode,
-    onSwitch: (m) => { authMode = m; showAuth(); },
+  const router = createRouter(root);
+  let authMode = AUTH_SCREENS.LOGIN;
+
+  const goAuth = () => router.go(ROUTES.AUTH);
+  router
+    .define(ROUTES.AUTH, () => renderAuth({
+      mode: authMode,
+      onSwitch: (m) => { authMode = m; goAuth(); },
+    }))
+    .define(ROUTES.HOME, () => homeScreen({ router }))
+    .define(ROUTES.PROFILE, () => renderProfile({ onBack: () => router.go(ROUTES.HOME) }))
+    .define(ROUTES.SETTINGS, () => renderSettings({
+      onBack: () => router.go(ROUTES.HOME),
+      onRerender: () => router.go(ROUTES.SETTINGS),
+    }));
+
+  root.replaceChildren(loadingScreen());
+
+  authStore.subscribe((s) => {
+    if (s.loading) return;                                  // hal bo'lguncha kutamiz
+    if (!s.firebaseUser) { authMode = AUTH_SCREENS.LOGIN; goAuth(); return; }
+    if (!s.userDoc || !s.role) { root.replaceChildren(blockedScreen('home.suspended')); return; }
+    if (s.status !== 'active') { root.replaceChildren(blockedScreen('home.suspended')); return; }
+    // Kirgan + aktiv: joriy route auth bo'lsa home'ga o't.
+    if (router.current() === ROUTES.AUTH || router.current() === null) router.go(ROUTES.HOME);
+    else router.go(router.current());                       // ma'lumot yangilanganda qayta render
   });
 
-  authService.onChange((user) => {
-    if (user) {
-      logger.info('Auth: kirgan holat');
-      screens.show('shell', { user });
-    } else {
-      logger.info('Auth: kirmagan holat');
-      authMode = 'login';
-      showAuth();
-    }
-  });
+  authStore.initAuthStore();
+  logger.info('Fermer ilovasi ishga tushdi');
 }
 
 main();
