@@ -1,28 +1,142 @@
 rules_version = '2';
 
 // ============================================================
-//  SmartLake 2.0 — Firestore Security Rules
-//  SPRINT-1: xavfsiz-standart (secure-by-default).
-//  Faqat foydalanuvchi o'z profiliga kira oladi; qolgan hamma
-//  narsa TAQIQLANGAN. Multi-tenant/ownership qoidalari Sprint-2'da
-//  shu asos ustiga qo'shiladi (bu vaqtinchalik emas — bu poydevor).
+//  SmartLake 2.0 — Firestore Security Rules (multi-tenant)
+//  ADR-001: yagona baza. Tenant izolyatsiyasi: har hujjatda
+//  `ownerUid` denormalizatsiya -> egalik tekshiruvi get()siz
+//  (hot yo'l uchun arzon). Admin/rol tekshiruvi (kam uchraydi)
+//  users/{uid}.role dan get() bilan.
+//
+//  Rollar: farmer (standart) · operator · region · super.
+//  Qurilma (gateway): custom claim `device: true` (Sprint-9).
+//  Super admin roli tashqi yo'l bilan seed qilinadi (konsol /
+//  Cloud Function) — foydalanuvchi o'zini KO'TARA OLMAYDI.
 // ============================================================
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function signedIn() {
-      return request.auth != null;
+    // ---------- Yordamchilar ----------
+    function signedIn() { return request.auth != null; }
+    function uid() { return request.auth.uid; }
+    function isSelf(u) { return signedIn() && uid() == u; }
+
+    function userExists() {
+      return exists(/databases/$(database)/documents/users/$(uid()));
     }
-    function isSelf(uid) {
-      return signedIn() && request.auth.uid == uid;
+    function role() {
+      return get(/databases/$(database)/documents/users/$(uid())).data.role;
+    }
+    function isSuper()    { return signedIn() && userExists() && role() == 'super'; }
+    function isOperator() { return signedIn() && userExists() && role() == 'operator'; }
+    function isRegion()   { return signedIn() && userExists() && role() == 'region'; }
+    function isAdmin()    { return isSuper() || isOperator() || isRegion(); }
+
+    // Qurilma (gateway) — cheklangan mashina identifikatori.
+    function isDevice() { return signedIn() && request.auth.token.device == true; }
+
+    // Egalik: berilgan ownerUid joriy foydalanuvchiga tegishlimi.
+    function owns(ownerUid) { return signedIn() && ownerUid == uid(); }
+
+    // Faqat ruxsat etilgan maydonlar o'zgarganini tekshirish.
+    function onlyFields(allowed) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowed);
     }
 
-    // Foydalanuvchi profili — faqat egasi o'qiydi/yozadi.
-    match /users/{uid} {
-      allow read, write: if isSelf(uid);
+    // ---------- users ----------
+    match /users/{u} {
+      allow read: if isSelf(u) || isAdmin();
+
+      // Yaratish: faqat o'zi; role majburan 'farmer' (self-escalation yo'q).
+      allow create: if isSelf(u) && request.resource.data.role == 'farmer';
+
+      // Yangilash: o'zi FAQAT profil maydonlarini (role/regions O'ZGARMAYDI),
+      // yoki super (hammasi).
+      allow update: if (isSelf(u)
+                        && onlyFields(['ism', 'fam', 'vil', 'tum', 'phone', 'locale', 'email', 'updatedAt']))
+                    || isSuper();
+
+      allow delete: if isSuper();
     }
 
-    // Aniq ruxsat berilmagan hamma narsa taqiqlanadi.
+    // ---------- devices ----------
+    match /devices/{deviceId} {
+      allow read: if owns(resource.data.ownerUid) || isAdmin() || isDevice();
+      // Biriktirish/bloklash/o'chirish — faqat admin (fermer emas).
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ---------- lakes ----------
+    match /lakes/{lakeId} {
+      allow read: if owns(resource.data.ownerUid) || isAdmin();
+
+      // Yaratish: fermer o'z nomiga; boshda approved = false.
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == uid()
+        && request.resource.data.approved == false;
+
+      // Yangilash: egasi FAQAT ruxsat etilgan maydonlarni (ownerUid/approved
+      // o'zgarmaydi -> o'zini tasdiqlay olmaydi), yoki admin.
+      allow update: if (owns(resource.data.ownerUid)
+                        && onlyFields(['name', 'deviceId', 'region', 'settings', 'updatedAt']))
+                    || isAdmin();
+
+      allow delete: if owns(resource.data.ownerUid) || isAdmin();
+    }
+
+    // ---------- telemetry (latest) + history ----------
+    match /telemetry/{deviceId} {
+      allow read: if owns(resource.data.ownerUid) || isAdmin();
+      // Yozish: FAQAT qurilma (gateway) yoki admin; ownerUid bo'lishi shart.
+      allow create, update: if (isDevice() || isAdmin())
+        && request.resource.data.ownerUid is string;
+      allow delete: if isAdmin();
+
+      match /history/{point} {
+        allow read: if isAdmin()
+          || owns(get(/databases/$(database)/documents/telemetry/$(deviceId)).data.ownerUid);
+        allow create: if isDevice() || isAdmin();
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    // ---------- commands ----------
+    match /commands/{cmdId} {
+      allow read: if owns(resource.data.ownerUid) || isAdmin() || isDevice();
+
+      // Yaratish: fermer FAQAT o'zi egalik qiladigan qurilmaga; status 'pending'.
+      allow create: if signedIn()
+        && request.resource.data.ownerUid == uid()
+        && request.resource.data.status == 'pending'
+        && get(/databases/$(database)/documents/devices/$(request.resource.data.deviceId)).data.ownerUid == uid();
+
+      // Bajarilgach yangilash/o'chirish: qurilma yoki admin; egasi o'chirishi ham mumkin.
+      allow update: if isDevice() || isAdmin();
+      allow delete: if isDevice() || isAdmin() || owns(resource.data.ownerUid);
+    }
+
+    // ---------- requests (ko'l tasdiq so'rovi) ----------
+    match /requests/{reqId} {
+      allow read: if isAdmin();
+      allow create: if signedIn()
+        && request.resource.data.uid == uid()
+        && request.resource.data.status == 'pending';
+      allow update, delete: if isAdmin();
+    }
+
+    // ---------- announcements ----------
+    match /announcements/{annId} {
+      allow read: if signedIn();               // barcha fermer ko'radi
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ---------- logs (audit — o'zgarmas) ----------
+    match /logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update, delete: if false;
+    }
+
+    // ---------- default: hamma narsa taqiqlangan ----------
     match /{document=**} {
       allow read, write: if false;
     }
