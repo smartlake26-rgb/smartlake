@@ -1,49 +1,58 @@
 // ============================================================
-//  core/i18n/ru.js — Русские тексты (дополнительный язык)
-//  Ключи зеркалируют uz.js. Отсутствующие ключи -> fallback на uz.
+//  core/i18n/ru.js — Русские тексты
 // ============================================================
 
 export const ru = {
-  app: {
-    name: 'SmartLake',
-    tagline: 'Мониторинг рыбных прудов',
-    loading: 'Загрузка...',
-  },
+  app: { name: 'SmartLake', tagline: 'Мониторинг рыбных прудов', loading: 'Загрузка...' },
 
   common: {
-    save: 'Сохранить',
-    cancel: 'Отмена',
-    logout: 'Выход',
-    email: 'Email',
-    password: 'Пароль',
-    welcome: 'Добро пожаловать',
+    save: 'Сохранить', saved: 'Сохранено', cancel: 'Отмена', back: 'Назад',
+    logout: 'Выход', email: 'Email', password: 'Пароль', welcome: 'Добро пожаловать',
   },
 
   auth: {
-    loginTitle: 'Вход в систему',
-    registerTitle: 'Регистрация',
-    loginBtn: 'Войти',
-    registerBtn: 'Зарегистрироваться',
-    toRegister: 'Нет аккаунта? Зарегистрируйтесь',
-    toLogin: 'Есть аккаунт? Войдите',
-    signingIn: 'Вход...',
-    creating: 'Создание...',
+    loginTitle: 'Вход в систему', registerTitle: 'Регистрация', forgotTitle: 'Сброс пароля',
+    loginBtn: 'Войти', registerBtn: 'Зарегистрироваться', sendReset: 'Отправить ссылку',
+    toRegister: 'Нет аккаунта? Зарегистрируйтесь', toLogin: 'Вернуться ко входу',
+    forgotLink: 'Забыли пароль?',
+    signingIn: 'Вход...', creating: 'Создание...', sending: 'Отправка...',
+    resetSent: 'Ссылка для сброса пароля отправлена на email',
     loggedInAs: 'Вы вошли: {email}',
   },
 
+  profile: {
+    title: 'Профиль', firstName: 'Имя', lastName: 'Фамилия',
+    region: 'Область', selectRegion: 'Выберите область', district: 'Район',
+    phone: 'Телефон',
+  },
+
+  settings: {
+    title: 'Настройки', language: 'Язык', password: 'Пароль',
+    changePassword: 'Сменить пароль (по email)',
+    emailUnverified: 'Email не подтверждён', resendVerification: 'Отправить письмо повторно',
+    verificationSent: 'Письмо с подтверждением отправлено',
+  },
+
+  home: {
+    profile: 'Профиль', settings: 'Настройки',
+    verifyBanner: 'Ваш email не подтверждён. Пожалуйста, проверьте почту.',
+    suspended: 'Ваш аккаунт временно приостановлен. Свяжитесь с администратором.',
+    noAdminAccess: 'У этого аккаунта нет прав администратора',
+  },
+
+  role: { farmer: 'Фермер', operator: 'Оператор', region: 'Региональный менеджер', super: 'Супер админ' },
+
   error: {
     generic: 'Произошла ошибка. Попробуйте снова.',
-    config: 'Ошибка в настройках приложения.',
-    auth: 'Ошибка входа.',
+    config: 'Ошибка в настройках приложения.', auth: 'Ошибка входа.',
     data: 'Ошибка при работе с данными.',
-    emailRequired: 'Введите email',
-    emailInvalid: 'Неверный формат email',
-    passwordRequired: 'Введите пароль',
-    passwordShort: 'Пароль минимум 6 символов',
-    emailInUse: 'Этот email уже зарегистрирован',
-    userNotFound: 'Пользователь не найден',
-    wrongPassword: 'Неверный email или пароль',
-    tooManyRequests: 'Слишком много попыток — попробуйте позже',
+    emailRequired: 'Введите email', emailInvalid: 'Неверный формат email',
+    passwordRequired: 'Введите пароль', passwordShort: 'Пароль минимум 6 символов',
+    firstNameRequired: 'Введите имя', lastNameRequired: 'Введите фамилию',
+    regionRequired: 'Выберите область', regionInvalid: 'Неверная область',
+    phoneInvalid: 'Неверный номер телефона',
+    emailInUse: 'Этот email уже зарегистрирован', userNotFound: 'Пользователь не найден',
+    wrongPassword: 'Неверный email или пароль', tooManyRequests: 'Слишком много попыток — попробуйте позже',
     network: 'Нет интернет-соединения',
   },
 };
