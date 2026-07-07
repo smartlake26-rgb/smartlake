@@ -19,6 +19,9 @@ export const ROUTES = Object.freeze({
   SETTINGS: 'settings',
   CLAIM: 'claim',          // fermer: qurilma qo'shish
   REQUESTS: 'requests',    // admin: kutilayotgan so'rovlar
+  LAKES: 'lakes',          // fermer: ko'llar ro'yxati
+  LAKE_FORM: 'lakeForm',   // ko'l yaratish/tahrirlash
+  LAKE_DETAIL: 'lakeDetail', // ko'l detali + biriktirish
 });
 
 /** Admin hisoblangan rollar. */
