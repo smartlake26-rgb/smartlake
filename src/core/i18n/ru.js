@@ -163,4 +163,14 @@ export const ru = {
   },
 };
 
+
+// --- Sprint-5.5 MD3 ---
+ru.nav = { home: 'Главная', lakes: 'Пруды', devices: 'Устройства', alerts: 'Уведомления', profile: 'Профиль' };
+ru.alerts = { none: 'Нет уведомлений', allGood: 'Все устройства в норме' };
+Object.assign(ru.home, { hi: 'Привет', lakes: 'Пруды', devices: 'Устройства', online: 'Онлайн', alerts: 'Тревоги', emptyHint: 'Добавьте пруд или устройство, чтобы начать', contactAdmin: 'Свяжитесь с администратором' });
+Object.assign(ru.common, { edit: 'Изменить' });
+Object.assign(ru.settings, { darkMode: 'Тёмная тема', about: 'О приложении', logoutConfirm: 'Вы действительно хотите выйти?' });
+Object.assign(ru.lake, { archiveConfirm: 'Пруд будет архивирован и скрыт из списка. Продолжить?', lakeName: 'Название пруда (необязательно)' });
+Object.assign(ru.device, { unassigned: 'Не привязано', empty: 'Пока нет устройств', emptyHint: 'Используйте код активации для добавления', claimHint: 'ID и ключ активации указаны на упаковке' });
+
 export default ru;

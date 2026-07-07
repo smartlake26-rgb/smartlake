@@ -1,9 +1,5 @@
 // ============================================================
-//  features/auth/views/authView.js — Kirish / Ro'yxat / Parol tiklash
-//  Uch rejim: login · register (profil maydonlari bilan) · forgot.
-//  Validatsiya: authValidators (email/parol) + userValidators (profil).
-//  Muvaffaqiyatli kirish/ro'yxatdan keyin router authStore orqali
-//  avtomatik yo'naltiradi (bu view navigatsiya qilmaydi).
+//  features/auth/views/authView.js — Kirish / Ro'yxat / Parol tiklash (MD3)
 // ============================================================
 
 import { el } from '../../../shared/dom.js';
@@ -12,120 +8,81 @@ import { toast } from '../../../shared/toast.js';
 import { t, getLocale } from '../../../core/i18n/index.js';
 import { handleError } from '../../../core/errors.js';
 import { VILOYATLAR } from '../../../core/config.js';
+import { mdButton, mdCard, field, input, select } from '../../../shared/ui/index.js';
 import { authService } from '../services/authService.js';
 import { authStore } from '../store/index.js';
 import { validateLoginForm } from '../validators/authValidators.js';
 import { userValidators } from '../../users/index.js';
 import { AUTH_SCREENS } from '../constants/authConstants.js';
 
-function field(labelKey, input) {
-  return el('div', { class: 'field' }, [el('label', { text: t(labelKey) }), input]);
-}
-
-function regionSelect() {
-  const sel = el('select', { class: 'sl-input' });
-  sel.appendChild(el('option', { value: '', text: t('profile.selectRegion') }));
-  VILOYATLAR.forEach((v) => sel.appendChild(el('option', { value: v, text: v })));
-  return sel;
-}
-
 export function renderAuth(ctx = {}) {
   const mode = Object.values(AUTH_SCREENS).includes(ctx.mode) ? ctx.mode : AUTH_SCREENS.LOGIN;
-  const errEl = el('div', { class: 'form-err' });
+  const err = el('div', { class: 'md-banner warn', style: 'display:none' });
+  const setErr = (k) => { err.textContent = t(k); err.style.display = 'flex'; };
 
-  const email = el('input', { type: 'email', inputmode: 'email', autocomplete: 'email', placeholder: 'you@example.com' });
-  const pass = el('input', { type: 'password', autocomplete: mode === AUTH_SCREENS.REGISTER ? 'new-password' : 'current-password', placeholder: '••••••' });
+  const email = input({ type: 'email', autocomplete: 'email', placeholder: 'you@example.com' });
+  const pass = input({ type: 'password', autocomplete: mode === AUTH_SCREENS.REGISTER ? 'new-password' : 'current-password', placeholder: '******' });
+  const ism = input({ type: 'text' });
+  const fam = input({ type: 'text' });
+  const vil = select([{ value: '', label: t('profile.selectRegion') }, ...VILOYATLAR.map((v) => ({ value: v, label: v }))], '');
+  const tum = input({ type: 'text' });
+  const phone = input({ type: 'tel', placeholder: '+998 90 123 45 67' });
 
-  // Register profil maydonlari
-  const ism = el('input', { type: 'text', autocomplete: 'given-name' });
-  const fam = el('input', { type: 'text', autocomplete: 'family-name' });
-  const vil = regionSelect();
-  const tum = el('input', { type: 'text' });
-  const phone = el('input', { type: 'tel', inputmode: 'tel', placeholder: '+998 90 123 45 67' });
-
-  const submitBtn = el('button', { class: 'btn', type: 'button' });
-
-  function submitLabel() {
-    return mode === AUTH_SCREENS.REGISTER ? t('auth.registerBtn')
-      : mode === AUTH_SCREENS.FORGOT ? t('auth.sendReset')
-        : t('auth.loginBtn');
-  }
-  function setBusy(busy, labelKey) {
-    submitBtn.disabled = busy;
-    submitBtn.textContent = busy ? t(labelKey) : submitLabel();
-  }
-  submitBtn.textContent = submitLabel();
-
-  async function doLogin() {
-    const check = validateLoginForm({ email: email.value, password: pass.value });
-    if (!check.valid) { errEl.textContent = t(check.messageKey); return; }
-    setBusy(true, 'auth.signingIn');
-    try { await authService.signIn(email.value, pass.value); }
-    catch (e) { errEl.textContent = t(handleError(e, 'auth.login').messageKey); setBusy(false); }
-  }
-
-  async function doRegister() {
+  const btnLabel = mode === AUTH_SCREENS.REGISTER ? t('auth.registerBtn') : mode === AUTH_SCREENS.FORGOT ? t('auth.sendReset') : t('auth.loginBtn');
+  const submit = mdButton({ label: btnLabel, full: true, onClick: run });
+  async function run() {
+    err.style.display = 'none';
+    if (mode === AUTH_SCREENS.FORGOT) {
+      if (!email.value.trim()) return setErr('error.emailRequired');
+      submit.disabled = true;
+      try { await authService.resetPassword(email.value); toast(t('auth.resetSent'), 'ok'); ctx.onSwitch(AUTH_SCREENS.LOGIN); }
+      catch (e) { setErr(handleError(e, 'forgot').messageKey); submit.disabled = false; }
+      return;
+    }
     const cred = validateLoginForm({ email: email.value, password: pass.value });
-    if (!cred.valid) { errEl.textContent = t(cred.messageKey); return; }
-    const profile = { ism: ism.value, fam: fam.value, vil: vil.value, tum: tum.value, phone: phone.value };
-    const prof = userValidators.validateProfile(profile);
-    if (!prof.valid) { errEl.textContent = t(prof.messageKey); return; }
-    setBusy(true, 'auth.creating');
-    try {
-      await authService.register(email.value, pass.value, profile, getLocale());
-      await authStore.reload();   // userDoc yuklansin -> router yo'naltiradi
-    } catch (e) { errEl.textContent = t(handleError(e, 'auth.register').messageKey); setBusy(false); }
+    if (!cred.valid) return setErr(cred.messageKey);
+    submit.disabled = true;
+    if (mode === AUTH_SCREENS.REGISTER) {
+      const profile = { ism: ism.value, fam: fam.value, vil: vil.value, tum: tum.value, phone: phone.value };
+      const pr = userValidators.validateProfile(profile);
+      if (!pr.valid) { submit.disabled = false; return setErr(pr.messageKey); }
+      try { await authService.register(email.value, pass.value, profile, getLocale()); await authStore.reload(); }
+      catch (e) { setErr(handleError(e, 'register').messageKey); submit.disabled = false; }
+    } else {
+      try { await authService.signIn(email.value, pass.value); }
+      catch (e) { setErr(handleError(e, 'login').messageKey); submit.disabled = false; }
+    }
   }
 
-  async function doForgot() {
-    if (!email.value.trim()) { errEl.textContent = t('error.emailRequired'); return; }
-    setBusy(true, 'auth.sending');
-    try {
-      await authService.resetPassword(email.value);
-      toast(t('auth.resetSent'), 'ok');
-      ctx.onSwitch && ctx.onSwitch(AUTH_SCREENS.LOGIN);
-    } catch (e) { errEl.textContent = t(handleError(e, 'auth.forgot').messageKey); setBusy(false); }
-  }
-
-  submitBtn.addEventListener('click', () => {
-    errEl.textContent = '';
-    if (mode === AUTH_SCREENS.REGISTER) doRegister();
-    else if (mode === AUTH_SCREENS.FORGOT) doForgot();
-    else doLogin();
-  });
-
-  const cardChildren = [
-    el('div', { style: 'font-weight:800;font-size:17px;margin-bottom:14px', text: mode === AUTH_SCREENS.REGISTER ? t('auth.registerTitle') : mode === AUTH_SCREENS.FORGOT ? t('auth.forgotTitle') : t('auth.loginTitle') }),
-    errEl,
-  ];
-
+  const formFields = [];
   if (mode === AUTH_SCREENS.REGISTER) {
-    cardChildren.push(
-      field('profile.firstName', ism),
-      field('profile.lastName', fam),
-      field('profile.region', vil),
-      field('profile.district', tum),
-      field('profile.phone', phone),
-    );
+    formFields.push(field(t('profile.firstName'), ism), field(t('profile.lastName'), fam), field(t('profile.region'), vil), field(t('profile.district'), tum), field(t('profile.phone'), phone));
   }
-  cardChildren.push(field('common.email', email));
-  if (mode !== AUTH_SCREENS.FORGOT) cardChildren.push(field('common.password', pass));
-  cardChildren.push(submitBtn);
+  formFields.push(field(t('common.email'), email));
+  if (mode !== AUTH_SCREENS.FORGOT) formFields.push(field(t('common.password'), pass));
 
-  // Pastdagi navigatsiya havolalari
-  const links = el('div', {}, []);
+  const links = el('div', { style: 'text-align:center;margin-top:14px' });
   if (mode === AUTH_SCREENS.LOGIN) {
-    links.appendChild(el('div', { class: 'auth-switch', text: t('auth.toRegister'), onClick: () => ctx.onSwitch(AUTH_SCREENS.REGISTER) }));
-    links.appendChild(el('div', { class: 'auth-switch', text: t('auth.forgotLink'), onClick: () => ctx.onSwitch(AUTH_SCREENS.FORGOT) }));
+    links.append(
+      el('button', { class: 'md-btn text', style: 'display:block;margin:0 auto', text: t('auth.toRegister'), onClick: () => ctx.onSwitch(AUTH_SCREENS.REGISTER) }),
+      el('button', { class: 'md-btn text', style: 'display:block;margin:0 auto', text: t('auth.forgotLink'), onClick: () => ctx.onSwitch(AUTH_SCREENS.FORGOT) }),
+    );
   } else {
-    links.appendChild(el('div', { class: 'auth-switch', text: t('auth.toLogin'), onClick: () => ctx.onSwitch(AUTH_SCREENS.LOGIN) }));
+    links.append(el('button', { class: 'md-btn text', style: 'display:block;margin:0 auto', text: t('auth.toLogin'), onClick: () => ctx.onSwitch(AUTH_SCREENS.LOGIN) }));
   }
 
-  return el('div', { class: 'app' }, [
-    el('div', { class: 'auth-wrap center' }, [
-      el('div', { class: 'auth-brand', html: `${icon('waves', 26)} ${t('app.name')}` }),
-      el('div', { class: 'auth-sub', text: t('app.tagline') }),
-      el('div', { class: 'card' }, cardChildren),
+  return el('div', { class: 'md-app' }, [
+    el('div', { class: 'md-content no-nav', style: 'display:flex;flex-direction:column;justify-content:center;min-height:100dvh' }, [
+      el('div', { style: 'text-align:center;margin-bottom:22px' }, [
+        el('div', { style: 'color:var(--md-primary)', html: icon('waves', 44) }),
+        el('div', { class: 't-headline', style: 'color:var(--md-primary)', text: t('app.name') }),
+        el('div', { class: 't-body-sm muted', text: t('app.tagline') }),
+      ]),
+      mdCard([
+        el('div', { class: 't-title', style: 'margin-bottom:14px', text: mode === AUTH_SCREENS.REGISTER ? t('auth.registerTitle') : mode === AUTH_SCREENS.FORGOT ? t('auth.forgotTitle') : t('auth.loginTitle') }),
+        err,
+        el('div', { class: 'stack' }, [...formFields, submit]),
+      ], { elevated: true }),
       links,
     ]),
   ]);

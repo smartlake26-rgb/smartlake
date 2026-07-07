@@ -1,0 +1,181 @@
+/* ============================================================
+   shared/ui/ui.css — MD3 komponent stillari + tipografiya
+   ============================================================ */
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font);
+  background: var(--md-surface);
+  color: var(--md-on-surface);
+  -webkit-font-smoothing: antialiased;
+  transition: background var(--motion) var(--ease), color var(--motion) var(--ease);
+}
+button { font-family: inherit; }
+
+/* --- Tipografiya (MD3) --- */
+.t-display { font-size: 32px; font-weight: 700; letter-spacing: -.5px; line-height: 1.15; }
+.t-headline { font-size: 24px; font-weight: 700; letter-spacing: -.3px; line-height: 1.2; }
+.t-title { font-size: 18px; font-weight: 600; line-height: 1.3; }
+.t-title-sm { font-size: 15px; font-weight: 600; line-height: 1.3; }
+.t-body { font-size: 15px; font-weight: 400; line-height: 1.45; }
+.t-body-sm { font-size: 13px; font-weight: 400; line-height: 1.4; }
+.t-label { font-size: 12px; font-weight: 600; letter-spacing: .04em; line-height: 1.3; }
+.t-mono { font-family: var(--mono); }
+.muted { color: var(--md-on-surface-variant); }
+
+/* --- App shell --- */
+.md-app { max-width: 480px; margin: 0 auto; min-height: 100vh; min-height: 100dvh;
+  background: var(--md-surface); position: relative; }
+.md-content { padding: var(--sp-4); padding-bottom: 96px; }
+.md-content.no-nav { padding-bottom: var(--sp-5); }
+
+/* --- Top App Bar --- */
+.md-appbar { position: sticky; top: 0; z-index: 20; background: var(--md-surface);
+  display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4);
+  padding-top: calc(var(--sp-3) + env(safe-area-inset-top));
+  border-bottom: 1px solid var(--md-outline-variant); }
+.md-appbar .ab-title { flex: 1; font-size: 20px; font-weight: 700; }
+.md-appbar .ab-sub { font-size: 12px; color: var(--md-on-surface-variant); font-weight: 400; }
+.md-iconbtn { width: 40px; height: 40px; border-radius: var(--shape-full); border: none;
+  background: transparent; color: var(--md-on-surface-variant); display: inline-flex;
+  align-items: center; justify-content: center; cursor: pointer; transition: background var(--motion-fast); }
+.md-iconbtn:hover { background: color-mix(in srgb, var(--md-on-surface) 8%, transparent); }
+.md-iconbtn:active { background: color-mix(in srgb, var(--md-on-surface) 14%, transparent); }
+.md-avatar { width: 38px; height: 38px; border-radius: var(--shape-full); background: var(--md-primary-container);
+  color: var(--md-on-primary-container); display: inline-flex; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 15px; }
+
+/* --- Bottom Navigation --- */
+.md-bottomnav { position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; width: 100%; max-width: 480px;
+  z-index: 30; background: var(--md-surface-container); border-top: 1px solid var(--md-outline-variant);
+  display: flex; padding: var(--sp-2) var(--sp-1) calc(var(--sp-2) + env(safe-area-inset-bottom)); }
+.md-navitem { flex: 1; background: none; border: none; cursor: pointer; display: flex; flex-direction: column;
+  align-items: center; gap: 3px; padding: 4px 0; color: var(--md-on-surface-variant); }
+.md-navitem .ni-ic { width: 56px; height: 30px; border-radius: var(--shape-full); display: inline-flex;
+  align-items: center; justify-content: center; transition: background var(--motion) var(--ease); position: relative; }
+.md-navitem .ni-label { font-size: 11px; font-weight: 600; }
+.md-navitem.active { color: var(--md-on-surface); }
+.md-navitem.active .ni-ic { background: var(--md-primary-container); color: var(--md-on-primary-container); }
+.md-navitem .ni-dot { position: absolute; top: 3px; right: 12px; width: 7px; height: 7px;
+  border-radius: 50%; background: var(--md-critical); }
+
+/* --- Buttons --- */
+.md-btn { border: none; border-radius: var(--shape-full); font-size: 14px; font-weight: 600;
+  padding: 11px 22px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  gap: 8px; transition: filter var(--motion-fast), box-shadow var(--motion-fast); min-height: 44px; }
+.md-btn:disabled { opacity: .5; cursor: default; }
+.md-btn.filled { background: var(--md-primary); color: var(--md-on-primary); }
+.md-btn.filled:hover:not(:disabled) { box-shadow: var(--elev-1); filter: brightness(1.05); }
+.md-btn.tonal { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+.md-btn.outlined { background: transparent; color: var(--md-primary); border: 1px solid var(--md-outline); }
+.md-btn.text { background: transparent; color: var(--md-primary); padding: 11px 12px; }
+.md-btn.danger { background: var(--md-error); color: var(--md-on-error); }
+.md-btn.full { width: 100%; }
+
+.md-fab { position: fixed; right: 18px; bottom: 104px; z-index: 25; border: none; cursor: pointer;
+  height: 56px; min-width: 56px; padding: 0 20px; border-radius: var(--shape-lg);
+  background: var(--md-primary-container); color: var(--md-on-primary-container); box-shadow: var(--elev-3);
+  display: inline-flex; align-items: center; gap: 8px; font-weight: 700; font-size: 14px; }
+
+/* --- Card --- */
+.md-card { background: var(--md-surface-container-low); border-radius: var(--shape-lg);
+  padding: var(--sp-4); border: 1px solid var(--md-outline-variant); }
+.md-card.elev { box-shadow: var(--elev-1); border-color: transparent; }
+.md-card.tap { cursor: pointer; transition: box-shadow var(--motion-fast), transform var(--motion-fast); }
+.md-card.tap:active { transform: scale(.99); }
+.stack { display: flex; flex-direction: column; gap: var(--sp-3); }
+.stack-2 { display: flex; flex-direction: column; gap: var(--sp-2); }
+.row { display: flex; align-items: center; gap: var(--sp-2); }
+.row-between { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-2); }
+.grow { flex: 1; }
+
+/* --- Chip / Badge --- */
+.md-chip { display: inline-flex; align-items: center; gap: 5px; border-radius: var(--shape-full);
+  padding: 4px 11px; font-size: 12px; font-weight: 700; border: 1px solid transparent; }
+.chip-dot { width: 7px; height: 7px; border-radius: 50%; }
+.st-healthy { background: color-mix(in srgb, var(--md-success) 16%, transparent); color: var(--md-success); }
+.st-good { background: color-mix(in srgb, var(--md-success) 16%, transparent); color: var(--md-success); }
+.st-warning { background: color-mix(in srgb, var(--md-warning) 18%, transparent); color: var(--md-warning); }
+.st-critical { background: color-mix(in srgb, var(--md-critical) 16%, transparent); color: var(--md-critical); }
+.st-offline { background: color-mix(in srgb, var(--md-neutral) 18%, transparent); color: var(--md-neutral); }
+.st-unknown { background: color-mix(in srgb, var(--md-neutral) 18%, transparent); color: var(--md-neutral); }
+
+/* --- Stat card --- */
+.md-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-3); }
+.md-stat { background: var(--md-surface-container-low); border-radius: var(--shape-lg); padding: var(--sp-4);
+  border: 1px solid var(--md-outline-variant); }
+.md-stat .s-ic { width: 38px; height: 38px; border-radius: var(--shape-md); display: inline-flex;
+  align-items: center; justify-content: center; margin-bottom: 10px; }
+.md-stat .s-val { font-size: 26px; font-weight: 800; line-height: 1; }
+.md-stat .s-lab { font-size: 12px; color: var(--md-on-surface-variant); margin-top: 4px; }
+
+/* --- Sensor card --- */
+.sensor-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sp-3); }
+.sensor-card { background: var(--md-surface-container-low); border: 1px solid var(--md-outline-variant);
+  border-radius: var(--shape-lg); padding: var(--sp-4); text-align: center; }
+.sensor-card .sc-lab { font-size: 12px; color: var(--md-on-surface-variant); }
+.sensor-card .sc-val { font-size: 28px; font-weight: 800; margin-top: 4px; }
+.sensor-card .sc-unit { font-size: 13px; color: var(--md-on-surface-variant); font-weight: 600; }
+
+/* --- Fields --- */
+.md-field { display: flex; flex-direction: column; gap: 6px; }
+.md-field label { font-size: 12px; font-weight: 600; color: var(--md-on-surface-variant); }
+.md-input, .md-select { width: 100%; padding: 13px 14px; border-radius: var(--shape-sm);
+  border: 1px solid var(--md-outline); background: var(--md-surface-container-lowest); color: var(--md-on-surface);
+  font-size: 15px; font-family: inherit; outline: none; transition: border-color var(--motion-fast); }
+.md-input:focus, .md-select:focus { border-color: var(--md-primary); border-width: 2px; padding: 12px 13px; }
+
+/* --- List item --- */
+.md-list { display: flex; flex-direction: column; }
+.md-listitem { display: flex; align-items: center; gap: var(--sp-3); padding: 13px 4px;
+  border-bottom: 1px solid var(--md-outline-variant); }
+.md-listitem:last-child { border-bottom: none; }
+.md-listitem.tap { cursor: pointer; }
+.li-lead { width: 40px; height: 40px; border-radius: var(--shape-md); background: var(--md-surface-container-high);
+  display: inline-flex; align-items: center; justify-content: center; color: var(--md-on-surface-variant); }
+
+/* --- Dialog --- */
+.md-scrim { position: fixed; inset: 0; background: var(--md-scrim); z-index: 60; display: flex;
+  align-items: center; justify-content: center; padding: var(--sp-4); animation: fade var(--motion) var(--ease); }
+.md-dialog { background: var(--md-surface-container-high); border-radius: var(--shape-xl); padding: var(--sp-5);
+  width: 100%; max-width: 340px; box-shadow: var(--elev-4); animation: pop var(--motion) var(--ease); }
+
+/* --- Banners --- */
+.md-banner { border-radius: var(--shape-md); padding: 12px 14px; font-size: 13px; display: flex; gap: 8px; align-items: center; }
+.md-banner.warn { background: var(--md-error-container); color: var(--md-on-error-container); }
+.md-banner.info { background: var(--md-secondary-container); color: var(--md-on-secondary-container); }
+
+/* --- Empty / Error state --- */
+.md-state { text-align: center; padding: 56px 20px; color: var(--md-on-surface-variant); }
+.md-state .st-ic { color: var(--md-outline); margin-bottom: 12px; }
+.md-state .st-title { font-size: 16px; font-weight: 700; color: var(--md-on-surface); }
+.md-state .st-desc { font-size: 13px; margin-top: 4px; }
+
+/* --- Skeleton --- */
+.sk { border-radius: var(--shape-sm); background: linear-gradient(90deg,
+  var(--md-surface-container) 25%, var(--md-surface-container-high) 37%, var(--md-surface-container) 63%);
+  background-size: 400% 100%; animation: shimmer 1.3s ease infinite; }
+.sk-line { height: 12px; margin: 8px 0; }
+.sk-card { height: 120px; margin-bottom: 12px; border-radius: var(--shape-lg); }
+
+/* --- Health bar / gauge --- */
+.health-track { height: 8px; border-radius: var(--shape-full); background: var(--md-surface-container-high); overflow: hidden; }
+.health-fill { height: 100%; border-radius: var(--shape-full); transition: width var(--motion-slow) var(--ease); }
+
+/* --- Animations --- */
+@keyframes shimmer { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+@keyframes fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes pop { from { opacity: 0; transform: scale(.94); } to { opacity: 1; transform: scale(1); } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.anim-up { animation: slideUp var(--motion) var(--ease); }
+.spin { animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* --- Toast --- */
+.md-toast-wrap { position: fixed; left: 50%; transform: translateX(-50%); bottom: 100px; z-index: 80;
+  display: flex; flex-direction: column; gap: 8px; width: calc(100% - 32px); max-width: 420px; }
+.md-toast { background: var(--md-on-surface); color: var(--md-surface); border-radius: var(--shape-sm);
+  padding: 13px 16px; font-size: 14px; box-shadow: var(--elev-3); animation: slideUp var(--motion) var(--ease); }
+.md-toast.ok { background: var(--md-success); color: #fff; }
+.md-toast.err { background: var(--md-error); color: var(--md-on-error); }

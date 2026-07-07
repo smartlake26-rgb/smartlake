@@ -1,138 +1,77 @@
 // ============================================================
-//  farmer/main.js — Fermer ilovasi boot ildizi (Sprint-3)
-//  Router + authStore + himoyalangan yo'nalishlar.
-//  Auto-login (Firebase sessiya) -> rol/status yuklanadi -> yo'nalish.
-//  To'liq dashboard (ko'llar/monitoring) -> Sprint-4.
+//  farmer/main.js — Fermer ilovasi boot ildizi (Sprint-5.5 MD3)
+//  Theme + Firebase + authStore (faza-asosli) -> Auth ekrani yoki
+//  Bottom-nav Shell. dataStore ilovaga bitta telemetriya listeneri beradi.
 // ============================================================
 
-import '../shared/base.css';
+import '../shared/ui/tokens.css';
+import '../shared/ui/ui.css';
+import '../core/firebase.js';
 
 import { el } from '../shared/dom.js';
 import { icon } from '../shared/icons.js';
-import { toast } from '../shared/toast.js';
-import { createRouter } from '../shared/router.js';
 import { logger } from '../core/logger.js';
 import { handleError } from '../core/errors.js';
 import { t, detectLocale, setLocale } from '../core/i18n/index.js';
-import {
-  authService, authStore, access,
-  renderAuth, renderProfile, renderSettings,
-  AUTH_SCREENS, ROUTES,
-} from '../features/auth/index.js';
-import { renderClaim } from '../features/devices/index.js';
-import { renderLakesList, renderLakeForm, renderLakeDetail } from '../features/lakes/index.js';
-import { renderDashboard, renderDeviceDetail } from '../features/telemetry/index.js';
+import { initTheme } from '../shared/ui/theme.js';
+import { mdButton, loader } from '../shared/ui/index.js';
+import { authService, authStore, renderAuth, AUTH_SCREENS } from '../features/auth/index.js';
+import * as dataStore from './dataStore.js';
+import { createShell } from './shell.js';
 
 window.addEventListener('error', (ev) => handleError(ev.error || ev.message, 'window.onerror'));
 window.addEventListener('unhandledrejection', (ev) => handleError(ev.reason, 'unhandledrejection'));
 
 function loadingScreen() {
-  return el('div', { class: 'app' }, [el('div', { class: 'shell' }, [el('div', { text: t('app.loading') })])]);
-}
-
-function bootError(err) {
-  const { messageKey } = handleError(err, 'boot');
-  return el('div', { class: 'app' }, [el('div', { class: 'shell' }, [el('div', { style: 'color:var(--crit);font-weight:700', text: t(messageKey) })])]);
-}
-
-function blockedScreen(messageKey) {
-  return el('div', { class: 'app' }, [
-    el('div', { class: 'shell' }, [
-      el('div', { class: 'banner err', text: t(messageKey) }),
-      el('button', { class: 'btn', style: 'max-width:200px', text: t('common.logout'), onClick: () => authService.signOut() }),
+  return el('div', { class: 'md-app' }, [
+    el('div', { style: 'min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px' }, [
+      el('div', { style: 'color:var(--md-primary)', html: icon('waves', 44) }),
+      loader(30),
     ]),
   ]);
 }
 
-function homeScreen({ router }) {
-  const s = authStore.getState();
-  const children = [];
-  if (!s.emailVerified) children.push(el('div', { class: 'banner', text: t('home.verifyBanner') }));
-  children.push(
-    el('div', { style: 'color:var(--primary)', html: icon('waves', 40) }),
-    el('div', { style: 'font-size:20px;font-weight:800', text: `${t('common.welcome')}, ${s.profile ? s.profile.ism : ''}!` }),
-    el('span', { class: 'role-badge', text: t('role.' + (s.role || 'farmer')) }),
-    el('div', { class: 'home-actions' }, [
-      el('button', { class: 'btn', text: t('tm.dashboard'), onClick: () => router.go(ROUTES.DASHBOARD) }),
-      el('button', { class: 'btn ghost', text: t('lake.myLakes'), onClick: () => router.go(ROUTES.LAKES) }),
-      el('button', { class: 'btn ghost', text: t('device.claimTitle'), onClick: () => router.go(ROUTES.CLAIM) }),
-      el('button', { class: 'btn ghost', text: t('home.profile'), onClick: () => router.go(ROUTES.PROFILE) }),
-      el('button', { class: 'btn ghost', text: t('home.settings'), onClick: () => router.go(ROUTES.SETTINGS) }),
+function blockedScreen(messageKey, onLogout) {
+  return el('div', { class: 'md-app' }, [
+    el('div', { class: 'md-content no-nav', style: 'min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:12px' }, [
+      el('div', { style: 'color:var(--md-warning)', html: icon('lock', 44) }),
+      el('div', { class: 't-title', text: t(messageKey) }),
+      el('div', { class: 't-body-sm muted', text: t('home.contactAdmin') }),
+      el('div', { style: 'margin-top:8px' }, [mdButton({ label: t('common.logout'), variant: 'tonal', onClick: onLogout })]),
     ]),
-  );
-  return el('div', { class: 'app' }, [el('div', { class: 'shell' }, children)]);
+  ]);
 }
 
-async function main() {
-  const root = document.getElementById('root');
-  try {
-    await import('../core/firebase.js');
-    setLocale(detectLocale());
-  } catch (e) {
-    root.replaceChildren(bootError(e));
-    return;
+function main() {
+  const root = document.getElementById('app') || document.getElementById('root') || document.body;
+  initTheme();
+  setLocale(detectLocale());
+
+  let authMode = AUTH_SCREENS.LOGIN;
+  let shell = null;
+  let phase = null;
+  const logout = () => authService.signOut();
+
+  function renderAuthScreen() {
+    root.replaceChildren(renderAuth({ mode: authMode, onSwitch: (m) => { authMode = m; renderAuthScreen(); } }));
   }
 
-  const router = createRouter(root);
-  let authMode = AUTH_SCREENS.LOGIN;
-  let openLakeId = null;   // LAKE_DETAIL uchun
-  let editLake = null;     // LAKE_FORM: null = yaratish, obyekt = tahrirlash
-  let openDeviceId = null; // DEVICE_DETAIL uchun
-
-  const goAuth = () => router.go(ROUTES.AUTH);
-  router
-    .define(ROUTES.AUTH, () => renderAuth({
-      mode: authMode,
-      onSwitch: (m) => { authMode = m; goAuth(); },
-    }))
-    .define(ROUTES.HOME, () => homeScreen({ router }))
-    .define(ROUTES.PROFILE, () => renderProfile({ onBack: () => router.go(ROUTES.HOME) }))
-    .define(ROUTES.CLAIM, () => renderClaim({ onBack: () => router.go(ROUTES.HOME) }))
-    .define(ROUTES.SETTINGS, () => renderSettings({
-      onBack: () => router.go(ROUTES.HOME),
-      onRerender: () => router.go(ROUTES.SETTINGS),
-    }))
-    .define(ROUTES.LAKES, () => renderLakesList({
-      onCreate: () => { editLake = null; router.go(ROUTES.LAKE_FORM); },
-      onOpen: (id) => { openLakeId = id; router.go(ROUTES.LAKE_DETAIL); },
-      onBack: () => router.go(ROUTES.HOME),
-    }))
-    .define(ROUTES.LAKE_FORM, () => renderLakeForm({
-      lake: editLake,
-      onDone: () => router.go(ROUTES.LAKES),
-      onBack: () => router.go(editLake ? ROUTES.LAKE_DETAIL : ROUTES.LAKES),
-    }))
-    .define(ROUTES.LAKE_DETAIL, () => renderLakeDetail({
-      lakeId: openLakeId,
-      onEdit: (lake) => { editLake = lake; router.go(ROUTES.LAKE_FORM); },
-      onBack: () => router.go(ROUTES.LAKES),
-    }))
-    .define(ROUTES.DASHBOARD, () => renderDashboard({
-      onOpenDevice: (id) => { if (!id) return; openDeviceId = id; router.go(ROUTES.DEVICE_DETAIL); },
-      onBack: () => router.go(ROUTES.HOME),
-    }))
-    .define(ROUTES.DEVICE_DETAIL, () => renderDeviceDetail({
-      deviceId: openDeviceId,
-      onBack: () => router.go(ROUTES.DASHBOARD),
-    }));
-
-  root.replaceChildren(loadingScreen());
-
-  let authPhase = null;   // 'auth' | 'blocked' | 'app' — faqat FAZA o'zgarganda harakat
   authStore.subscribe((s) => {
-    if (s.loading) return;                                  // hal bo'lguncha kutamiz
+    if (s.loading) return;
     const next = !s.firebaseUser ? 'auth'
       : (!s.userDoc || !s.role || s.status !== 'active') ? 'blocked'
         : 'app';
-    if (next === authPhase) return;                         // holat o'zgarmadi -> joriy ekranga TEGMAYMIZ
-    authPhase = next;
-    if (next === 'auth') { authMode = AUTH_SCREENS.LOGIN; goAuth(); }
-    else if (next === 'blocked') root.replaceChildren(blockedScreen('home.suspended'));
-    else if (router.current() === ROUTES.AUTH || router.current() === null) router.go(ROUTES.HOME);
+    if (next === phase) return;
+    phase = next;
+    if (shell) { shell.destroy(); shell = null; }
+    if (next === 'auth') { dataStore.stop(); authMode = AUTH_SCREENS.LOGIN; renderAuthScreen(); }
+    else if (next === 'blocked') { dataStore.stop(); root.replaceChildren(blockedScreen('home.suspended', logout)); }
+    else { dataStore.start(s.uid); shell = createShell(root, { onLogout: logout }); }
   });
 
+  root.replaceChildren(loadingScreen());
   authStore.initAuthStore();
-  logger.info('Fermer ilovasi ishga tushdi');
+  logger.info('Fermer ilovasi ishga tushdi (MD3)');
 }
 
 main();

@@ -1,31 +1,30 @@
 // ============================================================
-//  shared/toast.js — Qisqa bildirishnoma (toast)
-//  Asl ilovadagi toast() ning modul, qayta ishlatiladigan shakli.
+//  shared/toast.js — MD3 toast (snackbar)
 // ============================================================
 
-let _node = null;
-let _timer = null;
-
-function ensure() {
-  if (_node) return _node;
-  _node = document.createElement('div');
-  _node.className = 'toast';
-  document.body.appendChild(_node);
-  return _node;
+let wrap = null;
+function ensureWrap() {
+  if (!wrap || !document.body.contains(wrap)) {
+    wrap = document.createElement('div');
+    wrap.className = 'md-toast-wrap';
+    document.body.appendChild(wrap);
+  }
+  return wrap;
 }
 
-/**
- * Toast ko'rsatish.
- * @param {string} message
- * @param {'default'|'ok'|'err'} [type='default']
- * @param {number} [ms=2600]
- */
-export function toast(message, type = 'default', ms = 2600) {
-  const node = ensure();
-  node.textContent = message;
-  node.className = 'toast show' + (type === 'ok' ? ' ok' : type === 'err' ? ' err' : '');
-  if (_timer) clearTimeout(_timer);
-  _timer = setTimeout(() => { node.className = 'toast'; }, ms);
+/** Toast ko'rsatish. type: 'info' | 'ok' | 'err'. */
+export function toast(message, type = 'info', ms = 2600) {
+  const w = ensureWrap();
+  const t = document.createElement('div');
+  t.className = `md-toast ${type === 'ok' ? 'ok' : type === 'err' ? 'err' : ''}`;
+  t.textContent = message;
+  w.appendChild(t);
+  setTimeout(() => {
+    t.style.transition = 'opacity .25s, transform .25s';
+    t.style.opacity = '0';
+    t.style.transform = 'translateY(8px)';
+    setTimeout(() => t.remove(), 260);
+  }, ms);
 }
 
 export default toast;
