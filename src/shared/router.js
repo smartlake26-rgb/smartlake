@@ -6,6 +6,7 @@
 // ============================================================
 
 import { mount } from './dom.js';
+import { logger } from '../core/logger.js';
 
 export function createRouter(rootEl) {
   const routes = new Map();
@@ -27,6 +28,7 @@ export function createRouter(rootEl) {
 
     /** Route'ga o'tish (guard + oldingi view cleanup bilan). */
     go(name, ctx = {}) {
+      logger.info('[router] go ->', name, '| joriy:', currentName);
       const r = routes.get(name);
       if (!r) throw new Error(`router: ro'yxatdan o'tmagan route: ${name}`);
       if (r.guard) {
