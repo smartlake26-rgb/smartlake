@@ -21,6 +21,7 @@ import {
 } from '../features/auth/index.js';
 import { renderClaim } from '../features/devices/index.js';
 import { renderLakesList, renderLakeForm, renderLakeDetail } from '../features/lakes/index.js';
+import { renderDashboard, renderDeviceDetail } from '../features/telemetry/index.js';
 
 window.addEventListener('error', (ev) => handleError(ev.error || ev.message, 'window.onerror'));
 window.addEventListener('unhandledrejection', (ev) => handleError(ev.reason, 'unhandledrejection'));
@@ -52,7 +53,8 @@ function homeScreen({ router }) {
     el('div', { style: 'font-size:20px;font-weight:800', text: `${t('common.welcome')}, ${s.profile ? s.profile.ism : ''}!` }),
     el('span', { class: 'role-badge', text: t('role.' + (s.role || 'farmer')) }),
     el('div', { class: 'home-actions' }, [
-      el('button', { class: 'btn', text: t('lake.myLakes'), onClick: () => router.go(ROUTES.LAKES) }),
+      el('button', { class: 'btn', text: t('tm.dashboard'), onClick: () => router.go(ROUTES.DASHBOARD) }),
+      el('button', { class: 'btn ghost', text: t('lake.myLakes'), onClick: () => router.go(ROUTES.LAKES) }),
       el('button', { class: 'btn ghost', text: t('device.claimTitle'), onClick: () => router.go(ROUTES.CLAIM) }),
       el('button', { class: 'btn ghost', text: t('home.profile'), onClick: () => router.go(ROUTES.PROFILE) }),
       el('button', { class: 'btn ghost', text: t('home.settings'), onClick: () => router.go(ROUTES.SETTINGS) }),
@@ -75,6 +77,7 @@ async function main() {
   let authMode = AUTH_SCREENS.LOGIN;
   let openLakeId = null;   // LAKE_DETAIL uchun
   let editLake = null;     // LAKE_FORM: null = yaratish, obyekt = tahrirlash
+  let openDeviceId = null; // DEVICE_DETAIL uchun
 
   const goAuth = () => router.go(ROUTES.AUTH);
   router
@@ -103,6 +106,14 @@ async function main() {
       lakeId: openLakeId,
       onEdit: (lake) => { editLake = lake; router.go(ROUTES.LAKE_FORM); },
       onBack: () => router.go(ROUTES.LAKES),
+    }))
+    .define(ROUTES.DASHBOARD, () => renderDashboard({
+      onOpenDevice: (id) => { openDeviceId = id; router.go(ROUTES.DEVICE_DETAIL); },
+      onBack: () => router.go(ROUTES.HOME),
+    }))
+    .define(ROUTES.DEVICE_DETAIL, () => renderDeviceDetail({
+      deviceId: openDeviceId,
+      onBack: () => router.go(ROUTES.DASHBOARD),
     }));
 
   root.replaceChildren(loadingScreen());
