@@ -78,12 +78,14 @@ export const ownershipService = {
         assertTransition(dev.lifecycle, DEVICE_LIFECYCLE.ASSIGNED);   // FSM
 
         const lakeRef = doc(collection(db, COLLECTIONS.LAKES));
-        tx.update(devRef, { ownerUid: req.uid, lifecycle: DEVICE_LIFECYCLE.ASSIGNED, updatedAt: serverTimestamp() });
+        tx.update(devRef, { ownerUid: req.uid, lifecycle: DEVICE_LIFECYCLE.ASSIGNED, lakeId: lakeRef.id, updatedAt: serverTimestamp() });
         tx.set(lakeRef, {
-          ownerUid: req.uid, deviceId, name: req.lakeName || deviceId,
-          region: dev.region, approved: true,
-          settings: { minDo: 5, farq: 2, kritik: 3 },
-          createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+          ownerUid: req.uid, name: req.lakeName || deviceId,
+          description: '', region: dev.region, district: '',
+          coordinates: null, area: null, averageDepth: null, waterVolume: null,
+          fishSpecies: [], deviceIds: [deviceId],
+          status: 'active',
+          createdAt: serverTimestamp(), updatedAt: serverTimestamp(), archivedAt: null,
         });
         tx.delete(reqRef);
         return { lakeId: lakeRef.id, ownerUid: req.uid };
