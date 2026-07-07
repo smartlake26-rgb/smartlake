@@ -47,9 +47,15 @@ body {
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;   /* kontent yuqoridan -> uzun ekranda pastki tugma yetib boradi */
   padding: 28px 22px;
   gap: 18px;
+}
+.auth-wrap.center { justify-content: center; }   /* faqat login/register/forgot markazda */
+.topbar.with-back { display: flex; align-items: center; gap: 6px; }
+.topbar-back {
+  background: none; border: none; color: #fff; cursor: pointer;
+  padding: 2px 6px 2px 0; display: inline-flex; align-items: center;
 }
 .auth-brand {
   text-align: center;

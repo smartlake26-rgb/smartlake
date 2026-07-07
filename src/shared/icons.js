@@ -13,6 +13,7 @@ const PATHS = {
   power: '<path d="M12 3.5v8"/><path d="M6.8 6.8a7.5 7.5 0 1 0 10.4 0"/>',
   plus: '<path d="M12 5v14"/><path d="M5 12h14"/>',
   droplet: '<path d="M12 3.5s6 6.2 6 10.3a6 6 0 0 1-12 0C6 9.7 12 3.5 12 3.5z"/>',
+  arrowLeft: '<path d="M15 5l-7 7 7 7"/>',
 };
 
 /**
