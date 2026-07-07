@@ -101,7 +101,7 @@ export const lakeService = {
     if (!lakeId) return null;
     try {
       const snap = await getDoc(ref(lakeId));
-      return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+      return snap.exists() ? { ...snap.data(), id: snap.id } : null;
     } catch (e) { throw wrap(e, 'getLake'); }
   },
 
@@ -110,7 +110,7 @@ export const lakeService = {
     try {
       const q = query(collection(db, COLLECTIONS.LAKES), where('ownerUid', '==', owner));
       const snap = await getDocs(q);
-      const all = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const all = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
       return includeArchived ? all : all.filter((l) => l.status !== LAKE_STATUS.ARCHIVED);
     } catch (e) { throw wrap(e, 'listByOwner'); }
   },
