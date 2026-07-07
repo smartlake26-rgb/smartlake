@@ -20,6 +20,7 @@ import {
   AUTH_SCREENS, ROUTES,
 } from '../features/auth/index.js';
 import { renderClaim } from '../features/devices/index.js';
+import { renderLakesList, renderLakeForm, renderLakeDetail } from '../features/lakes/index.js';
 
 window.addEventListener('error', (ev) => handleError(ev.error || ev.message, 'window.onerror'));
 window.addEventListener('unhandledrejection', (ev) => handleError(ev.reason, 'unhandledrejection'));
@@ -51,7 +52,8 @@ function homeScreen({ router }) {
     el('div', { style: 'font-size:20px;font-weight:800', text: `${t('common.welcome')}, ${s.profile ? s.profile.ism : ''}!` }),
     el('span', { class: 'role-badge', text: t('role.' + (s.role || 'farmer')) }),
     el('div', { class: 'home-actions' }, [
-      el('button', { class: 'btn', text: t('device.claimTitle'), onClick: () => router.go(ROUTES.CLAIM) }),
+      el('button', { class: 'btn', text: t('lake.myLakes'), onClick: () => router.go(ROUTES.LAKES) }),
+      el('button', { class: 'btn ghost', text: t('device.claimTitle'), onClick: () => router.go(ROUTES.CLAIM) }),
       el('button', { class: 'btn ghost', text: t('home.profile'), onClick: () => router.go(ROUTES.PROFILE) }),
       el('button', { class: 'btn ghost', text: t('home.settings'), onClick: () => router.go(ROUTES.SETTINGS) }),
     ]),
@@ -71,6 +73,8 @@ async function main() {
 
   const router = createRouter(root);
   let authMode = AUTH_SCREENS.LOGIN;
+  let openLakeId = null;   // LAKE_DETAIL uchun
+  let editLake = null;     // LAKE_FORM: null = yaratish, obyekt = tahrirlash
 
   const goAuth = () => router.go(ROUTES.AUTH);
   router
@@ -84,6 +88,21 @@ async function main() {
     .define(ROUTES.SETTINGS, () => renderSettings({
       onBack: () => router.go(ROUTES.HOME),
       onRerender: () => router.go(ROUTES.SETTINGS),
+    }))
+    .define(ROUTES.LAKES, () => renderLakesList({
+      onCreate: () => { editLake = null; router.go(ROUTES.LAKE_FORM); },
+      onOpen: (id) => { openLakeId = id; router.go(ROUTES.LAKE_DETAIL); },
+      onBack: () => router.go(ROUTES.HOME),
+    }))
+    .define(ROUTES.LAKE_FORM, () => renderLakeForm({
+      lake: editLake,
+      onDone: () => router.go(ROUTES.LAKES),
+      onBack: () => router.go(editLake ? ROUTES.LAKE_DETAIL : ROUTES.LAKES),
+    }))
+    .define(ROUTES.LAKE_DETAIL, () => renderLakeDetail({
+      lakeId: openLakeId,
+      onEdit: (lake) => { editLake = lake; router.go(ROUTES.LAKE_FORM); },
+      onBack: () => router.go(ROUTES.LAKES),
     }));
 
   root.replaceChildren(loadingScreen());
