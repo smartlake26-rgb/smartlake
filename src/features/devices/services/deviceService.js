@@ -66,6 +66,7 @@ export const deviceService = {
 
   /** Qurilmani o'qish (yo'q bo'lsa null). */
   async getDevice(deviceId) {
+    if (!deviceId) return null;                 // null yo'l -> Firestore'ga bormaymiz
     try {
       const snap = await getDoc(ref(deviceId));
       return snap.exists() ? { id: snap.id, ...snap.data() } : null;
