@@ -33,7 +33,7 @@ export const telemetryService = {
       q,
       (snap) => {
         const telemetry = new Map();
-        snap.forEach((d) => telemetry.set(d.id, sanitizeTelemetry({ id: d.id, ...d.data() })));
+        snap.forEach((d) => telemetry.set(d.id, sanitizeTelemetry({ ...d.data(), id: d.id })));
         onData({ telemetry, fromCache: snap.metadata.fromCache });
       },
       (err) => {
