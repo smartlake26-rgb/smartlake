@@ -69,7 +69,7 @@ export const deviceService = {
     if (!deviceId) return null;                 // null yo'l -> Firestore'ga bormaymiz
     try {
       const snap = await getDoc(ref(deviceId));
-      return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+      return snap.exists() ? { ...snap.data(), id: snap.id } : null;
     } catch (e) { throw wrap(e, 'getDevice'); }
   },
 
@@ -97,7 +97,7 @@ export const deviceService = {
     try {
       const q = query(collection(db, COLLECTIONS.DEVICES), where('ownerUid', '==', uid));
       const snap = await getDocs(q);
-      return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      return snap.docs.map((d) => ({ ...d.data(), id: d.id }));
     } catch (e) { throw wrap(e, 'listByOwner'); }
   },
 };
