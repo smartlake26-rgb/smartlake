@@ -42,6 +42,13 @@ export const DEVICE_LIFECYCLE = Object.freeze({
 /** Device presence (hisoblanadi — saqlanmaydi). */
 export const DEVICE_PRESENCE = Object.freeze({ ONLINE: 'online', OFFLINE: 'offline', PENDING: 'pending' });
 
+/** Ko'l statusi (lakes/{id}.status). Soft-delete: archived (fizik delete yo'q). */
+export const LAKE_STATUS = Object.freeze({
+  ACTIVE: 'active',
+  INACTIVE: 'inactive',
+  ARCHIVED: 'archived',
+});
+
 /** Buyruq statusi. */
 export const COMMAND_STATUS = Object.freeze({ PENDING: 'pending', DONE: 'done' });
 
@@ -62,5 +69,5 @@ export const paths = Object.freeze({
 
 export default {
   COLLECTIONS, SUBCOLLECTIONS, ROLES, USER_STATUS,
-  DEVICE_LIFECYCLE, DEVICE_PRESENCE, COMMAND_STATUS, REQUEST_STATUS, paths,
+  DEVICE_LIFECYCLE, DEVICE_PRESENCE, LAKE_STATUS, COMMAND_STATUS, REQUEST_STATUS, paths,
 };
