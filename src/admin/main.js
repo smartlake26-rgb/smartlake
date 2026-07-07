@@ -72,13 +72,17 @@ async function main() {
 
   root.replaceChildren(loadingScreen());
 
+  let authPhase = null;
   authStore.subscribe((s) => {
     if (s.loading) return;
-    if (!s.firebaseUser) { authMode = AUTH_SCREENS.LOGIN; goAuth(); return; }
-    // Rol guard: faqat admin rollari.
-    if (!access.canAccess(s.userDoc, ADMIN_ROLES)) { root.replaceChildren(deniedScreen()); return; }
-    if (router.current() === ROUTES.AUTH || router.current() === null) router.go(ROUTES.HOME);
-    else router.go(router.current());
+    const next = !s.firebaseUser ? 'auth'
+      : !access.canAccess(s.userDoc, ADMIN_ROLES) ? 'denied'
+        : 'app';
+    if (next === authPhase) return;
+    authPhase = next;
+    if (next === 'auth') { authMode = AUTH_SCREENS.LOGIN; goAuth(); }
+    else if (next === 'denied') root.replaceChildren(deniedScreen());
+    else if (router.current() === ROUTES.AUTH || router.current() === null) router.go(ROUTES.HOME);
   });
 
   authStore.initAuthStore();
