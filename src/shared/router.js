@@ -10,12 +10,14 @@ import { mount } from './dom.js';
 export function createRouter(rootEl) {
   const routes = new Map();
   let currentName = null;
+  let currentCleanup = null;   // joriy view'ning tozalash funksiyasi (listener unsubscribe)
 
   const api = {
     /**
      * Route belgilash.
      * @param {string} name
-     * @param {(ctx)=>Node} render
+     * @param {(ctx)=>Node} render  — qaytargan Node'da `.__cleanup` bo'lsa,
+     *   navigatsiyada avtomatik chaqiriladi (memory-leak oldini oladi).
      * @param {(ctx)=>(string|false|null|undefined)} [guard]
      */
     define(name, render, guard = null) {
@@ -23,7 +25,7 @@ export function createRouter(rootEl) {
       return api;
     },
 
-    /** Route'ga o'tish (guard tekshiruvi bilan). */
+    /** Route'ga o'tish (guard + oldingi view cleanup bilan). */
     go(name, ctx = {}) {
       const r = routes.get(name);
       if (!r) throw new Error(`router: ro'yxatdan o'tmagan route: ${name}`);
@@ -31,8 +33,13 @@ export function createRouter(rootEl) {
         const redirect = r.guard(ctx);
         if (redirect && redirect !== name) return api.go(redirect, ctx);
       }
+      // Oldingi view'ni tozalash (listener'larni yopish).
+      if (typeof currentCleanup === 'function') { try { currentCleanup(); } catch (_) { /* ignore */ } }
+      currentCleanup = null;
       currentName = name;
-      mount(rootEl, r.render(ctx));
+      const node = r.render(ctx);
+      if (node && typeof node.__cleanup === 'function') currentCleanup = node.__cleanup;
+      mount(rootEl, node);
       return api;
     },
 
