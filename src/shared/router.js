@@ -6,7 +6,6 @@
 // ============================================================
 
 import { mount } from './dom.js';
-import { logger } from '../core/logger.js';
 
 export function createRouter(rootEl) {
   const routes = new Map();
@@ -22,13 +21,16 @@ export function createRouter(rootEl) {
      * @param {(ctx)=>(string|false|null|undefined)} [guard]
      */
     define(name, render, guard = null) {
+      if (typeof name !== 'string' || !name) {
+        // Odatda ROUTES konstantasi eskirgan/deploy nomuvofiq bo'lsa yuz beradi.
+        throw new Error('router.define: route nomi bo\'sh/undefined — ROUTES konstantasini tekshiring (deploy nomuvofiqligi?)');
+      }
       routes.set(name, { render, guard });
       return api;
     },
 
     /** Route'ga o'tish (guard + oldingi view cleanup bilan). */
     go(name, ctx = {}) {
-      logger.info('[router] go ->', name, '| joriy:', currentName);
       const r = routes.get(name);
       if (!r) throw new Error(`router: ro'yxatdan o'tmagan route: ${name}`);
       if (r.guard) {

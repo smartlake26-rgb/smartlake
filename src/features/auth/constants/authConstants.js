@@ -22,6 +22,8 @@ export const ROUTES = Object.freeze({
   LAKES: 'lakes',          // fermer: ko'llar ro'yxati
   LAKE_FORM: 'lakeForm',   // ko'l yaratish/tahrirlash
   LAKE_DETAIL: 'lakeDetail', // ko'l detali + biriktirish
+  DASHBOARD: 'dashboard',  // realtime monitoring
+  DEVICE_DETAIL: 'deviceDetail', // qurilma tafsilotlari
 });
 
 /** Admin hisoblangan rollar. */
