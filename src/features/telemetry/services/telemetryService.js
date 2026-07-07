@@ -31,7 +31,6 @@ export const telemetryService = {
     const q = query(collection(db, COLLECTIONS.TELEMETRY), where('ownerUid', '==', ownerUid));
     const unsub = onSnapshot(
       q,
-      { includeMetadataChanges: true },
       (snap) => {
         const telemetry = new Map();
         snap.forEach((d) => telemetry.set(d.id, sanitizeTelemetry({ id: d.id, ...d.data() })));
