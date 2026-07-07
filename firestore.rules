@@ -109,7 +109,7 @@ service cloud.firestore {
       allow update: if (owns(resource.data.ownerUid)
                         && onlyFields(['name', 'description', 'district', 'coordinates',
                                        'area', 'averageDepth', 'waterVolume', 'fishSpecies',
-                                       'deviceIds', 'status', 'archivedAt', 'updatedAt']))
+                                       'deviceIds', 'status', 'archivedAt', 'thresholds', 'updatedAt']))
                     || adminForRegion(resource.data.region);
 
       // FIZIK DELETE YO'Q — soft-delete (status = archived).
