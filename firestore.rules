@@ -61,12 +61,14 @@ service cloud.firestore {
         && request.resource.data.activationKey is string
         && request.resource.data.deviceId == deviceId;
 
-      // Yangilash (claim tasdiqlash yoki lifecycle o'zgartirish): admin (hudud bo'yicha).
-      //  Egalik o'g'irlanmaydi: ownerUid o'zgarmaydi YOKI oldin null bo'lgan (birinchi biriktirish).
-      allow update: if adminForRegion(resource.data.region)
-        && validLifecycle(request.resource.data.lifecycle)
-        && (request.resource.data.ownerUid == resource.data.ownerUid
-            || resource.data.ownerUid == null);
+      // Yangilash: EGASI faqat lakeId (biriktirish/ajratish);
+      //  yoki ADMIN (claim tasdiqlash / lifecycle) hudud bo'yicha.
+      //  Egalik o'g'irlanmaydi: ownerUid o'zgarmaydi YOKI oldin null bo'lgan.
+      allow update: if (owns(resource.data.ownerUid) && onlyFields(['lakeId', 'updatedAt']))
+        || (adminForRegion(resource.data.region)
+            && validLifecycle(request.resource.data.lifecycle)
+            && (request.resource.data.ownerUid == resource.data.ownerUid
+                || resource.data.ownerUid == null));
 
       // O'chirish/retire — faqat super (qurilma tarixi saqlanadi).
       allow delete: if isSuper();
@@ -96,14 +98,22 @@ service cloud.firestore {
     // ---------- lakes ----------
     match /lakes/{lakeId} {
       allow read: if owns(resource.data.ownerUid) || adminForRegion(resource.data.region);
-      // Yaratish: claim tasdiqlashda admin (hudud bo'yicha).
-      allow create: if adminForRegion(request.resource.data.region)
-        && request.resource.data.approved == true;
-      // Yangilash: egasi (cheklangan maydonlar) yoki admin (hudud).
+
+      // Yaratish: fermer o'ziga (mustaqil, status active) YOKI admin (claim tasdig'ida).
+      allow create: if (signedIn()
+                        && request.resource.data.ownerUid == uid()
+                        && request.resource.data.status == 'active')
+                    || adminForRegion(request.resource.data.region);
+
+      // Yangilash: egasi (cheklangan maydonlar — ownerUid/region O'ZGARMAYDI) yoki admin.
       allow update: if (owns(resource.data.ownerUid)
-                        && onlyFields(['name', 'settings', 'updatedAt']))
+                        && onlyFields(['name', 'description', 'district', 'coordinates',
+                                       'area', 'averageDepth', 'waterVolume', 'fishSpecies',
+                                       'deviceIds', 'status', 'archivedAt', 'updatedAt']))
                     || adminForRegion(resource.data.region);
-      allow delete: if owns(resource.data.ownerUid) || adminForRegion(resource.data.region);
+
+      // FIZIK DELETE YO'Q — soft-delete (status = archived).
+      allow delete: if false;
     }
 
     // ---------- telemetry (latest) + history ----------
