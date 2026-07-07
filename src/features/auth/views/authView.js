@@ -122,7 +122,7 @@ export function renderAuth(ctx = {}) {
   }
 
   return el('div', { class: 'app' }, [
-    el('div', { class: 'auth-wrap' }, [
+    el('div', { class: 'auth-wrap center' }, [
       el('div', { class: 'auth-brand', html: `${icon('waves', 26)} ${t('app.name')}` }),
       el('div', { class: 'auth-sub', text: t('app.tagline') }),
       el('div', { class: 'card' }, cardChildren),
