@@ -9,6 +9,12 @@ export const AUDIT_ACTIONS = Object.freeze({
   CLAIM_REJECTED: 'claim_rejected',
   OWNERSHIP_CHANGED: 'ownership_changed',
   STATUS_CHANGED: 'status_changed',
+  LAKE_CREATED: 'lake_created',
+  LAKE_UPDATED: 'lake_updated',
+  LAKE_ARCHIVED: 'lake_archived',
+  LAKE_STATUS_CHANGED: 'lake_status_changed',
+  DEVICE_ASSIGNED: 'device_assigned',
+  DEVICE_UNASSIGNED: 'device_unassigned',
 });
 
 /** Audit obyekt turlari. */
