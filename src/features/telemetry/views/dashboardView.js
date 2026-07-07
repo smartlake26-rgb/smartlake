@@ -7,6 +7,7 @@
 // ============================================================
 
 import { el, mount } from '../../../shared/dom.js';
+import { icon } from '../../../shared/icons.js';
 import { t } from '../../../core/i18n/index.js';
 import { handleError } from '../../../core/errors.js';
 import { lakeService } from '../../lakes/index.js';
@@ -46,7 +47,10 @@ export function renderDashboard(ctx = {}) {
   const bannerSlot = el('div', {});
   const body = el('div', {});
   const root = el('div', { class: 'app' }, [
-    el('div', { class: 'topbar', text: t('tm.dashboard') }),
+    el('div', { class: 'topbar with-back' }, [
+      el('button', { class: 'topbar-back', html: icon('arrowLeft', 22), onClick: () => ctx.onBack && ctx.onBack() }),
+      el('span', { text: t('tm.dashboard') }),
+    ]),
     el('div', { class: 'auth-wrap' }, [
       bannerSlot,
       body,
@@ -58,6 +62,8 @@ export function renderDashboard(ctx = {}) {
   let devices = [];
   let telemetry = new Map();
   let unsub = null;
+  let destroyed = false;
+  const onNet = () => renderAll();
 
   mount(body, skeletonCards(3));
 
@@ -106,8 +112,8 @@ export function renderDashboard(ctx = {}) {
     return el('div', { class: 'card', style: 'margin-bottom:12px' }, [head, counts, metrics, health, last, devs]);
   }
 
-  function renderAll(fromCache) {
-    mount(bannerSlot, fromCache ? offlineBanner() : el('span'));
+  function renderAll() {
+    mount(bannerSlot, navigator.onLine === false ? offlineBanner() : el('span'));
     if (!lakes.length) { mount(body, emptyState('tm.empty')); return; }
     mount(body, ...lakes.map(lakeCard));
   }
@@ -122,16 +128,24 @@ export function renderDashboard(ctx = {}) {
       mount(body, el('div', { class: 'banner err', text: t(handleError(e, 'dashboard.load').messageKey) }));
       return;
     }
+    if (destroyed) return;                       // ekran yopilgan bo'lsa listener ochmaymiz
     unsub = telemetryService.watchByOwner(
       s.uid,
-      ({ telemetry: map, fromCache }) => { telemetry = map; renderAll(fromCache); },
-      () => renderAll(false),
+      ({ telemetry: map }) => { telemetry = map; renderAll(); },
+      () => renderAll(),
     );
-    renderAll(false);   // telemetriyasiz ham darhol ko'rsatamiz
+    window.addEventListener('online', onNet);
+    window.addEventListener('offline', onNet);
+    renderAll();
   }
   boot();
 
-  root.__cleanup = () => { if (unsub) unsub(); };
+  root.__cleanup = () => {
+    destroyed = true;
+    if (unsub) unsub();
+    window.removeEventListener('online', onNet);
+    window.removeEventListener('offline', onNet);
+  };
   return root;
 }
 

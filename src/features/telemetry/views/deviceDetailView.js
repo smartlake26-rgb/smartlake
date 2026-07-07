@@ -6,6 +6,7 @@
 // ============================================================
 
 import { el, mount } from '../../../shared/dom.js';
+import { icon } from '../../../shared/icons.js';
 import { toast } from '../../../shared/toast.js';
 import { t } from '../../../core/i18n/index.js';
 import { handleError } from '../../../core/errors.js';
@@ -38,7 +39,10 @@ export function renderDeviceDetail(ctx = {}) {
   const s = authStore.getState();
   const body = el('div', {});
   const root = el('div', { class: 'app' }, [
-    el('div', { class: 'topbar', text: t('tm.deviceDetail') }),
+    el('div', { class: 'topbar with-back' }, [
+      el('button', { class: 'topbar-back', html: icon('arrowLeft', 22), onClick: () => ctx.onBack && ctx.onBack() }),
+      el('span', { text: t('tm.deviceDetail') }),
+    ]),
     el('div', { class: 'auth-wrap' }, [
       body,
       el('button', { class: 'btn ghost', text: t('common.back'), onClick: () => ctx.onBack && ctx.onBack() }),
@@ -49,6 +53,7 @@ export function renderDeviceDetail(ctx = {}) {
   let lake = null;
   let tel = null;
   let unsub = null;
+  let destroyed = false;
 
   // deviceId yo'q bo'lsa — Firestore'ga bormaymiz, tushunarli holat ko'rsatamiz.
   if (!ctx.deviceId) {
@@ -118,6 +123,7 @@ export function renderDeviceDetail(ctx = {}) {
       mount(body, el('div', { class: 'banner err', text: t(handleError(e, 'device.load').messageKey) }));
       return;
     }
+    if (destroyed) return;
     unsub = telemetryService.watchByOwner(s.uid, ({ telemetry }) => {
       tel = telemetry.get(ctx.deviceId) || null;
       render();
@@ -126,7 +132,7 @@ export function renderDeviceDetail(ctx = {}) {
   }
   boot();
 
-  root.__cleanup = () => { if (unsub) unsub(); };
+  root.__cleanup = () => { destroyed = true; if (unsub) unsub(); };
   return root;
 }
 
