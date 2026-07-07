@@ -8,6 +8,7 @@
 
 import { el, mount } from '../../../shared/dom.js';
 import { icon } from '../../../shared/icons.js';
+import { logger } from '../../../core/logger.js';
 import { t } from '../../../core/i18n/index.js';
 import { handleError } from '../../../core/errors.js';
 import { lakeService } from '../../lakes/index.js';
@@ -46,15 +47,16 @@ export function renderDashboard(ctx = {}) {
   const s = authStore.getState();
   const bannerSlot = el('div', {});
   const body = el('div', {});
+  const goBack = () => { logger.info('[dashboard] ORQAGA bosildi'); if (ctx.onBack) ctx.onBack(); };
   const root = el('div', { class: 'app' }, [
     el('div', { class: 'topbar with-back' }, [
-      el('button', { class: 'topbar-back', html: icon('arrowLeft', 22), onClick: () => ctx.onBack && ctx.onBack() }),
+      el('button', { class: 'topbar-back', html: icon('arrowLeft', 22), onClick: goBack }),
       el('span', { text: t('tm.dashboard') }),
     ]),
     el('div', { class: 'auth-wrap' }, [
       bannerSlot,
       body,
-      el('button', { class: 'btn ghost', text: t('common.back'), onClick: () => ctx.onBack && ctx.onBack() }),
+      el('button', { class: 'btn ghost', text: t('common.back'), onClick: goBack }),
     ]),
   ]);
 
