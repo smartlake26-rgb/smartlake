@@ -98,6 +98,7 @@ export const lakeService = {
   },
 
   async getLake(lakeId) {
+    if (!lakeId) return null;
     try {
       const snap = await getDoc(ref(lakeId));
       return snap.exists() ? { id: snap.id, ...snap.data() } : null;
