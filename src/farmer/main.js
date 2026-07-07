@@ -108,7 +108,7 @@ async function main() {
       onBack: () => router.go(ROUTES.LAKES),
     }))
     .define(ROUTES.DASHBOARD, () => renderDashboard({
-      onOpenDevice: (id) => { openDeviceId = id; router.go(ROUTES.DEVICE_DETAIL); },
+      onOpenDevice: (id) => { if (!id) return; openDeviceId = id; router.go(ROUTES.DEVICE_DETAIL); },
       onBack: () => router.go(ROUTES.HOME),
     }))
     .define(ROUTES.DEVICE_DETAIL, () => renderDeviceDetail({
