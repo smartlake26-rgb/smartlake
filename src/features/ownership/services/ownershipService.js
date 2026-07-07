@@ -136,7 +136,7 @@ export const ownershipService = {
     }
     return onSnapshot(
       q,
-      (snap) => cb(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      (snap) => cb(snap.docs.map((d) => ({ ...d.data(), id: d.id }))),
       (err) => { logger.error('watchRequests xato:', err && err.code); cb([]); },
     );
   },
