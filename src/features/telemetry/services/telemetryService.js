@@ -44,6 +44,21 @@ export const telemetryService = {
     logger.info('Telemetriya listener ochildi:', ownerUid);
     return unsub;
   },
+
+  /** ADMIN (faqat-o'qish): butun telemetriya kolleksiyasi realtime. Rules isAdmin. */
+  watchAll(onData, onError) {
+    const unsub = onSnapshot(
+      collection(db, COLLECTIONS.TELEMETRY),
+      (snap) => {
+        const telemetry = new Map();
+        snap.forEach((d) => telemetry.set(d.id, { ...d.data(), id: d.id }));
+        onData({ telemetry, fromCache: snap.metadata.fromCache });
+      },
+      (err) => { handleError(err, 'telemetryService.watchAll'); if (onError) onError(err); },
+    );
+    logger.info('Admin telemetriya listener ochildi');
+    return unsub;
+  },
 };
 
 export default telemetryService;

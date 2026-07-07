@@ -5,7 +5,7 @@
 export const uz = {
   app: { name: 'SmartLake', tagline: "Baliq ko'llari monitoringi", loading: 'Yuklanmoqda...' },
 
-  common: {
+  common: { search: "Qidirish...", noData: "Ma'lumot yo'q", approve: "Tasdiqlash", reject: "Rad etish",
     save: 'Saqlash', saved: 'Saqlandi', cancel: 'Bekor qilish', back: 'Orqaga',
     logout: 'Chiqish', email: 'Email', password: 'Parol', welcome: 'Xush kelibsiz',
   },
@@ -26,7 +26,7 @@ export const uz = {
     phone: 'Telefon',
   },
 
-  settings: {
+  settings: { role: "Rol",
     title: 'Sozlamalar', language: 'Til', password: 'Parol',
     changePassword: "Parolni o'zgartirish (email orqali)",
     emailUnverified: 'Email tasdiqlanmagan', resendVerification: 'Tasdiq emailini qayta yuborish',
@@ -73,7 +73,7 @@ export const uz = {
     notAssignedHere: "Qurilma bu ko'lga biriktirilmagan",
   },
 
-  device: {
+  device: { lifecycle: "Hayot sikli",
     claimTitle: "Qurilma qo'shish",
     deviceId: 'Qurilma ID',
     activationKey: 'Faollashtirish kaliti',
@@ -121,7 +121,7 @@ export const uz = {
     status_archived: 'Arxivlangan',
   },
 
-  tm: {
+  tm: { status: "Holat",
     dashboard: 'Monitoring',
     deviceDetail: 'Qurilma tafsilotlari',
     empty: "Hali ko'l yoki qurilma yo'q",
@@ -172,5 +172,14 @@ Object.assign(uz.common, { edit: 'Tahrirlash' });
 Object.assign(uz.settings, { darkMode: 'Tungi rejim', about: 'Ilova haqida', logoutConfirm: 'Rostdan ham chiqmoqchimisiz?' });
 Object.assign(uz.lake, { archiveConfirm: "Ko'l arxivlanadi va ro'yxatdan yashiriladi. Davom etilsinmi?", lakeName: "Ko'l nomi (ixtiyoriy)" });
 Object.assign(uz.device, { unassigned: 'Biriktirilmagan', empty: "Hali qurilma yo'q", emptyHint: "Qurilma qo'shish uchun faollashtirish kodidan foydalaning", claimHint: "Qurilma ID va faollashtirish kalitini qadoqdan toping" });
+
+Object.assign(uz.nav, { dashboard: 'Boshqaruv paneli', monitoring: 'Monitoring', users: 'Foydalanuvchilar', approvals: "Ko'l tasdig'i", audit: 'Audit jurnali', settings: 'Sozlamalar' });
+Object.assign(uz.common, { search: 'Qidirish...', noData: "Ma'lumot yo'q", approve: 'Tasdiqlash', reject: 'Rad etish' });
+Object.assign(uz.device, { lifecycle: 'Hayot sikli' });
+Object.assign(uz.tm, { status: 'Holat' });
+Object.assign(uz.settings, { role: 'Rol' });
+uz.user = Object.assign(uz.user || {}, { active: 'Faol', suspended: 'Bloklangan' });
+uz.approval = Object.assign(uz.approval || {}, { approved: 'Tasdiqlandi', rejected: 'Rad etildi', empty: "Kutilayotgan so'rov yo'q" });
+uz.audit = Object.assign(uz.audit || {}, { time: 'Vaqt', action: 'Amal', actor: 'Bajaruvchi', target: 'Obyekt', empty: "Audit yozuvi yo'q (Sprint-7'da to'ldiriladi)" });
 
 export default uz;

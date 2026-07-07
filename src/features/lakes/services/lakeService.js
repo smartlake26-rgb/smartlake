@@ -114,6 +114,27 @@ export const lakeService = {
       return includeArchived ? all : all.filter((l) => l.status !== LAKE_STATUS.ARCHIVED);
     } catch (e) { throw wrap(e, 'listByOwner'); }
   },
+
+  /**
+   * ADMIN (faqat-o'qish): super/operator -> barchasi; region -> o'z hududlari.
+   * Rules: lakes read = owns || adminForRegion(region).
+   * @param {object} userDoc {role, regions?}
+   */
+  async listAllAdmin(userDoc = {}) {
+    try {
+      const role = userDoc.role;
+      if (role === 'super' || role === 'operator') {
+        const snap = await getDocs(collection(db, COLLECTIONS.LAKES));
+        return snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+      }
+      // region: hududlar bo'yicha (Firestore 'in' <=10)
+      const regions = (userDoc.regions || []).slice(0, 10);
+      if (!regions.length) return [];
+      const q = query(collection(db, COLLECTIONS.LAKES), where('region', 'in', regions));
+      const snap = await getDocs(q);
+      return snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+    } catch (e) { throw wrap(e, 'listAllAdmin'); }
+  },
 };
 
 export default lakeService;

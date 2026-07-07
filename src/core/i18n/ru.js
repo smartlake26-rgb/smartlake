@@ -5,7 +5,7 @@
 export const ru = {
   app: { name: 'SmartLake', tagline: 'Мониторинг рыбных прудов', loading: 'Загрузка...' },
 
-  common: {
+  common: { search: "Поиск...", noData: "Нет данных", approve: "Подтвердить", reject: "Отклонить",
     save: 'Сохранить', saved: 'Сохранено', cancel: 'Отмена', back: 'Назад',
     logout: 'Выход', email: 'Email', password: 'Пароль', welcome: 'Добро пожаловать',
   },
@@ -26,7 +26,7 @@ export const ru = {
     phone: 'Телефон',
   },
 
-  settings: {
+  settings: { role: "Роль",
     title: 'Настройки', language: 'Язык', password: 'Пароль',
     changePassword: 'Сменить пароль (по email)',
     emailUnverified: 'Email не подтверждён', resendVerification: 'Отправить письмо повторно',
@@ -73,7 +73,7 @@ export const ru = {
     notAssignedHere: 'Устройство не привязано к этому пруду',
   },
 
-  device: {
+  device: { lifecycle: "Жизненный цикл",
     claimTitle: 'Добавить устройство',
     deviceId: 'ID устройства',
     activationKey: 'Ключ активации',
@@ -121,7 +121,7 @@ export const ru = {
     status_archived: 'Архивирован',
   },
 
-  tm: {
+  tm: { status: "Статус",
     dashboard: 'Мониторинг',
     deviceDetail: 'Детали устройства',
     empty: 'Пока нет прудов или устройств',
@@ -172,5 +172,14 @@ Object.assign(ru.common, { edit: 'Изменить' });
 Object.assign(ru.settings, { darkMode: 'Тёмная тема', about: 'О приложении', logoutConfirm: 'Вы действительно хотите выйти?' });
 Object.assign(ru.lake, { archiveConfirm: 'Пруд будет архивирован и скрыт из списка. Продолжить?', lakeName: 'Название пруда (необязательно)' });
 Object.assign(ru.device, { unassigned: 'Не привязано', empty: 'Пока нет устройств', emptyHint: 'Используйте код активации для добавления', claimHint: 'ID и ключ активации указаны на упаковке' });
+
+Object.assign(ru.nav, { dashboard: 'Панель', monitoring: 'Мониторинг', users: 'Пользователи', approvals: 'Подтверждение', audit: 'Журнал аудита', settings: 'Настройки' });
+Object.assign(ru.common, { search: 'Поиск...', noData: 'Нет данных', approve: 'Подтвердить', reject: 'Отклонить' });
+Object.assign(ru.device, { lifecycle: 'Жизненный цикл' });
+Object.assign(ru.tm, { status: 'Статус' });
+Object.assign(ru.settings, { role: 'Роль' });
+ru.user = Object.assign(ru.user || {}, { active: 'Активен', suspended: 'Заблокирован' });
+ru.approval = Object.assign(ru.approval || {}, { approved: 'Подтверждено', rejected: 'Отклонено', empty: 'Нет запросов' });
+ru.audit = Object.assign(ru.audit || {}, { time: 'Время', action: 'Действие', actor: 'Исполнитель', target: 'Объект', empty: 'Нет записей аудита (Sprint-7)' });
 
 export default ru;

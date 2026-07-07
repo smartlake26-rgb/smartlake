@@ -5,7 +5,7 @@
 //  Rollar FAQAT shu hujjatda saqlanadi (custom claim yo'q — ADR qarori).
 // ============================================================
 
-import { doc, getDoc, setDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, getDocs, collection, serverTimestamp } from 'firebase/firestore';
 
 import { db } from '../../../core/firebase.js';
 import { DataError } from '../../../core/errors.js';
@@ -88,6 +88,14 @@ export const userService = {
     } catch (e) {
       throw wrap(e, 'setLocale');
     }
+  },
+
+  /** ADMIN (faqat-o'qish): barcha foydalanuvchilar. Rules isAdmin talab qiladi. */
+  async listAll() {
+    try {
+      const snap = await getDocs(collection(db, COLLECTIONS.USERS));
+      return snap.docs.map((d) => ({ ...d.data(), uid: d.id }));
+    } catch (e) { throw wrap(e, 'listAll'); }
   },
 };
 

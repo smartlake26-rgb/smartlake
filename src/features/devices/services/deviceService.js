@@ -100,6 +100,14 @@ export const deviceService = {
       return snap.docs.map((d) => ({ ...d.data(), id: d.id }));
     } catch (e) { throw wrap(e, 'listByOwner'); }
   },
+
+  /** ADMIN (faqat-o'qish): barcha qurilmalar. Rules isAdmin talab qiladi. */
+  async listAll() {
+    try {
+      const snap = await getDocs(collection(db, COLLECTIONS.DEVICES));
+      return snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+    } catch (e) { throw wrap(e, 'listAll'); }
+  },
 };
 
 export default deviceService;
