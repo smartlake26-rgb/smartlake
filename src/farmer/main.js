@@ -118,14 +118,17 @@ async function main() {
 
   root.replaceChildren(loadingScreen());
 
+  let authPhase = null;   // 'auth' | 'blocked' | 'app' — faqat FAZA o'zgarganda harakat
   authStore.subscribe((s) => {
     if (s.loading) return;                                  // hal bo'lguncha kutamiz
-    if (!s.firebaseUser) { authMode = AUTH_SCREENS.LOGIN; goAuth(); return; }
-    if (!s.userDoc || !s.role) { root.replaceChildren(blockedScreen('home.suspended')); return; }
-    if (s.status !== 'active') { root.replaceChildren(blockedScreen('home.suspended')); return; }
-    // Kirgan + aktiv: joriy route auth bo'lsa home'ga o't.
-    if (router.current() === ROUTES.AUTH || router.current() === null) router.go(ROUTES.HOME);
-    else router.go(router.current());                       // ma'lumot yangilanganda qayta render
+    const next = !s.firebaseUser ? 'auth'
+      : (!s.userDoc || !s.role || s.status !== 'active') ? 'blocked'
+        : 'app';
+    if (next === authPhase) return;                         // holat o'zgarmadi -> joriy ekranga TEGMAYMIZ
+    authPhase = next;
+    if (next === 'auth') { authMode = AUTH_SCREENS.LOGIN; goAuth(); }
+    else if (next === 'blocked') root.replaceChildren(blockedScreen('home.suspended'));
+    else if (router.current() === ROUTES.AUTH || router.current() === null) router.go(ROUTES.HOME);
   });
 
   authStore.initAuthStore();
