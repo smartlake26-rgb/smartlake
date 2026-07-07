@@ -50,6 +50,12 @@ export function renderDeviceDetail(ctx = {}) {
   let tel = null;
   let unsub = null;
 
+  // deviceId yo'q bo'lsa — Firestore'ga bormaymiz, tushunarli holat ko'rsatamiz.
+  if (!ctx.deviceId) {
+    mount(body, el('div', { class: 'banner err', text: t('error.deviceNotFound') }));
+    return root;
+  }
+
   mount(body, skeletonCards(2));
 
   function render() {
