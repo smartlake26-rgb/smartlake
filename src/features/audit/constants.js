@@ -15,6 +15,11 @@ export const AUDIT_ACTIONS = Object.freeze({
   LAKE_STATUS_CHANGED: 'lake_status_changed',
   DEVICE_ASSIGNED: 'device_assigned',
   DEVICE_UNASSIGNED: 'device_unassigned',
+  COMMAND_CREATED: 'command_created',
+  COMMAND_SENT: 'command_sent',
+  COMMAND_EXECUTED: 'command_executed',
+  COMMAND_FAILED: 'command_failed',
+  COMMAND_EXPIRED: 'command_expired',
 });
 
 /** Audit obyekt turlari. */
@@ -23,6 +28,7 @@ export const AUDIT_TARGETS = Object.freeze({
   LAKE: 'lake',
   REQUEST: 'request',
   USER: 'user',
+  COMMAND: 'command',
 });
 
 export default { AUDIT_ACTIONS, AUDIT_TARGETS };

@@ -17,6 +17,7 @@ import { resolveThresholds } from '../domain/thresholds.js';
 import { deviceStatus } from '../domain/statusEngine.js';
 import { healthScore } from '../domain/healthScore.js';
 import { telemetryAge } from '../domain/freshness.js';
+import { renderCommandPanel } from '../../commands/index.js';
 
 function fmtAge(ts) {
   const age = telemetryAge(ts);
@@ -37,6 +38,7 @@ export function renderDeviceDetailPage(nav, deviceId) {
   if (!deviceId) { mount(content, emptyState({ icon: 'chip', title: t('error.deviceNotFound') })); return root; }
 
   const histOut = el('div', {});
+  const cmdPanel = renderCommandPanel(deviceId, s.uid);   // bir marta (o'z listeneri bilan)
 
   function render() {
     const st = dataStore.getState();
@@ -90,12 +92,12 @@ export function renderDeviceDetailPage(nav, deviceId) {
       histOut,
     ]);
 
-    mount(content, el('div', { class: 'stack' }, [header, sensors, info, history]));
+    mount(content, el('div', { class: 'stack' }, [header, sensors, cmdPanel, info, history]));
   }
 
   const unsub = dataStore.subscribe(render);
   render();
-  root.__cleanup = unsub;
+  root.__cleanup = () => { unsub(); if (cmdPanel && typeof cmdPanel.__cleanup === 'function') cmdPanel.__cleanup(); };
   return root;
 }
 
