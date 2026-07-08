@@ -137,9 +137,14 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.ownerUid == uid()
         && request.resource.data.status == 'pending'
+        && request.resource.data.commandType is string
         && get(/databases/$(database)/documents/devices/$(request.resource.data.deviceId)).data.ownerUid == uid();
-      allow update: if isDevice() || isAdmin();
-      allow delete: if isDevice() || isAdmin() || owns(resource.data.ownerUid);
+      // Yangilash: FAQAT admin YOKI o'z qurilmasiga tegishli gateway (deviceId claim),
+      // va FAQAT status/sentAt/completedAt/result maydonlari (Sprint-9 gateway claim beradi).
+      allow update: if (isAdmin()
+                        || (isDevice() && request.auth.token.deviceId == resource.data.deviceId))
+                    && onlyFields(['status', 'sentAt', 'completedAt', 'result']);
+      allow delete: if isAdmin() || owns(resource.data.ownerUid);
     }
 
     // ---------- announcements ----------
