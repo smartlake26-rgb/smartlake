@@ -182,4 +182,16 @@ uz.user = Object.assign(uz.user || {}, { active: 'Faol', suspended: 'Bloklangan'
 uz.approval = Object.assign(uz.approval || {}, { approved: 'Tasdiqlandi', rejected: 'Rad etildi', empty: "Kutilayotgan so'rov yo'q" });
 uz.audit = Object.assign(uz.audit || {}, { time: 'Vaqt', action: 'Amal', actor: 'Bajaruvchi', target: 'Obyekt', empty: "Audit yozuvi yo'q (Sprint-7'da to'ldiriladi)" });
 
+Object.assign(uz.nav, { commands: 'Buyruqlar' });
+uz.cmd = Object.assign(uz.cmd || {}, {
+  control: 'Boshqaruv', recent: 'Oxirgi buyruqlar', none: "Hali buyruq yo'q", noneAdmin: "Buyruq yo'q",
+  sent: 'Buyruq yuborildi', command: 'Buyruq', completed: 'Yakunlandi', result: 'Natija', unknown: "Noma'lum",
+  aeratorOn: 'Aerator YOQ', aeratorOff: "Aerator O'CH", autoOn: 'Avto YOQ', autoOff: "Avto O'CH",
+  feedStart: 'Yem BOSHLA', feedStop: "Yem TO'XTAT", restart: 'Qayta ishga tushirish',
+  syncTime: 'Vaqtni sinxronlash', reqStatus: 'Holat so\'rash', reqConfig: 'Konfiguratsiya so\'rash',
+});
+uz.cmdGroup = Object.assign(uz.cmdGroup || {}, { aerator: 'Aerator', auto: 'Avto rejim', feed: 'Yem motori', system: 'Tizim' });
+uz.cmdStatus = Object.assign(uz.cmdStatus || {}, { pending: 'Kutilmoqda', sent: 'Yuborildi', executed: 'Bajarildi', failed: 'Xato', expired: 'Muddati o\'tdi' });
+Object.assign(uz.error, { badTransition: "Noto'g'ri status o'tishi", badCommandType: "Noto'g'ri buyruq turi", badPayload: "Noto'g'ri payload", notOwner: 'Bu qurilma sizga tegishli emas' });
+
 export default uz;

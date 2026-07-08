@@ -49,8 +49,24 @@ export const LAKE_STATUS = Object.freeze({
   ARCHIVED: 'archived',
 });
 
-/** Buyruq statusi. */
-export const COMMAND_STATUS = Object.freeze({ PENDING: 'pending', DONE: 'done' });
+/** Buyruq statusi (FSM). */
+export const COMMAND_STATUS = Object.freeze({
+  PENDING: 'pending', SENT: 'sent', EXECUTED: 'executed', FAILED: 'failed', EXPIRED: 'expired',
+});
+
+/** Qo'llab-quvvatlanadigan buyruq turlari. */
+export const COMMAND_TYPES = Object.freeze({
+  AERATOR_ON: 'aerator_on',
+  AERATOR_OFF: 'aerator_off',
+  AUTO_ON: 'auto_on',
+  AUTO_OFF: 'auto_off',
+  FEED_START: 'feed_start',
+  FEED_STOP: 'feed_stop',
+  RESTART: 'restart',
+  SYNC_TIME: 'sync_time',
+  REQUEST_STATUS: 'request_status',
+  REQUEST_CONFIG: 'request_config',
+});
 
 /** So'rov statusi. */
 export const REQUEST_STATUS = Object.freeze({ PENDING: 'pending', APPROVED: 'approved', REJECTED: 'rejected' });
@@ -69,5 +85,5 @@ export const paths = Object.freeze({
 
 export default {
   COLLECTIONS, SUBCOLLECTIONS, ROLES, USER_STATUS,
-  DEVICE_LIFECYCLE, DEVICE_PRESENCE, LAKE_STATUS, COMMAND_STATUS, REQUEST_STATUS, paths,
+  DEVICE_LIFECYCLE, DEVICE_PRESENCE, LAKE_STATUS, COMMAND_STATUS, COMMAND_TYPES, REQUEST_STATUS, paths,
 };
