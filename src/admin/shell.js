@@ -18,6 +18,7 @@ import { renderAdminMonitoring } from '../features/telemetry/views/adminMonitori
 import { renderAdminLakes } from '../features/lakes/views/adminLakes.js';
 import { renderAdminUsers } from '../features/users/views/adminUsers.js';
 import { renderAdminApprovals } from '../features/ownership/views/adminApprovals.js';
+import { renderAdminCommands } from '../features/commands/index.js';
 import { renderAdminAlerts } from '../features/telemetry/views/adminAlerts.js';
 import { renderAdminAudit } from '../features/audit/views/adminAudit.js';
 import { renderAdminSettings } from '../features/auth/views/adminSettings.js';
@@ -26,6 +27,7 @@ const SECTIONS = [
   { id: 'dashboard', name: 'nav.dashboard', ic: 'home', roles: ['super', 'operator', 'region'], render: renderAdminDashboard },
   { id: 'devices', name: 'nav.devices', ic: 'chip', roles: ['super', 'operator', 'region'], render: renderAdminDevices },
   { id: 'monitoring', name: 'nav.monitoring', ic: 'activity', roles: ['super', 'operator', 'region'], render: renderAdminMonitoring },
+  { id: 'commands', name: 'nav.commands', ic: 'power', roles: ['super', 'operator', 'region'], render: renderAdminCommands },
   { id: 'lakes', name: 'nav.lakes', ic: 'droplet', roles: ['super', 'operator', 'region'], render: renderAdminLakes },
   { id: 'users', name: 'nav.users', ic: 'user', roles: ['super', 'operator', 'region'], render: renderAdminUsers },
   { id: 'approvals', name: 'nav.approvals', ic: 'check', roles: ['super', 'operator', 'region'], render: renderAdminApprovals },
