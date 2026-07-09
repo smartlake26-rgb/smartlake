@@ -1,0 +1,8 @@
+{
+  "name": "SmartLake",
+  "description": "Baliq ko'llari uchun real-time monitoring va boshqaruv platformasi",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
