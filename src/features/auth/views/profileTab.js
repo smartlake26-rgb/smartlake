@@ -9,7 +9,7 @@ import { icon } from '../../../shared/icons.js';
 import { appBar, mdCard, listItem, mdButton, select, openDialog } from '../../../shared/ui/index.js';
 import { toggleTheme, getTheme } from '../../../shared/ui/theme.js';
 import { LOCALES } from '../../../core/config.js';
-import { authService, authStore } from '../index.js';
+import { authService, authStore, access } from '../index.js';
 import { userService } from '../../users/index.js';
 import { renderProfileEditPage } from './profileEditPage.js';
 
@@ -40,7 +40,9 @@ export function renderProfileTab(nav) {
     // Profil karta
     const profileCard = mdCard([
       el('div', { class: 'row', style: 'gap:14px' }, [
-        el('div', { class: 'md-avatar', style: 'width:56px;height:56px;font-size:20px', text: `${(pr.ism || '?')[0] || ''}${(pr.fam || '')[0] || ''}`.toUpperCase() }),
+        pr.photoUrl 
+          ? el('img', { src: pr.photoUrl, class: 'md-avatar', style: 'width:56px;height:56px;object-fit:cover;border:1px solid rgba(0, 112, 144, 0.2)' })
+          : el('div', { class: 'md-avatar', style: 'width:56px;height:56px;font-size:20px', text: `${(pr.ism || '?')[0] || ''}${(pr.fam || '')[0] || ''}`.toUpperCase() }),
         el('div', { class: 'grow' }, [
           el('div', { class: 't-title', text: `${pr.ism || ''} ${pr.fam || ''}` }),
           el('div', { class: 't-body-sm muted', text: st.email || '' }),
@@ -64,6 +66,14 @@ export function renderProfileTab(nav) {
 
     const settingsCard = mdCard([
       el('div', { class: 't-label muted', style: 'margin-bottom:6px', text: t('settings.title') }),
+      ...(access.isAdmin(st.role) ? [
+        listItem({ 
+          leading: 'shield', 
+          title: "Admin Panelga o'tish", 
+          subtitle: "Tizimni to'liq boshqarish va monitoring qilish", 
+          onClick: () => { window.location.href = '/admin.html'; } 
+        })
+      ] : []),
       switchRow(t('settings.darkMode'), darkOn ? 'moon' : 'sun', darkOn, () => { toggleTheme(); nav.reTab(); }),
       el('div', { class: 'md-listitem' }, [
         el('div', { class: 'li-lead', html: icon('globe', 20) }),
@@ -72,6 +82,10 @@ export function renderProfileTab(nav) {
       ]),
       listItem({ leading: 'mail', title: t('settings.changePassword'), onClick: async () => {
         try { await authService.resetPassword(st.email); toast(t('auth.resetSent'), 'ok'); } catch (_) { toast(t('error.generic'), 'err'); }
+      } }),
+      listItem({ leading: 'help', title: "Ilova yo'riqnomasi (Onboarding)", subtitle: "Tizim imkoniyatlarini qaytadan ko'rish", onClick: () => {
+        try { localStorage.removeItem('sl_onboarded_' + st.uid); } catch (_) {}
+        window.location.reload();
       } }),
       listItem({ leading: 'info', title: t('settings.about'), subtitle: `SmartLake v${APP_VERSION}` }),
     ]);

@@ -4,7 +4,8 @@
 // ============================================================
 
 import { el, mount } from '../../../shared/dom.js';
-import { t } from '../../../core/i18n/index.js';
+import { icon } from '../../../shared/icons.js';
+import { t, detectLocale } from '../../../core/i18n/index.js';
 import {
   appBar, mdIconButton, statCard, mdCard, statusChip, skeletonCards, emptyState,
 } from '../../../shared/ui/index.js';
@@ -15,6 +16,7 @@ import { aggregateLake } from '../domain/aggregate.js';
 import { presence } from '../domain/freshness.js';
 import { DEVICE_STATUS } from '../constants/telemetryConstants.js';
 import { renderLakeDetailPage } from '../../lakes/views/lakeDetailPage.js';
+import { getLakeWeather, getWeatherIcon } from '../services/weatherService.js';
 
 function initials(profile) {
   if (!profile) return '·';
@@ -34,7 +36,9 @@ export function renderHomeTab(nav) {
     appBar({
       title: `${t('home.hi')}, ${s.profile ? s.profile.ism : ''}`,
       subtitle: t('role.' + (s.role || 'farmer')),
-      leading: el('div', { class: 'md-avatar', text: initials(s.profile) }),
+      leading: s.profile && s.profile.photoUrl 
+        ? el('img', { src: s.profile.photoUrl, class: 'md-avatar', style: 'object-fit:cover;border:1px solid rgba(0,112,144,0.15)' })
+        : el('div', { class: 'md-avatar', text: initials(s.profile) }),
       actions: [
         mdIconButton({ icon: 'bell', onClick: () => nav.switchTab('alerts') }),
         mdIconButton({ icon: 'settings', onClick: () => nav.switchTab('profile') }),
@@ -42,6 +46,23 @@ export function renderHomeTab(nav) {
     }),
     content,
   ]);
+
+  const weatherMap = new Map();
+  const weatherLoading = new Set();
+
+  function loadLakeWeather(lk) {
+    if (weatherMap.has(lk.id) || weatherLoading.has(lk.id)) return;
+    weatherLoading.add(lk.id);
+    const locale = detectLocale();
+    getLakeWeather(lk, locale)
+      .then((data) => {
+        weatherMap.set(lk.id, data);
+        renderContent();
+      })
+      .catch(() => {
+        weatherLoading.delete(lk.id);
+      });
+  }
 
   function stats(st) {
     const online = st.devices.filter((d) => d.lakeId && presence((st.telemetry.get(d.id) || {}).ts) === 'online').length;
@@ -62,23 +83,99 @@ export function renderHomeTab(nav) {
     const th = resolveThresholds(lk);
     const devs = st.devices.filter((d) => d.lakeId === lk.id);
     const a = aggregateLake(devs, st.telemetry, th);
+    
+    // Trigger loading weather
+    loadLakeWeather(lk);
+    const w = weatherMap.get(lk.id);
+
+    const bentoGrid = el('div', { 
+      style: 'display:grid;grid-template-columns:repeat(2, 1fr);gap:10px;margin-top:12px;margin-bottom:8px' 
+    }, [
+      // Oxygen (DO) cell
+      el('div', { 
+        class: 'bento-cell',
+        style: 'background:color-mix(in srgb, var(--md-primary) 6%, var(--md-surface-container));padding:10px 12px;border-radius:12px;border:1px solid var(--md-outline-variant);display:flex;flex-direction:column;justify-content:space-between;min-height:76px' 
+      }, [
+        el('div', { style: 'font-size:11px;color:var(--md-on-surface-variant);font-weight:600;display:flex;align-items:center;gap:4px' }, [
+          el('span', { html: icon('waves', 14), style: 'color:var(--md-primary)' }),
+          el('span', { text: 'DO' })
+        ]),
+        el('div', { style: 'font-size:18px;font-weight:800;color:var(--md-primary);margin-top:4px' }, [
+          el('span', { text: a.avgDo ?? '—' }),
+          el('span', { style: 'font-size:11px;font-weight:500;color:var(--md-on-surface-variant)', text: ' mg/L' })
+        ])
+      ]),
+      // Temp cell
+      el('div', { 
+        class: 'bento-cell',
+        style: 'background:color-mix(in srgb, var(--md-tertiary) 6%, var(--md-surface-container));padding:10px 12px;border-radius:12px;border:1px solid var(--md-outline-variant);display:flex;flex-direction:column;justify-content:space-between;min-height:76px' 
+      }, [
+        el('div', { style: 'font-size:11px;color:var(--md-on-surface-variant);font-weight:600;display:flex;align-items:center;gap:4px' }, [
+          el('span', { html: icon('thermometer', 14), style: 'color:var(--md-tertiary)' }),
+          el('span', { text: t('tm.temp') })
+        ]),
+        el('div', { style: 'font-size:18px;font-weight:800;color:var(--md-tertiary);margin-top:4px' }, [
+          el('span', { text: a.avgTemp ?? '—' }),
+          el('span', { style: 'font-size:12px;font-weight:500;color:var(--md-on-surface-variant)', text: '°C' })
+        ])
+      ]),
+      // pH cell
+      el('div', { 
+        class: 'bento-cell',
+        style: 'background:color-mix(in srgb, var(--md-secondary) 6%, var(--md-surface-container));padding:10px 12px;border-radius:12px;border:1px solid var(--md-outline-variant);display:flex;flex-direction:column;justify-content:space-between;min-height:76px' 
+      }, [
+        el('div', { style: 'font-size:11px;color:var(--md-on-surface-variant);font-weight:600;display:flex;align-items:center;gap:4px' }, [
+          el('span', { html: icon('activity', 14), style: 'color:var(--md-secondary)' }),
+          el('span', { text: 'pH' })
+        ]),
+        el('div', { style: 'font-size:18px;font-weight:800;color:var(--md-secondary);margin-top:4px' }, [
+          el('span', { text: a.avgPh ?? '—' })
+        ])
+      ]),
+      // Health Index cell
+      el('div', { 
+        class: `bento-cell${a.healthScore <= 60 ? ' bento-cell-critical' : ''}`,
+        style: `background:color-mix(in srgb, ${healthColor(a.healthScore)} 6%, var(--md-surface-container));padding:10px 12px;border-radius:12px;border:1px solid ${a.healthScore <= 60 ? 'var(--md-critical)' : 'var(--md-outline-variant)'};display:flex;flex-direction:column;justify-content:space-between;min-height:76px` 
+      }, [
+        el('div', { style: 'font-size:11px;color:var(--md-on-surface-variant);font-weight:600;display:flex;align-items:center;gap:4px' }, [
+          el('span', { html: icon('sun', 14), style: `color:${healthColor(a.healthScore)}` }),
+          el('span', { text: t('tm.health') })
+        ]),
+        el('div', { style: `font-size:18px;font-weight:800;color:${healthColor(a.healthScore)};margin-top:4px` }, [
+          el('span', { text: `${a.healthScore}%` })
+        ])
+      ])
+    ]);
+
+    // Beautiful horizontal weather summary row
+    let weatherRow = null;
+    if (w) {
+      const isUz = detectLocale() === 'uz';
+      const weatherIconName = getWeatherIcon(w.code);
+      weatherRow = el('div', {
+        style: 'margin-top:8px;margin-bottom:4px;padding:8px 12px;border-radius:10px;background:color-mix(in srgb, var(--md-primary) 6%, var(--md-surface-container-low));border:1px solid var(--md-outline-variant);display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:600;color:var(--md-on-surface-variant)'
+      }, [
+        el('div', { style: 'display:flex;align-items:center;gap:6px' }, [
+          el('span', { html: icon(weatherIconName, 15), style: 'color:var(--md-primary);display:inline-flex' }),
+          el('span', { text: `${w.district}: ${w.temp}°C (${w.label})` })
+        ]),
+        el('span', {
+          style: 'font-size:11px;opacity:0.9;font-weight:700',
+          text: isUz ? `Ertaga: ${w.tomorrowTempMax}°C` : `Завтра: ${w.tomorrowTempMax}°C`
+        })
+      ]);
+    }
+
     return mdCard([
       el('div', { class: 'row-between' }, [
-        el('div', { class: 't-title', text: lk.name }),
+        el('div', { class: 't-title', style: 'letter-spacing:-0.2px', text: lk.name }),
         statusChip(a.status, t('tm.status_' + a.status)),
       ]),
       el('div', { class: 't-body-sm muted', style: 'margin-top:2px', text:
         `${a.deviceCount} ${t('lake.devices')} · ${a.online}/${a.offline} ${t('tm.online')}` }),
-      el('div', { class: 'sensor-grid', style: 'margin-top:12px' }, [
-        el('div', { class: 'sensor-card' }, [el('div', { class: 'sc-lab', text: 'DO' }), el('div', { class: 'sc-val', html: `${a.avgDo ?? '—'}` })]),
-        el('div', { class: 'sensor-card' }, [el('div', { class: 'sc-lab', text: t('tm.temp') }), el('div', { class: 'sc-val', html: `${a.avgTemp ?? '—'}<span class="sc-unit">°</span>` })]),
-      ]),
-      el('div', { class: 'row-between', style: 'margin-top:12px' }, [
-        el('span', { class: 't-body-sm muted', text: `${t('tm.health')}` }),
-        el('span', { class: 't-title-sm', text: `${a.healthScore}/100` }),
-      ]),
-      el('div', { class: 'health-track' }, [el('div', { class: 'health-fill', style: `width:${a.healthScore}%;background:${healthColor(a.healthScore)}` })]),
-      el('div', { class: 't-body-sm muted', style: 'margin-top:10px', text: `${t('tm.lastUpdate')}: ${fmtAge(a.lastUpdate)}` }),
+      bentoGrid,
+      weatherRow,
+      el('div', { class: 't-body-sm muted', style: 'margin-top:10px;font-size:11.5px', text: `${t('tm.lastUpdate')}: ${fmtAge(a.lastUpdate)}` }),
     ], { elevated: true, cls: 'anim-up', onClick: () => nav.push((n) => renderLakeDetailPage(n, lk.id)) });
   }
 

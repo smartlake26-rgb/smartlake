@@ -72,6 +72,7 @@ export const userService = {
           vil: profile.vil,
           tum: (profile.tum || '').trim(),
           phone: (profile.phone || '').trim(),
+          photoUrl: profile.photoUrl || null,
         },
         updatedAt: serverTimestamp(),
       });
