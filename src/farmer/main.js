@@ -43,6 +43,29 @@ function blockedScreen(messageKey, onLogout) {
 }
 
 function main() {
+  // Dasturni yangilashda keshni tozalash mexanizmi
+  const CURRENT_VERSION = '2.0.7';
+  const savedVersion = localStorage.getItem('smartlake_version');
+  if (savedVersion !== CURRENT_VERSION) {
+    localStorage.setItem('smartlake_version', CURRENT_VERSION);
+    if ('caches' in window) {
+      caches.keys().then((names) => {
+        return Promise.all(names.map(name => caches.delete(name)));
+      }).then(() => {
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then((registrations) => {
+            return Promise.all(registrations.map(r => r.unregister()));
+          }).then(() => {
+            window.location.reload(true);
+          });
+        } else {
+          window.location.reload(true);
+        }
+      });
+      return; // Yangilanish vaqtida ishga tushishni to'xtatib turamiz
+    }
+  }
+
   const root = document.getElementById('app') || document.getElementById('root') || document.body;
   initTheme();
   setLocale(detectLocale());
@@ -72,6 +95,32 @@ function main() {
   root.replaceChildren(loadingScreen());
   authStore.initAuthStore();
   logger.info('Fermer ilovasi ishga tushdi (MD3)');
+
+  // Service Worker ro'yxatdan o'tkazish va yangilanishlarni nazorat qilish
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then((reg) => {
+          logger.info('Service Worker muvaffaqiyatli ro\'yxatdan o\'tdi:', reg.scope);
+          
+          // Yangi versiya topilganda uni yuklash
+          reg.onupdatefound = () => {
+            const installingWorker = reg.installing;
+            if (installingWorker) {
+              installingWorker.onstatechange = () => {
+                if (installingWorker.state === 'installed') {
+                  if (navigator.serviceWorker.controller) {
+                    logger.info('Yangi yangilanish aniqlandi. Sahifa yangilanmoqda...');
+                    window.location.reload();
+                  }
+                }
+              };
+            }
+          };
+        })
+        .catch((err) => logger.warn('Service Worker ro\'yxatdan o\'tishda xatolik:', err));
+    });
+  }
 }
 
 main();

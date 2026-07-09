@@ -5,13 +5,13 @@
    ============================================================ */
 
 :root {
-  --bg: #EAF1EF; --surface: #FFFFFF; --surface-2: #F4F8F7;
-  --ink: #11302B; --ink-soft: #5E736E; --ink-faint: #92A29E;
-  --primary: #0E7C6B; --primary-d: #0A5C50; --aqua: #15AEC2;
-  --good: #1E9E6A; --warn: #E0922F; --crit: #DC4B3E;
-  --line: #DDE7E4; --line-soft: #EAF0EE;
+  --bg: #EAF3F5; --surface: #FFFFFF; --surface-2: #F2F7F9;
+  --ink: #0F262C; --ink-soft: #556B72; --ink-faint: #8DA1A7;
+  --primary: #007090; --primary-d: #005066; --aqua: #00A3C4;
+  --good: #00A36C; --warn: #E28413; --crit: #E0362B;
+  --line: #D1DFE3; --line-soft: #E6EEF0;
   --r: 16px; --r-sm: 12px;
-  --shadow: 0 6px 22px rgba(16, 60, 52, .08);
+  --shadow: 0 6px 22px rgba(0, 112, 144, .08);
   --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, system-ui, sans-serif;
   --mono: ui-monospace, "SF Mono", "Roboto Mono", "Droid Sans Mono", Menlo, Consolas, monospace;
 }
@@ -26,7 +26,7 @@ html, body {
 
 body {
   font-family: var(--sans);
-  background: #0A4A42;
+  background: #042D3A; /* Beautiful deep navy water-ocean color */
   color: var(--ink);
   -webkit-tap-highlight-color: transparent;
   overscroll-behavior-y: none;

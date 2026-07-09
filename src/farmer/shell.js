@@ -13,6 +13,8 @@ import { renderNotificationsTab } from '../features/telemetry/views/notification
 import { renderLakesTab } from '../features/lakes/views/lakesTab.js';
 import { renderDevicesTab } from '../features/devices/views/devicesTab.js';
 import { renderProfileTab } from '../features/auth/views/profileTab.js';
+import { renderOnboarding } from './onboarding.js';
+import { authStore } from '../features/auth/index.js';
 
 const TABS = {
   home: renderHomeTab,
@@ -26,6 +28,18 @@ export function createShell(root, ctx = {}) {
   let activeTab = 'home';
   let subPage = null;                 // { render(nav): Node } | null
   let cleanup = null;
+  let onboardingActive = false;
+
+  // Check onboarding status
+  const uid = authStore.getState().uid;
+  let onboarded = false;
+  try {
+    onboarded = localStorage.getItem('sl_onboarded_' + uid) === 'true';
+  } catch (_) {}
+
+  if (!onboarded) {
+    onboardingActive = true;
+  }
 
   const navItems = () => [
     { id: 'home', icon: 'home', label: t('nav.home') },
@@ -51,6 +65,14 @@ export function createShell(root, ctx = {}) {
   }
 
   function render() {
+    if (onboardingActive) {
+      const onboardNode = renderOnboarding(uid, () => {
+        onboardingActive = false;
+        render();
+      });
+      mountNode(onboardNode);
+      return;
+    }
     if (subPage) { mountNode(subPage.render(nav)); return; }
     const tabNode = TABS[activeTab](nav);
     const shell = el('div', { class: 'md-app' }, [tabNode, bottomNav({ items: navItems(), active: activeTab, onSelect: nav.switchTab })]);

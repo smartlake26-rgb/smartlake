@@ -79,12 +79,16 @@ export function statCard({ icon: ic, value, label, color = 'var(--md-primary)' }
 }
 
 /* --- Sensor card --- */
-export function sensorCard({ label, value, unit = '', status = 'unknown' }) {
+export function sensorCard({ label, value, unit = '', status = 'unknown', isLive = false }) {
   const color = { healthy: 'var(--md-success)', good: 'var(--md-success)', warning: 'var(--md-warning)', critical: 'var(--md-critical)' }[status] || 'var(--md-on-surface)';
-  return el('div', { class: 'sensor-card' }, [
+  const children = [
     el('div', { class: 'sc-lab', text: label }),
     el('div', { class: 'sc-val', style: `color:${color}`, html: `${value == null ? '—' : value}<span class="sc-unit"> ${unit}</span>` }),
-  ]);
+  ];
+  if (isLive) {
+    children.push(el('span', { class: 'sensor-live-dot' }));
+  }
+  return el('div', { class: 'sensor-card' }, children);
 }
 
 /* --- Field --- */

@@ -6,33 +6,33 @@
 
 :root {
   /* --- Rang rollari (LIGHT) --- */
-  --md-primary: #0E7C6B;
+  --md-primary: #0E7C6B; /* SmartLake teal */
   --md-on-primary: #FFFFFF;
-  --md-primary-container: #A6F2E2;
-  --md-on-primary-container: #00201B;
+  --md-primary-container: #CEF5F1;
+  --md-on-primary-container: #00201A;
 
-  --md-secondary: #4A635D;
+  --md-secondary: #4C626A;
   --md-on-secondary: #FFFFFF;
-  --md-secondary-container: #CCE8E0;
-  --md-on-secondary-container: #06201B;
+  --md-secondary-container: #CFE6F1;
+  --md-on-secondary-container: #071E26;
 
-  --md-tertiary: #106B7C;
+  --md-tertiary: #15AEC2; /* Aqua / Teal supporting */
   --md-on-tertiary: #FFFFFF;
-  --md-tertiary-container: #ADEBFF;
-  --md-on-tertiary-container: #001F27;
+  --md-tertiary-container: #B7F1FF;
+  --md-on-tertiary-container: #001F25;
 
-  --md-surface: #F4FBF8;
-  --md-surface-dim: #D5DBD8;
-  --md-surface-bright: #F4FBF8;
+  --md-surface: #F0F8F7; /* Cool Refreshing Water Mint White */
+  --md-surface-dim: #D2DFDD;
+  --md-surface-bright: #F0F8F7;
   --md-surface-container-lowest: #FFFFFF;
-  --md-surface-container-low: #EEF5F2;
-  --md-surface-container: #E9EFEC;
-  --md-surface-container-high: #E3E9E7;
-  --md-surface-container-highest: #DDE4E1;
-  --md-on-surface: #161D1B;
-  --md-on-surface-variant: #3F4945;
-  --md-outline: #6F7975;
-  --md-outline-variant: #BEC9C4;
+  --md-surface-container-low: #E7F3F1;
+  --md-surface-container: #DFEFEA;
+  --md-surface-container-high: #D4E5E1;
+  --md-surface-container-highest: #CBDCD8;
+  --md-on-surface: #0A1C19;
+  --md-on-surface-variant: #394845;
+  --md-outline: #6F7D79;
+  --md-outline-variant: #BCCBC7;
 
   --md-error: #BA1A1A;
   --md-on-error: #FFFFFF;
@@ -40,10 +40,10 @@
   --md-on-error-container: #410002;
 
   /* Holat ranglari (sensor status) */
-  --md-success: #1E9E6A;
-  --md-warning: #E0922F;
-  --md-critical: #DC4B3E;
-  --md-neutral: #8B958F;
+  --md-success: #00A36C; /* Sog'lom ko'l yashili */
+  --md-warning: #E28413;
+  --md-critical: #E0362B;
+  --md-neutral: #8A979A;
 
   --md-scrim: rgba(0, 0, 0, .32);
 
@@ -69,43 +69,43 @@
 }
 
 [data-theme="dark"] {
-  --md-primary: #89D6C6;
-  --md-on-primary: #00382F;
-  --md-primary-container: #005045;
-  --md-on-primary-container: #A6F2E2;
+  --md-primary: #4ED9C6; /* Brilliant minty teal */
+  --md-on-primary: #003730;
+  --md-primary-container: #005046;
+  --md-on-primary-container: #81FBE8;
 
-  --md-secondary: #B0CCC4;
-  --md-on-secondary: #1C352F;
-  --md-secondary-container: #334B45;
-  --md-on-secondary-container: #CCE8E0;
+  --md-secondary: #B4CAD6;
+  --md-on-secondary: #1E333C;
+  --md-secondary-container: #354A53;
+  --md-on-secondary-container: #CFE6F1;
 
-  --md-tertiary: #82D3E8;
+  --md-tertiary: #80E2F4;
   --md-on-tertiary: #00363F;
   --md-tertiary-container: #004E5B;
-  --md-on-tertiary-container: #ADEBFF;
+  --md-on-tertiary-container: #B7F1FF;
 
-  --md-surface: #0E1513;
-  --md-surface-dim: #0E1513;
-  --md-surface-bright: #333B38;
-  --md-surface-container-lowest: #090F0D;
-  --md-surface-container-low: #161D1B;
-  --md-surface-container: #1A211F;
-  --md-surface-container-high: #252B29;
-  --md-surface-container-highest: #303634;
-  --md-on-surface: #DDE4E1;
-  --md-on-surface-variant: #BEC9C4;
-  --md-outline: #89938F;
-  --md-outline-variant: #3F4945;
+  --md-surface: #071513; /* Dark Deep Water Navy */
+  --md-surface-dim: #071513;
+  --md-surface-bright: #1E3330;
+  --md-surface-container-lowest: #050E0C;
+  --md-surface-container-low: #0F1D1B;
+  --md-surface-container: #132220;
+  --md-surface-container-high: #1B2D2B;
+  --md-surface-container-highest: #233734;
+  --md-on-surface: #E0E9E6;
+  --md-on-surface-variant: #BFC9C6;
+  --md-outline: #899390;
+  --md-outline-variant: #3F4946;
 
   --md-error: #FFB4AB;
   --md-on-error: #690005;
   --md-error-container: #93000A;
   --md-on-error-container: #FFDAD6;
 
-  --md-success: #5BD39B;
-  --md-warning: #F0B458;
-  --md-critical: #FF897D;
-  --md-neutral: #9AA4A0;
+  --md-success: #5CE3A7;
+  --md-warning: #FFB952;
+  --md-critical: #FF8A80;
+  --md-neutral: #98A5A9;
 
   --md-scrim: rgba(0, 0, 0, .5);
   --elev-1: 0 1px 3px rgba(0,0,0,.4);

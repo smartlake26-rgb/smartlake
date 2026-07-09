@@ -33,6 +33,14 @@ export async function refresh() {
     ]);
     _state.lakes = lakes;
     _state.devices = devices;
+    
+    // Save to cache
+    try {
+      localStorage.setItem(`sl_cache_lakes_${_uid}`, JSON.stringify(lakes));
+      localStorage.setItem(`sl_cache_devices_${_uid}`, JSON.stringify(devices));
+    } catch (err) {
+      logger.warn('Error saving lakes/devices cache:', err);
+    }
   } catch (e) { handleError(e, 'dataStore.refresh'); }
   _state.loading = false;
   emit();
@@ -42,12 +50,45 @@ export async function refresh() {
 export async function start(uid) {
   _uid = uid;
   _state.loading = true;
+  
+  // Try loading from local storage cache first for instant load
+  try {
+    const cachedLakes = localStorage.getItem(`sl_cache_lakes_${uid}`);
+    const cachedDevices = localStorage.getItem(`sl_cache_devices_${uid}`);
+    const cachedTelemetry = localStorage.getItem(`sl_cache_telemetry_${uid}`);
+    
+    if (cachedLakes) _state.lakes = JSON.parse(cachedLakes);
+    if (cachedDevices) _state.devices = JSON.parse(cachedDevices);
+    if (cachedTelemetry) {
+      const parsed = JSON.parse(cachedTelemetry);
+      _state.telemetry = new Map(Object.entries(parsed));
+    }
+    
+    // If we have cached data, we can disable the primary loader so UI renders instantly!
+    if (cachedLakes || cachedDevices) {
+      _state.loading = false;
+    }
+  } catch (err) {
+    logger.warn('Error loading cache on start:', err);
+  }
+  
   emit();
   await refresh();
   if (_unsub) _unsub();
   _unsub = telemetryService.watchByOwner(
     uid,
-    ({ telemetry }) => { _state.telemetry = telemetry; emit(); },
+    ({ telemetry }) => { 
+      _state.telemetry = telemetry; 
+      
+      // Save to cache
+      try {
+        const obj = Object.fromEntries(telemetry.entries());
+        localStorage.setItem(`sl_cache_telemetry_${uid}`, JSON.stringify(obj));
+      } catch (err) {
+        logger.warn('Error saving telemetry cache:', err);
+      }
+      emit(); 
+    },
     () => emit(),
   );
   logger.info('Farmer dataStore ishga tushdi');

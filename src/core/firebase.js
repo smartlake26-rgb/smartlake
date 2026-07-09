@@ -7,7 +7,7 @@
 
 import { initializeApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
-import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
+import { getFirestore, connectFirestoreEmulator, enableIndexedDbPersistence } from 'firebase/firestore';
 
 import { assertEnv, firebaseConfig, useEmulator } from './env.js';
 import { logger } from './logger.js';
@@ -18,6 +18,17 @@ assertEnv();
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+// Offline persistence ni yoqish
+enableIndexedDbPersistence(db).catch((err) => {
+  if (err.code === 'failed-precondition') {
+    logger.warn('Firestore persistence enabled in single-tab mode only (multiple tabs open).');
+  } else if (err.code === 'unimplemented') {
+    logger.warn('Firestore persistence is unimplemented in this browser.');
+  } else {
+    logger.warn('Firestore persistence error:', err);
+  }
+});
 
 // Lokal ishlab chiqish: Firebase Emulator Suite'ga ulanish.
 if (useEmulator) {
