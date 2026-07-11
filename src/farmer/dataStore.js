@@ -11,7 +11,7 @@ import { telemetryService } from '../features/telemetry/index.js';
 import { logger } from '../core/logger.js';
 import { handleError } from '../core/errors.js';
 
-const _state = { lakes: [], devices: [], telemetry: new Map(), loading: true };
+const _state = { lakes: [], archivedLakes: [], devices: [], telemetry: new Map(), loading: true };
 const _subs = new Set();
 let _unsub = null;
 let _uid = null;
@@ -19,7 +19,7 @@ let _uid = null;
 function emit() { const s = getState(); _subs.forEach((fn) => fn(s)); }
 
 export function getState() {
-  return { lakes: _state.lakes, devices: _state.devices, telemetry: _state.telemetry, loading: _state.loading };
+  return { lakes: _state.lakes, archivedLakes: _state.archivedLakes, devices: _state.devices, telemetry: _state.telemetry, loading: _state.loading };
 }
 export function subscribe(fn) { _subs.add(fn); return () => _subs.delete(fn); }
 
@@ -27,16 +27,17 @@ export function subscribe(fn) { _subs.add(fn); return () => _subs.delete(fn); }
 export async function refresh() {
   if (!_uid) return;
   try {
-    const [lakes, devices] = await Promise.all([
-      lakeService.listByOwner(_uid),
+    const [allLakes, devices] = await Promise.all([
+      lakeService.listByOwner(_uid, { includeArchived: true }),
       deviceService.listByOwner(_uid),
     ]);
-    _state.lakes = lakes;
+    _state.lakes = allLakes.filter((l) => l.status !== 'archived');
+    _state.archivedLakes = allLakes.filter((l) => l.status === 'archived');
     _state.devices = devices;
     
     // Save to cache
     try {
-      localStorage.setItem(`sl_cache_lakes_${_uid}`, JSON.stringify(lakes));
+      localStorage.setItem(`sl_cache_lakes_${_uid}`, JSON.stringify(allLakes));
       localStorage.setItem(`sl_cache_devices_${_uid}`, JSON.stringify(devices));
     } catch (err) {
       logger.warn('Error saving lakes/devices cache:', err);
@@ -57,7 +58,11 @@ export async function start(uid) {
     const cachedDevices = localStorage.getItem(`sl_cache_devices_${uid}`);
     const cachedTelemetry = localStorage.getItem(`sl_cache_telemetry_${uid}`);
     
-    if (cachedLakes) _state.lakes = JSON.parse(cachedLakes);
+    if (cachedLakes) {
+      const allLakes = JSON.parse(cachedLakes);
+      _state.lakes = allLakes.filter((l) => l.status !== 'archived');
+      _state.archivedLakes = allLakes.filter((l) => l.status === 'archived');
+    }
     if (cachedDevices) _state.devices = JSON.parse(cachedDevices);
     if (cachedTelemetry) {
       const parsed = JSON.parse(cachedTelemetry);
@@ -97,7 +102,7 @@ export async function start(uid) {
 export function stop() {
   if (_unsub) { _unsub(); _unsub = null; }
   _subs.clear();
-  _state.lakes = []; _state.devices = []; _state.telemetry = new Map(); _state.loading = true;
+  _state.lakes = []; _state.archivedLakes = []; _state.devices = []; _state.telemetry = new Map(); _state.loading = true;
   _uid = null;
 }
 

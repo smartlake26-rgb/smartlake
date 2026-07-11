@@ -180,7 +180,7 @@ uz.alerts = { none: 'Ogohlantirish yo\'q', allGood: 'Barcha qurilmalar sog\'lom'
 Object.assign(uz.home, { hi: 'Salom', lakes: "Ko'llar", devices: 'Qurilmalar', online: 'Onlayn', alerts: 'Ogohlantirish', emptyHint: "Boshlash uchun ko'l qo'shing yoki qurilma ulang", contactAdmin: 'Administrator bilan bog\'laning' });
 Object.assign(uz.common, { edit: 'Tahrirlash' });
 Object.assign(uz.settings, { darkMode: 'Tungi rejim', about: 'Ilova haqida', logoutConfirm: 'Rostdan ham chiqmoqchimisiz?' });
-Object.assign(uz.lake, { archiveConfirm: "Ko'l arxivlanadi va ro'yxatdan yashiriladi. Davom etilsinmi?", lakeName: "Ko'l nomi (ixtiyoriy)" });
+Object.assign(uz.lake, { archiveConfirm: "Ko'l arxivlanadi va ro'yxatdan yashiriladi. Davom etilsinmi?", lakeName: "Ko'l nomi (ixtiyoriy)", restore: "Arxivdan chiqarish", restored: "Arxivdan chiqarildi", restoreConfirm: "Ushbu ko'lni arxivdan chiqarib, faol holatga qaytarishni xohlaysizmi?", archivedLakes: "Arxivlangan ko'llar", emptyArchived: "Arxivlangan ko'llar yo'q" });
 Object.assign(uz.device, { unassigned: 'Biriktirilmagan', empty: "Hali qurilma yo'q", emptyHint: "Qurilma qo'shish uchun faollashtirish kodidan foydalaning", claimHint: "Qurilma ID va faollashtirish kalitini qadoqdan toping" });
 
 Object.assign(uz.nav, { dashboard: 'Boshqaruv paneli', monitoring: 'Monitoring', users: 'Foydalanuvchilar', approvals: "Ko'l tasdig'i", audit: 'Audit jurnali', settings: 'Sozlamalar' });
