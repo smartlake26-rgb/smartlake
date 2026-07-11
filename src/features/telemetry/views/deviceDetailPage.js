@@ -17,8 +17,11 @@ import { historyService, RANGES } from '../services/historyService.js';
 import { resolveThresholds } from '../domain/thresholds.js';
 import { deviceStatus } from '../domain/statusEngine.js';
 import { healthScore } from '../domain/healthScore.js';
-import { telemetryAge } from '../domain/freshness.js';
+import { telemetryAge, presence } from '../domain/freshness.js';
 import { renderCommandPanel } from '../../commands/index.js';
+import { COMMAND_TYPES } from '../../../core/collections.js';
+import { commandService } from '../../commands/services/commandService.js';
+import { toast } from '../../../shared/toast.js';
 
 function svgEl(tag, props = {}, children = []) {
   const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
@@ -484,7 +487,7 @@ export function renderDeviceDetailPage(nav, deviceId) {
 
     const score = healthScore(tel, th);
     const isDeviceCritical = score <= 60;
-    const isOnline = status === 'healthy' || status === 'good';
+    const isOnline = tel ? (presence(tel.ts, Date.now(), th) === 'online') : false;
 
     const header = mdCard([
       el('div', { class: 'row-between' }, [
@@ -514,7 +517,111 @@ export function renderDeviceDetailPage(nav, deviceId) {
       ]),
     ]);
 
-    mount(content, el('div', { class: 'stack' }, [header, sensors, cmdPanel, info, history]));
+    // Beautiful Aerator control & status card
+    const isAeratorOn = tel && (tel.aerator === 1 || tel.aerator === true);
+    const isAutoMode = tel && (tel.auto === 1 || tel.auto === true);
+    
+    const turnOnBtn = mdButton({
+      label: "Majburiy yoqish",
+      icon: 'power',
+      variant: isAeratorOn ? 'filled' : 'outlined',
+      onClick: () => sendCommand(COMMAND_TYPES.AERATOR_ON)
+    });
+    
+    const turnOffBtn = mdButton({
+      label: "O'chirish",
+      icon: 'power',
+      variant: (!isAeratorOn) ? 'tonal' : 'outlined',
+      onClick: () => sendCommand(COMMAND_TYPES.AERATOR_OFF)
+    });
+    
+    const autoBtn = mdButton({
+      label: "Avto rejim",
+      icon: 'activity',
+      variant: isAutoMode ? 'filled' : 'outlined',
+      onClick: () => sendCommand(COMMAND_TYPES.AUTO_ON)
+    });
+
+    async function sendCommand(type) {
+      toast("Buyruq yuborilmoqda...", 'info');
+      try {
+        await commandService.createCommand({ deviceId, commandType: type, payload: null }, s.uid);
+        toast("Buyruq muvaffaqiyatli yuborildi!", 'ok');
+        await dataStore.refresh();
+      } catch (e) {
+        toast("Xatolik: " + e.message, 'err');
+      }
+    }
+
+    const aeratorControlCard = mdCard([
+      el('div', { style: 'display:flex; align-items:center; justify-content:space-between; margin-bottom:12px' }, [
+        el('div', { style: 'display:flex; align-items:center; gap:8px' }, [
+          el('span', { html: icon('waves', 18), style: 'color:var(--md-primary); display:inline-flex' }),
+          el('span', { style: 'font-weight:700; font-size:15px; color:var(--md-on-surface)', text: 'Ayrator Boshqaruvi va Holati' })
+        ]),
+        statusChip(isAeratorOn ? 'healthy' : 'offline', isAeratorOn ? 'ISHLAMOQDA' : 'TO\'XTATILGAN')
+      ]),
+      
+      el('div', { style: 'display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-radius:8px; background:var(--md-surface-container-high); margin-bottom:12px; font-size:12.5px; font-weight:600; color:var(--md-on-surface-variant)' }, [
+        el('span', { text: "Hozirgi Rejim:" }),
+        el('span', { 
+          style: `color:${isAutoMode ? 'var(--md-success)' : 'var(--md-primary)'}; font-weight:700`, 
+          text: isAutoMode ? "🤖 AVTOMATIK REJIM" : "🔧 MEXANIK (QO'LDA)" 
+        })
+      ]),
+
+      el('div', { style: 'display:flex; gap:8px; flex-wrap:wrap' }, [
+        turnOnBtn,
+        turnOffBtn,
+        autoBtn
+      ])
+    ], { elevated: true });
+
+    // Beautiful Signal Quality explanation box
+    const rssiVal = tel && tel.rssi != null ? Number(tel.rssi) : null;
+    let sigText = '';
+    let sigLabel = '';
+    let sigColor = '';
+    let sigIcon = '';
+    
+    if (rssiVal === null) {
+      sigLabel = "Ulanmagan (Offline)";
+      sigText = "Qurilma tarmoqqa ulanmagan. So'nggi datchik ma'lumotlari mavjud emas.";
+      sigColor = 'var(--md-outline)';
+      sigIcon = 'wifi-off';
+    } else if (rssiVal >= -60) {
+      sigLabel = "A'lo (Excellent)";
+      sigText = "Aloqa sifati o'ta barqaror, datchik ma'lumotlari real vaqt rejimida uzluksiz uzatilmoqda.";
+      sigColor = 'var(--md-success)';
+      sigIcon = 'wifi';
+    } else if (rssiVal >= -75) {
+      sigLabel = "Yaxshi (Good)";
+      sigText = "Aloqa sifati yaxshi, datchik ma'lumotlari muvaffaqiyatli yetib kelmoqda.";
+      sigColor = 'var(--md-success)';
+      sigIcon = 'wifi';
+    } else if (rssiVal >= -85) {
+      sigLabel = "O'rtacha (Fair)";
+      sigText = "Aloqa sifati o'rtacha. Vaqti-vaqti bilan ma'lumotlar uzatilishida qisqa kechikishlar bo'lishi mumkin.";
+      sigColor = 'var(--md-warning)';
+      sigIcon = 'wifi';
+    } else {
+      sigLabel = "Zaif (Poor)";
+      sigText = "Aloqa sifati o'ta zaif. Tarmoqdan uzilib qolish xavfi yuqori. Antennani tekshirish yoki ulanish nuqtasiga yaqinroq o'rnatish tavsiya etiladi.";
+      sigColor = 'var(--md-critical)';
+      sigIcon = 'wifi-off';
+    }
+    
+    const signalExplanationNode = mdCard([
+      el('div', { style: 'display:flex; align-items:center; gap:8px; margin-bottom:8px' }, [
+        el('span', { html: icon(sigIcon, 18), style: `color:${sigColor}; display:inline-flex` }),
+        el('span', { style: 'font-weight:700; font-size:14px; color:var(--md-on-surface)', text: `Aloqa Sifati: ${sigLabel}` })
+      ]),
+      el('p', { style: 'font-size:12px; line-height:1.4; color:var(--md-on-surface-variant); margin:0', text: `${sigText} (${rssiVal !== null ? 'Hozirgi RSSI kuchi: ' + rssiVal + ' dBm' : 'Signal kuchi mavjud emas'})` })
+    ], { elevated: true });
+
+    const stackItems = [header, sensors, aeratorControlCard, signalExplanationNode, cmdPanel, info, history];
+
+    mount(content, el('div', { class: 'stack' }, stackItems));
   }
 
   // Boshlang'ich yuklash

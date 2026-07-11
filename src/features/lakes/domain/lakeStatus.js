@@ -11,7 +11,7 @@ import { StateError } from '../../../core/errors.js';
 export const TRANSITIONS = Object.freeze({
   [S.ACTIVE]: [S.INACTIVE, S.ARCHIVED],
   [S.INACTIVE]: [S.ACTIVE, S.ARCHIVED],
-  [S.ARCHIVED]: [],              // terminal (soft-delete)
+  [S.ARCHIVED]: [S.ACTIVE, S.INACTIVE], // allow restoring from archive
 });
 
 export const ALL_STATES = Object.freeze(Object.values(S));

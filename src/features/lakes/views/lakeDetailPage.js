@@ -80,7 +80,7 @@ export function renderLakeDetailPage(nav, lakeId) {
     el('div', { class: 'md-appbar' }, [
       mdIconButton({ icon: 'arrowLeft', onClick: () => nav.back() }),
       el('div', { class: 'grow' }, [titleEl]),
-      mdIconButton({ icon: 'settings', onClick: () => { const lk = dataStore.getState().lakes.find((l) => l.id === lakeId); if (lk) nav.push((n) => renderLakeFormPage(n, lk)); } }),
+      mdIconButton({ icon: 'settings', onClick: () => { const st = dataStore.getState(); const lk = st.lakes.find((l) => l.id === lakeId) || st.archivedLakes.find((l) => l.id === lakeId); if (lk) nav.push((n) => renderLakeFormPage(n, lk)); } }),
     ]),
     content,
   ]);
@@ -521,7 +521,7 @@ export function renderLakeDetailPage(nav, lakeId) {
   function render() {
     const st = dataStore.getState();
     if (st.loading) { mount(content, skeletonCards(3)); return; }
-    const lake = st.lakes.find((l) => l.id === lakeId);
+    const lake = st.lakes.find((l) => l.id === lakeId) || st.archivedLakes.find((l) => l.id === lakeId);
     if (!lake) { mount(content, emptyState({ icon: 'droplet', title: t('error.lakeNotFound') })); return; }
     
     // Trigger non-blocking weather load
@@ -612,6 +612,16 @@ export function renderLakeDetailPage(nav, lakeId) {
             try { await lakeService.archive(lake.id, s.uid); await dataStore.refresh(); toast(t('lake.archived'), 'ok'); nav.back(); }
             catch (e) { toast(t(handleError(e, 'archive').messageKey), 'err'); }
           } },
+        ] });
+      } }));
+    } else {
+      actions.push(mdButton({ label: t('lake.restore'), variant: 'filled', full: true, onClick: () => {
+        openDialog({ title: t('lake.restore') + '?', body: t('lake.restoreConfirm'), actions: [
+          { label: t('common.cancel'), variant: 'text' },
+          { label: t('lake.restore'), variant: 'filled', onClick: async () => {
+            try { await lakeService.setStatus(lake.id, LAKE_STATUS.ACTIVE, s.uid); await dataStore.refresh(); toast(t('lake.restored'), 'ok'); nav.back(); }
+            catch (e) { toast(t(handleError(e, 'status').messageKey), 'err'); }
+          } }
         ] });
       } }));
     }

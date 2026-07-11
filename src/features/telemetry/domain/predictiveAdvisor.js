@@ -9,6 +9,75 @@ import { resolveThresholds } from './thresholds.js';
 import { DEVICE_STATUS } from '../constants/telemetryConstants.js';
 
 /**
+ * Calculates recommended daily feed based on lake fish biomass, water temperature, and dissolved oxygen.
+ */
+export function calculateFeed(lake, avgTemp, avgDo) {
+  if (!lake || !Array.isArray(lake.fishSpecies) || lake.fishSpecies.length === 0) {
+    return { success: false, error: 'no_species' };
+  }
+  
+  let totalBiomass = 0;
+  let hasNumbers = false;
+  const speciesDetails = [];
+  
+  lake.fishSpecies.forEach((item) => {
+    if (item && typeof item === 'object' && item.species) {
+      const count = Number(item.count || 0);
+      const avgW = Number(item.avgWeight || 0);
+      if (count > 0 && avgW > 0) {
+        const biomass = count * avgW;
+        totalBiomass += biomass;
+        hasNumbers = true;
+        speciesDetails.push({
+          species: item.species,
+          count,
+          avgWeight: avgW,
+          biomass
+        });
+      }
+    }
+  });
+  
+  if (!hasNumbers) {
+    return { success: false, error: 'no_numbers' };
+  }
+  
+  // Base feeding rate: 2.5% of body weight (0.025)
+  let baseRate = 0.025;
+  
+  // Temp adjustments
+  let tempFactor = 1.0;
+  if (avgTemp != null) {
+    if (avgTemp < 12) tempFactor = 0.1;
+    else if (avgTemp < 18) tempFactor = 0.5;
+    else if (avgTemp <= 28) tempFactor = 1.0;
+    else if (avgTemp <= 32) tempFactor = 0.6;
+    else tempFactor = 0.2;
+  }
+  
+  // Oxygen adjustments
+  let doFactor = 1.0;
+  if (avgDo != null) {
+    if (avgDo < 3.0) doFactor = 0.0;
+    else if (avgDo < 4.5) doFactor = 0.3;
+    else if (avgDo < 5.5) doFactor = 0.7;
+    else doFactor = 1.0;
+  }
+  
+  const recommendedFeed = totalBiomass * baseRate * tempFactor * doFactor;
+  
+  return {
+    success: true,
+    totalBiomass: Math.round(totalBiomass),
+    recommendedFeed: Math.round(recommendedFeed),
+    tempFactor,
+    doFactor,
+    ratePercent: (baseRate * tempFactor * doFactor * 100).toFixed(1),
+    speciesDetails
+  };
+}
+
+/**
  * Generates smart, predictive advice based on current sensor metrics, time of day, and weather forecast.
  * 
  * @param {object} lake - The lake object
@@ -25,6 +94,8 @@ export function generateSmartAdvice(lake, devs, telemetry, locale = 'uz', now = 
   const hour = now.getHours();
   
   const isUz = locale === 'uz';
+
+  const feeding = calculateFeed(lake, a.avgTemp, a.avgDo);
 
   const texts = {
     uz: {
@@ -177,7 +248,8 @@ export function generateSmartAdvice(lake, devs, telemetry, locale = 'uz', now = 
     title: t.title,
     analysis,
     recommendations,
-    trend
+    trend,
+    feeding
   };
 }
 

@@ -98,6 +98,36 @@ export const userService = {
       return snap.docs.map((d) => ({ ...d.data(), uid: d.id }));
     } catch (e) { throw wrap(e, 'listAll'); }
   },
+
+  /** ADMIN (isSuper talab qiladi): foydalanuvchi rolini yangilash. */
+  async updateRole(uid, role) {
+    try {
+      await updateDoc(ref(uid), { role, updatedAt: serverTimestamp() });
+      logger.info('User roli yangilandi:', uid, role);
+    } catch (e) {
+      throw wrap(e, 'updateRole');
+    }
+  },
+
+  /** ADMIN (isSuper talab qiladi): foydalanuvchi statusini yangilash. */
+  async updateStatus(uid, status) {
+    try {
+      await updateDoc(ref(uid), { status, updatedAt: serverTimestamp() });
+      logger.info('User statusi yangilandi:', uid, status);
+    } catch (e) {
+      throw wrap(e, 'updateStatus');
+    }
+  },
+
+  /** ADMIN (isSuper talab qiladi): region menejerga biriktirilgan viloyatlarni yangilash. */
+  async updateRegions(uid, regions) {
+    try {
+      await updateDoc(ref(uid), { regions, updatedAt: serverTimestamp() });
+      logger.info('User regionlari yangilandi:', uid, regions);
+    } catch (e) {
+      throw wrap(e, 'updateRegions');
+    }
+  },
 };
 
 export default userService;

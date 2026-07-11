@@ -42,6 +42,7 @@ export const ownershipService = {
         uid: actorUid,
         region: String(p.farmerRegion || '').trim(),
         lakeName: String(p.lakeName || '').trim(),
+        lakeId: String(p.lakeId || '').trim(),
         status: REQUEST_STATUS.PENDING,
         createdAt: serverTimestamp(),
       });
@@ -77,18 +78,40 @@ export const ownershipService = {
         if (dev.ownerUid) throw new DataError('Qurilma allaqachon biriktirilgan', { messageKey: 'error.alreadyClaimed' });
         assertTransition(dev.lifecycle, DEVICE_LIFECYCLE.ASSIGNED);   // FSM
 
-        const lakeRef = doc(collection(db, COLLECTIONS.LAKES));
-        tx.update(devRef, { ownerUid: req.uid, lifecycle: DEVICE_LIFECYCLE.ASSIGNED, lakeId: lakeRef.id, updatedAt: serverTimestamp() });
-        tx.set(lakeRef, {
-          ownerUid: req.uid, name: req.lakeName || deviceId,
-          description: '', region: dev.region, district: '',
-          coordinates: null, area: null, averageDepth: null, waterVolume: null,
-          fishSpecies: [], deviceIds: [deviceId],
-          status: 'active',
-          createdAt: serverTimestamp(), updatedAt: serverTimestamp(), archivedAt: null,
-        });
+        let targetLakeId = '';
+        if (req.lakeId) {
+          const existingLakeRef = doc(db, COLLECTIONS.LAKES, req.lakeId);
+          const existingLakeSnap = await tx.get(existingLakeRef);
+          if (existingLakeSnap.exists()) {
+            const lakeData = existingLakeSnap.data();
+            const currentDevices = Array.isArray(lakeData.deviceIds) ? lakeData.deviceIds : [];
+            if (!currentDevices.includes(deviceId)) {
+              currentDevices.push(deviceId);
+            }
+            tx.update(existingLakeRef, {
+              deviceIds: currentDevices,
+              updatedAt: serverTimestamp()
+            });
+            targetLakeId = req.lakeId;
+          }
+        }
+
+        if (!targetLakeId) {
+          const lakeRef = doc(collection(db, COLLECTIONS.LAKES));
+          tx.set(lakeRef, {
+            ownerUid: req.uid, name: req.lakeName || deviceId,
+            description: '', region: dev.region, district: '',
+            coordinates: null, area: null, averageDepth: null, waterVolume: null,
+            fishSpecies: [], deviceIds: [deviceId],
+            status: 'active',
+            createdAt: serverTimestamp(), updatedAt: serverTimestamp(), archivedAt: null,
+          });
+          targetLakeId = lakeRef.id;
+        }
+
+        tx.update(devRef, { ownerUid: req.uid, lifecycle: DEVICE_LIFECYCLE.ASSIGNED, lakeId: targetLakeId, updatedAt: serverTimestamp() });
         tx.delete(reqRef);
-        return { lakeId: lakeRef.id, ownerUid: req.uid };
+        return { lakeId: targetLakeId, ownerUid: req.uid };
       });
     } catch (e) { throw wrap(e, 'approveClaim'); }
 

@@ -14,6 +14,7 @@ import * as dataStore from '../../../farmer/dataStore.js';
 import { resolveThresholds } from '../domain/thresholds.js';
 import { aggregateLake } from '../domain/aggregate.js';
 import { presence } from '../domain/freshness.js';
+import { deviceStatus } from '../domain/statusEngine.js';
 import { DEVICE_STATUS } from '../constants/telemetryConstants.js';
 import { renderLakeDetailPage } from '../../lakes/views/lakeDetailPage.js';
 import { getLakeWeather, getWeatherIcon } from '../services/weatherService.js';
@@ -166,6 +167,40 @@ export function renderHomeTab(nav) {
       ]);
     }
 
+    let devicesBreakdown = null;
+    if (devs.length >= 1) {
+      devicesBreakdown = el('div', {
+        style: 'margin-top:12px; padding-top:10px; border-top:1px dashed var(--md-outline-variant); display:flex; flex-direction:column; gap:6px'
+      }, [
+        el('div', { style: 'font-size:11px; font-weight:700; color:var(--md-primary); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px', text: 'Qurilmalar holati' }),
+        el('div', { style: 'display:grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap:8px' }, devs.map((d) => {
+          const tel = st.telemetry.get(d.id);
+          const pres = tel ? presence(tel.ts) : 'offline';
+          const isOnline = pres === 'online';
+          const devSt = isOnline ? deviceStatus(tel, th) : 'offline';
+          
+          let dot = '🔴';
+          if (isOnline) {
+            if (devSt === 'healthy' || devSt === 'good') dot = '🟢';
+            else if (devSt === 'warning') dot = '🟡';
+            else dot = '🔴';
+          }
+          
+          const label = `${dot} Qurilma ${d.id.slice(-4)} (${d.region || 'Asosiy'})`;
+          const values = isOnline 
+            ? `DO ${tel.do ?? '—'} | ${tel.t ?? '—'}°C` 
+            : 'Oflayn';
+
+          return el('div', { 
+            style: 'padding:8px 10px; border-radius:10px; background:var(--md-surface-container-low); border:1px solid var(--md-outline-variant); display:flex; flex-direction:column; gap:3px' 
+          }, [
+            el('span', { style: 'font-size:11.5px; font-weight:700; color:var(--md-on-surface); text-overflow:ellipsis; overflow:hidden; white-space:nowrap', text: label }),
+            el('span', { style: 'font-size:11px; color:var(--md-on-surface-variant); font-family:monospace; font-weight:600', text: values }),
+          ]);
+        }))
+      ]);
+    }
+
     return mdCard([
       el('div', { class: 'row-between' }, [
         el('div', { class: 't-title', style: 'letter-spacing:-0.2px', text: lk.name }),
@@ -175,6 +210,7 @@ export function renderHomeTab(nav) {
         `${a.deviceCount} ${t('lake.devices')} · ${a.online}/${a.offline} ${t('tm.online')}` }),
       bentoGrid,
       weatherRow,
+      devicesBreakdown,
       el('div', { class: 't-body-sm muted', style: 'margin-top:10px;font-size:11.5px', text: `${t('tm.lastUpdate')}: ${fmtAge(a.lastUpdate)}` }),
     ], { elevated: true, cls: 'anim-up', onClick: () => nav.push((n) => renderLakeDetailPage(n, lk.id)) });
   }

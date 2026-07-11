@@ -26,12 +26,18 @@ function buildProfile(p) {
     name: String(p.name || '').trim(),
     description: String(p.description || '').trim(),
     district: String(p.district || '').trim(),
+    region: String(p.region || '').trim(),
     coordinates: p.coordinates && p.coordinates.lat != null
       ? { lat: Number(p.coordinates.lat), lng: Number(p.coordinates.lng) } : null,
     area: p.area != null && p.area !== '' ? Number(p.area) : null,
     averageDepth: p.averageDepth != null && p.averageDepth !== '' ? Number(p.averageDepth) : null,
     waterVolume: p.waterVolume != null && p.waterVolume !== '' ? Number(p.waterVolume) : null,
     fishSpecies: Array.isArray(p.fishSpecies) ? p.fishSpecies : [],
+    feedType: String(p.feedType || '').trim(),
+    aeratorPower: p.aeratorPower != null && p.aeratorPower !== '' ? Number(p.aeratorPower) : null,
+    aeratorDailyHours: p.aeratorDailyHours != null && p.aeratorDailyHours !== '' ? Number(p.aeratorDailyHours) : null,
+    electricityRate: p.electricityRate != null && p.electricityRate !== '' ? Number(p.electricityRate) : null,
+    totalFeedGiven: p.totalFeedGiven != null && p.totalFeedGiven !== '' ? Number(p.totalFeedGiven) : null,
   };
 }
 
@@ -46,7 +52,6 @@ export const lakeService = {
     const lakeRef = doc(collection(db, COLLECTIONS.LAKES));
     const data = {
       ownerUid: owner,
-      region: String(region || '').trim(),
       ...buildProfile(p),
       deviceIds: [],
       status: LAKE_STATUS.ACTIVE,
@@ -54,6 +59,7 @@ export const lakeService = {
       updatedAt: serverTimestamp(),
       archivedAt: null,
     };
+    if (!data.region) data.region = String(region || '').trim();
     try { await setDoc(lakeRef, data); } catch (e) { throw wrap(e, 'create'); }
     auditService.log(AUDIT_ACTIONS.LAKE_CREATED, { actor: owner, targetType: AUDIT_TARGETS.LAKE, targetId: lakeRef.id });
     logger.info('Ko\'l yaratildi:', lakeRef.id);

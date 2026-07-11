@@ -6,7 +6,7 @@ import { el } from '../../../shared/dom.js';
 import { toast } from '../../../shared/toast.js';
 import { t } from '../../../core/i18n/index.js';
 import { handleError } from '../../../core/errors.js';
-import { appBar, mdIconButton, mdCard, mdButton, field, input, banner } from '../../../shared/ui/index.js';
+import { appBar, mdIconButton, mdCard, mdButton, field, input, select, banner } from '../../../shared/ui/index.js';
 import { authStore } from '../../auth/index.js';
 import { ownershipService } from '../../ownership/index.js';
 import * as dataStore from '../../../farmer/dataStore.js';
@@ -18,12 +18,48 @@ export function renderClaimPage(nav) {
   const keyIn = input({ type: 'text', placeholder: 'XXXX-XXXX-XXXX-XXXX', style: 'text-transform:uppercase;font-family:var(--mono)' });
   const nameIn = input({ type: 'text' });
 
+  const userLakes = dataStore.getState().lakes || [];
+  const selectOptions = [
+    { value: 'new', label: "Yangi ko'l yaratish..." },
+    ...userLakes.map(lake => ({ value: lake.id, label: lake.name }))
+  ];
+
+  const lakeSelect = select(selectOptions, 'new');
+  const nameFieldContainer = el('div', { class: 'stack' }, [
+    field(t('device.lakeName'), nameIn)
+  ]);
+
+  lakeSelect.addEventListener('change', () => {
+    if (lakeSelect.value === 'new') {
+      nameFieldContainer.style.display = 'block';
+    } else {
+      nameFieldContainer.style.display = 'none';
+    }
+  });
+
   const submit = mdButton({ label: t('device.submitClaim'), full: true, onClick: async () => {
     err.style.display = 'none';
     if (!idIn.value.trim() || !keyIn.value.trim()) { err.textContent = t('error.claimFields'); err.style.display = 'flex'; return; }
+    
+    const isNew = lakeSelect.value === 'new';
+    const selectedLakeId = isNew ? '' : lakeSelect.value;
+    const selectedLakeName = isNew ? nameIn.value.trim() : (userLakes.find(l => l.id === selectedLakeId)?.name || '');
+
+    if (isNew && !selectedLakeName) {
+      err.textContent = "Iltimos, ko'l nomini kiriting yoki ro'yxatdan tanlang";
+      err.style.display = 'flex';
+      return;
+    }
+
     submit.disabled = true;
     try {
-      await ownershipService.requestClaim({ deviceId: idIn.value, activationKey: keyIn.value, lakeName: nameIn.value, farmerRegion: s.profile ? s.profile.vil : '' }, s.uid);
+      await ownershipService.requestClaim({
+        deviceId: idIn.value,
+        activationKey: keyIn.value,
+        lakeName: selectedLakeName,
+        lakeId: selectedLakeId,
+        farmerRegion: s.profile ? s.profile.vil : ''
+      }, s.uid);
       toast(t('device.claimSent'), 'ok');
       await dataStore.refresh();
       nav.back();
@@ -44,7 +80,8 @@ export function renderClaimPage(nav) {
         el('div', { class: 'stack' }, [
           field(t('device.deviceId'), idIn),
           field(t('device.activationKey'), keyIn),
-          field(t('device.lakeName'), nameIn),
+          field("Ko'l tanlash", lakeSelect),
+          nameFieldContainer,
           submit,
         ]),
       ], { elevated: true }),
