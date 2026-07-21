@@ -3,6 +3,9 @@
 //  Firebase web config maxfiy emas -> committed default (build har
 //  doim ishlaydi, hatto .env bo'lmasa ham: masalan Vercel'da).
 //  VITE_FB_* o'zgaruvchilari (bo'lsa) default'ni ustidan yozadi.
+//
+//  RTDB-BRIDGE: databaseURL merge'ga qo'shildi (VITE_FB_DATABASE_URL
+//  bilan override qilinishi mumkin).
 // ============================================================
 
 import { ConfigError } from './errors.js';
@@ -28,6 +31,7 @@ function val(key, fallback) {
 export const firebaseConfig = Object.freeze({
   apiKey: val('VITE_FB_API_KEY', DEFAULT_FIREBASE_CONFIG.apiKey),
   authDomain: val('VITE_FB_AUTH_DOMAIN', DEFAULT_FIREBASE_CONFIG.authDomain),
+  databaseURL: val('VITE_FB_DATABASE_URL', DEFAULT_FIREBASE_CONFIG.databaseURL),
   projectId: val('VITE_FB_PROJECT_ID', DEFAULT_FIREBASE_CONFIG.projectId),
   storageBucket: val('VITE_FB_STORAGE_BUCKET', DEFAULT_FIREBASE_CONFIG.storageBucket),
   messagingSenderId: val('VITE_FB_MESSAGING_SENDER_ID', DEFAULT_FIREBASE_CONFIG.messagingSenderId),

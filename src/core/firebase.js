@@ -1,13 +1,19 @@
 // ============================================================
 //  core/firebase.js — Firebase (modular SDK) ishga tushirish
-//  RTDB compat (vendored, 166KB) o'rniga faqat Auth + Firestore
-//  modullari import qilinadi (tree-shaking, kichikroq APK).
-//  ADR-001: birlamchi baza — Cloud Firestore.
+//  ADR-001: birlamchi baza — Cloud Firestore (users, devices,
+//  lakes, requests, commands...).
+//
+//  RTDB-BRIDGE: Realtime Database moduli QAYTARILDI, chunki
+//  gateway firmware telemetriyani RTDB'ga yozadi:
+//    nodes/<AQid>/latest  va  nodes/<AQid>/history
+//  Ilova telemetriyani shu yerdan o'qiydi (telemetryService),
+//  qolgan hamma narsa Firestore'da qoladi. Firmware O'ZGARMAGAN.
 // ============================================================
 
 import { initializeApp } from 'firebase/app';
 import { getAuth, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator, enableIndexedDbPersistence } from 'firebase/firestore';
+import { getDatabase } from 'firebase/database';
 
 import { assertEnv, firebaseConfig, useEmulator } from './env.js';
 import { logger } from './logger.js';
@@ -18,6 +24,7 @@ assertEnv();
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+export const rtdb = getDatabase(app);   // RTDB-BRIDGE: telemetriya manbai
 
 // Offline persistence ni yoqish
 enableIndexedDbPersistence(db).catch((err) => {
@@ -43,4 +50,4 @@ if (useEmulator) {
   logger.info('Firebase (live) ishga tushdi:', firebaseConfig.projectId);
 }
 
-export default { app, auth, db };
+export default { app, auth, db, rtdb };
