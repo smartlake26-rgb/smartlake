@@ -1,115 +1,231 @@
 /* ============================================================
-   shared/ui/tokens.css — Material Design 3 tokenlari
-   Brend: SmartLake teal (#0E7C6B) = MD3 primary.
-   Light + Dark (data-theme="dark"). Faqat presentation.
+   shared/ui/tokens.css — SMARTLAKE DESIGN SYSTEM v2 · TOKENLAR
+   ------------------------------------------------------------
+   Qatlamlar:  1) Primitivlar (xom qiymatlar)
+               2) Semantik rollar (--md-*)  ← komponentlar FAQAT shuni ishlatadi
+               3) Komponent tokenlari (btn/card/field/chart)
+   MUHIM: v1 dagi BARCHA nomlar saqlangan (superset) — mavjud
+   ekranlar o'zgarishsiz ishlaydi. Light + Dark (data-theme="dark").
    ============================================================ */
 
 :root {
-  /* --- Rang rollari (LIGHT) --- */
-  --md-primary: #0E7C6B; /* SmartLake teal */
+  /* ==========================================================
+     1 · PRIMITIVLAR — brend "suv" palitrasi (tonal ramp)
+     Teal #0E7C6B — brend yadro (o'zgarmagan). Atrofidagi
+     pog'onalar undan hosil qilingan, quyoshda o'qilish uchun
+     matn tonlari chuqurlashtirilgan.
+     ========================================================== */
+  --lake-05: #03110F;  --lake-10: #06201B;  --lake-20: #0A3B33;
+  --lake-30: #0C5A4D;  --lake-40: #0E7C6B;  /* ← brend */
+  --lake-50: #199C86;  --lake-60: #37BCA4;  --lake-70: #6BD7C2;
+  --lake-80: #9FEBDB;  --lake-90: #CEF5EE;  --lake-95: #E6FAF6;
+  --lake-98: #F3FCFA;  --lake-99: #F8FDFC;
+
+  --aqua-40: #0E7F9C;  --aqua-50: #15AEC2;  --aqua-80: #A5E8F5;  --aqua-90: #CFF3FA;
+
+  --slate-10: #0E1B19; --slate-30: #33433F; --slate-50: #5D6F6B;
+  --slate-70: #93A5A1; --slate-80: #B8C7C3; --slate-90: #D9E3E0; --slate-95: #ECF2F0;
+
+  /* ==========================================================
+     2 · SEMANTIK ROLLAR (LIGHT) — v1 nomlari saqlangan
+     ========================================================== */
+  --md-primary: #0E7C6B;
   --md-on-primary: #FFFFFF;
-  --md-primary-container: #CEF5F1;
-  --md-on-primary-container: #00201A;
+  --md-primary-container: var(--lake-90);
+  --md-on-primary-container: var(--lake-10);
 
-  --md-secondary: #4C626A;
+  --md-secondary: #45605C;
   --md-on-secondary: #FFFFFF;
-  --md-secondary-container: #CFE6F1;
-  --md-on-secondary-container: #071E26;
+  --md-secondary-container: #D9EAE6;
+  --md-on-secondary-container: #0B211E;
 
-  --md-tertiary: #15AEC2; /* Aqua / Teal supporting */
+  --md-tertiary: var(--aqua-50);
   --md-on-tertiary: #FFFFFF;
-  --md-tertiary-container: #B7F1FF;
-  --md-on-tertiary-container: #001F25;
+  --md-tertiary-container: var(--aqua-90);
+  --md-on-tertiary-container: #00252C;
 
-  --md-surface: #F0F8F7; /* Cool Refreshing Water Mint White */
-  --md-surface-dim: #D2DFDD;
-  --md-surface-bright: #F0F8F7;
+  /* Sirt narvoni: bir tekis, sovuq-yashil oq — "toza suv" */
+  --md-surface: var(--lake-98);
+  --md-surface-dim: #D8E5E2;
+  --md-surface-bright: var(--lake-99);
   --md-surface-container-lowest: #FFFFFF;
-  --md-surface-container-low: #E7F3F1;
-  --md-surface-container: #DFEFEA;
-  --md-surface-container-high: #D4E5E1;
-  --md-surface-container-highest: #CBDCD8;
-  --md-on-surface: #0A1C19;
-  --md-on-surface-variant: #394845;
-  --md-outline: #6F7D79;
-  --md-outline-variant: #BCCBC7;
+  --md-surface-container-low: #EFF7F5;
+  --md-surface-container: #E7F1EE;
+  --md-surface-container-high: #DCE9E6;
+  --md-surface-container-highest: #D1E0DC;
 
-  --md-error: #BA1A1A;
+  /* Matn: quyoshda o'qilish uchun v1 dan quyuqroq */
+  --md-on-surface: #071A16;
+  --md-on-surface-variant: #33443F;
+  --md-outline: #64756F;
+  --md-outline-variant: #C2D2CD;
+
+  --md-error: #B3261E;
   --md-on-error: #FFFFFF;
-  --md-error-container: #FFDAD6;
-  --md-on-error-container: #410002;
+  --md-error-container: #FADAD6;
+  --md-on-error-container: #3F0300;
 
-  /* Holat ranglari (sensor status) */
-  --md-success: #00A36C; /* Sog'lom ko'l yashili */
-  --md-warning: #E28413;
-  --md-critical: #E0362B;
-  --md-neutral: #8A979A;
+  /* Holat ranglari — sensor semantikasi (DO/pH/temp) */
+  --md-success: #0B8A5C;   /* sog'lom ko'l — AA kontrast uchun quyuqlashtirildi */
+  --md-warning: #B36A00;   /* ogohlantirish — och fonda o'qiladigan amber */
+  --md-critical: #C6362B;  /* kritik DO */
+  --md-neutral: #6E7E80;   /* offline/noma'lum */
+  /* Yumshoq konteynerlar (chip/banner fonlari uchun tayyor aralashmalar) */
+  --md-success-soft:  color-mix(in srgb, var(--md-success) 14%, transparent);
+  --md-warning-soft:  color-mix(in srgb, var(--md-warning) 15%, transparent);
+  --md-critical-soft: color-mix(in srgb, var(--md-critical) 13%, transparent);
+  --md-neutral-soft:  color-mix(in srgb, var(--md-neutral) 15%, transparent);
 
-  --md-scrim: rgba(0, 0, 0, .32);
+  --md-scrim: rgba(3, 17, 15, .38);
 
-  /* --- Shape --- */
-  --shape-xs: 4px; --shape-sm: 8px; --shape-md: 12px;
-  --shape-lg: 16px; --shape-xl: 28px; --shape-full: 999px;
+  /* ==========================================================
+     SHAPE — burchaklar tizimi
+     ========================================================== */
+  --shape-xs: 6px;  --shape-sm: 10px; --shape-md: 14px;
+  --shape-lg: 18px; --shape-xl: 28px; --shape-full: 999px;
+  --shape-card: 20px;      /* karta radiusi — yagona manba */
+  --shape-input: 12px;     /* forma elementlari */
 
-  /* --- Spacing (4px grid) --- */
-  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px; --sp-8: 48px;
+  /* ==========================================================
+     SPACING — 4px grid (v1 qiymatlari aynan saqlangan + kengaytma)
+     ========================================================== */
+  --sp-0: 0;    --sp-1: 4px;  --sp-2: 8px;  --sp-3: 12px; --sp-4: 16px;
+  --sp-5: 24px; --sp-6: 32px; --sp-7: 40px; --sp-8: 48px; --sp-9: 56px; --sp-10: 64px;
+  --page-pad: var(--sp-4);          /* ekran chetlari */
+  --card-pad: 18px;                  /* karta ichki bo'shlig'i */
+  --section-gap: var(--sp-4);        /* kartalar orasi */
 
-  /* --- Elevation --- */
-  --elev-1: 0 1px 2px rgba(0,0,0,.08), 0 1px 3px rgba(0,0,0,.06);
-  --elev-2: 0 1px 2px rgba(0,0,0,.10), 0 2px 6px rgba(0,0,0,.08);
-  --elev-3: 0 4px 8px rgba(0,0,0,.10), 0 1px 3px rgba(0,0,0,.10);
-  --elev-4: 0 6px 14px rgba(0,0,0,.12), 0 2px 5px rgba(0,0,0,.10);
+  /* ==========================================================
+     ELEVATION — "suv chuqurligi": teal-rangli soyalar, 6 pog'ona
+     ========================================================== */
+  --elev-0: none;
+  --elev-1: 0 1px 2px rgba(10, 59, 51, .05), 0 1px 3px rgba(10, 59, 51, .07);
+  --elev-2: 0 2px 6px rgba(10, 59, 51, .07), 0 1px 2px rgba(10, 59, 51, .06);
+  --elev-3: 0 6px 16px rgba(10, 59, 51, .09), 0 2px 4px rgba(10, 59, 51, .06);
+  --elev-4: 0 12px 28px rgba(10, 59, 51, .12), 0 4px 8px rgba(10, 59, 51, .07);
+  --elev-5: 0 20px 44px rgba(10, 59, 51, .16), 0 6px 12px rgba(10, 59, 51, .08);
+  /* Fokus halqasi — klaviatura navigatsiyasi uchun yagona token */
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--md-primary) 32%, transparent);
 
-  /* --- Typography --- */
-  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, system-ui, sans-serif;
+  /* ==========================================================
+     TYPOGRAPHY — tizim shrifti (ataylab: qishloq internetida
+     webfont yuklanmaydi, PWA offline birinchi ochilishda ham
+     to'g'ri ko'rinadi). Xarakter — RAQAMLARDA: sensor qiymatlari
+     tabular-nums bilan tekis ustunda turadi.
+     ========================================================== */
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, system-ui, sans-serif;
   --mono: ui-monospace, "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
 
+  --fs-display:  clamp(28px, 7vw, 34px);
+  --fs-headline: clamp(22px, 5.5vw, 26px);
+  --fs-title: 18px;  --fs-title-sm: 15px;
+  --fs-body: 15px;   --fs-body-sm: 13px;
+  --fs-label: 12px;  --fs-caption: 11px;
+  --fs-num-lg: 34px; --fs-num-md: 26px;   /* sensor qiymatlari */
+
+  --lh-tight: 1.15; --lh-snug: 1.3; --lh-normal: 1.5;
+
+  /* ==========================================================
+     MOTION — bitta til: tez kirish, yumshoq chiqish
+     ========================================================== */
   --motion-fast: 140ms; --motion: 220ms; --motion-slow: 360ms;
   --ease: cubic-bezier(.2, 0, 0, 1);
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --ease-spring: cubic-bezier(.34, 1.4, .64, 1);
+
+  /* Z-index shkala */
+  --z-appbar: 20; --z-fab: 25; --z-nav: 30; --z-dialog: 60; --z-toast: 80;
+
+  /* ==========================================================
+     3 · KOMPONENT TOKENLARI
+     ========================================================== */
+  /* Tugma */
+  --btn-h-sm: 36px; --btn-h-md: 44px; --btn-h-lg: 52px;
+  --btn-grad: linear-gradient(135deg, var(--lake-40) 0%, var(--aqua-50) 100%);
+  --btn-grad-shadow: 0 6px 16px rgba(14, 124, 107, .28);
+
+  /* Forma */
+  --field-bg: var(--md-surface-container-lowest);
+  --field-border: var(--md-outline-variant);
+  --field-border-focus: var(--md-primary);
+
+  /* Grafik (chart) palitrasi — SVG gauge/sparkline/history uchun */
+  --chart-grid: color-mix(in srgb, var(--md-outline-variant) 55%, transparent);
+  --chart-axis: var(--md-on-surface-variant);
+  --chart-label: var(--slate-50);
+  --chart-do: #0E7C6B;      /* kislorod — brend teal */
+  --chart-ph: #7C5CBF;      /* pH — binafsha (teal bilan adashmaydi) */
+  --chart-temp: #E07B39;    /* harorat — issiq apelsin */
+  --chart-area-opacity: .12;
+  --chart-threshold: var(--md-critical);
+  --chart-dot: var(--md-surface-container-lowest);
+  --gauge-track: var(--md-surface-container-high);
 }
 
+/* ============================================================
+   DARK — "chuqur suv": qora emas, to'q suv-yashil; yorug'lik
+   pog'onalari yuqoriga qarab ochiladi.
+   ============================================================ */
 [data-theme="dark"] {
-  --md-primary: #4ED9C6; /* Brilliant minty teal */
-  --md-on-primary: #003730;
-  --md-primary-container: #005046;
-  --md-on-primary-container: #81FBE8;
+  --md-primary: #52DFC9;
+  --md-on-primary: #00332B;
+  --md-primary-container: #0C5A4D;
+  --md-on-primary-container: #9FEBDB;
 
-  --md-secondary: #B4CAD6;
-  --md-on-secondary: #1E333C;
-  --md-secondary-container: #354A53;
-  --md-on-secondary-container: #CFE6F1;
+  --md-secondary: #B2CCC7;
+  --md-on-secondary: #1D3532;
+  --md-secondary-container: #324C48;
+  --md-on-secondary-container: #D9EAE6;
 
-  --md-tertiary: #80E2F4;
-  --md-on-tertiary: #00363F;
+  --md-tertiary: #7FDCEF;
+  --md-on-tertiary: #003641;
   --md-tertiary-container: #004E5B;
-  --md-on-tertiary-container: #B7F1FF;
+  --md-on-tertiary-container: #CFF3FA;
 
-  --md-surface: #071513; /* Dark Deep Water Navy */
-  --md-surface-dim: #071513;
-  --md-surface-bright: #1E3330;
-  --md-surface-container-lowest: #050E0C;
-  --md-surface-container-low: #0F1D1B;
-  --md-surface-container: #132220;
-  --md-surface-container-high: #1B2D2B;
-  --md-surface-container-highest: #233734;
-  --md-on-surface: #E0E9E6;
-  --md-on-surface-variant: #BFC9C6;
-  --md-outline: #899390;
-  --md-outline-variant: #3F4946;
+  --md-surface: #061412;
+  --md-surface-dim: #04100E;
+  --md-surface-bright: #1C312E;
+  --md-surface-container-lowest: #030B0A;
+  --md-surface-container-low: #0C1C19;
+  --md-surface-container: #10231F;
+  --md-surface-container-high: #182E2A;
+  --md-surface-container-highest: #203935;
+  --md-on-surface: #E2ECE9;
+  --md-on-surface-variant: #B6C6C1;
+  --md-outline: #82938E;
+  --md-outline-variant: #3B4B47;
 
   --md-error: #FFB4AB;
   --md-on-error: #690005;
   --md-error-container: #93000A;
   --md-on-error-container: #FFDAD6;
 
-  --md-success: #5CE3A7;
-  --md-warning: #FFB952;
-  --md-critical: #FF8A80;
-  --md-neutral: #98A5A9;
+  --md-success: #59DFA4;
+  --md-warning: #FFB95C;
+  --md-critical: #FF897F;
+  --md-neutral: #93A3A5;
+  --md-success-soft:  color-mix(in srgb, var(--md-success) 16%, transparent);
+  --md-warning-soft:  color-mix(in srgb, var(--md-warning) 17%, transparent);
+  --md-critical-soft: color-mix(in srgb, var(--md-critical) 15%, transparent);
+  --md-neutral-soft:  color-mix(in srgb, var(--md-neutral) 17%, transparent);
 
-  --md-scrim: rgba(0, 0, 0, .5);
-  --elev-1: 0 1px 3px rgba(0,0,0,.4);
-  --elev-2: 0 2px 6px rgba(0,0,0,.45);
-  --elev-3: 0 4px 10px rgba(0,0,0,.5);
-  --elev-4: 0 8px 18px rgba(0,0,0,.55);
+  --md-scrim: rgba(0, 0, 0, .55);
+
+  --elev-1: 0 1px 3px rgba(0,0,0,.42);
+  --elev-2: 0 2px 6px rgba(0,0,0,.46);
+  --elev-3: 0 6px 14px rgba(0,0,0,.5);
+  --elev-4: 0 12px 26px rgba(0,0,0,.55);
+  --elev-5: 0 20px 40px rgba(0,0,0,.6);
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--md-primary) 40%, transparent);
+
+  --btn-grad: linear-gradient(135deg, #14907C 0%, #1897AB 100%);
+  --btn-grad-shadow: 0 6px 16px rgba(0, 0, 0, .4);
+
+  --field-bg: var(--md-surface-container-low);
+  --chart-grid: color-mix(in srgb, var(--md-outline-variant) 60%, transparent);
+  --chart-do: #52DFC9;
+  --chart-ph: #B79CF0;
+  --chart-temp: #F09C63;
+  --gauge-track: var(--md-surface-container-high);
 }
