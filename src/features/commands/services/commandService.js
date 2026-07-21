@@ -9,15 +9,16 @@ import {
   collection, doc, addDoc, getDoc, getDocs, updateDoc,
   query, where, orderBy, limit, onSnapshot, serverTimestamp,
 } from 'firebase/firestore';
+import { ref as rtdbRef, push as rtdbPush } from 'firebase/database';
 
-import { db } from '../../../core/firebase.js';
+import { db, rtdb } from '../../../core/firebase.js';
 import { DataError } from '../../../core/errors.js';
 import { logger } from '../../../core/logger.js';
 import { COLLECTIONS, COMMAND_STATUS } from '../../../core/collections.js';
 import { auditService, AUDIT_ACTIONS, AUDIT_TARGETS } from '../../audit/index.js';
 import { assertTransition } from '../domain/commandLifecycle.js';
 import { validateCommand } from '../validators/commandValidators.js';
-import { buildPayload, COMMAND_TTL_MS } from '../constants/commandConstants.js';
+import { buildPayload, toGatewayCommand, COMMAND_TTL_MS } from '../constants/commandConstants.js';
 
 function wrap(e, ctx) { return e instanceof DataError ? e : new DataError(`${ctx}: ${e && e.message}`, { cause: e }); }
 function map(d) { return { ...d.data(), id: d.id }; }
@@ -40,6 +41,12 @@ export const commandService = {
     const check = validateCommand({ commandType, payload });
     if (!check.valid) throw new DataError('Buyruq validatsiyasi', { messageKey: check.messageKey });
 
+    // GW-BRIDGE: buyruqni gateway formatiga tarjima qilamiz. null = firmware
+    // bu buyruqni qo'llamaydi (feed/restart/config) YOKI qiymat diapazondan
+    // tashqarida (chegara buyruqlari) — Firestore'ga ham yozilmaydi.
+    const gwCmd = toGatewayCommand(commandType, payload, deviceId);
+    if (!gwCmd) throw new DataError('Buyruq qurilma tomonidan qo\'llab-quvvatlanmaydi yoki qiymat noto\'g\'ri', { messageKey: 'error.cmdUnsupported' });
+
     // Egalik tekshiruvi (rules ham majbur qiladi).
     const devSnap = await getDoc(doc(db, COLLECTIONS.DEVICES, deviceId));
     if (!devSnap.exists()) throw new DataError('Qurilma topilmadi', { messageKey: 'error.deviceNotFound' });
@@ -60,10 +67,17 @@ export const commandService = {
         result: null,
         createdBy: actorUid,
       });
+
+      // GW-BRIDGE: gateway o'qiydigan RTDB /commands ga push.
+      // Gateway 2s da bir o'qiydi -> LoRa CMD yuboradi -> yozuvni o'chiradi.
+      // Node ACK qaytarganda gateway nodes/<id>/latest ga last_cmd/last_cmd_ok
+      // yozadi — bu telemetriya orqali ilovaga realtime keladi.
+      await rtdbPush(rtdbRef(rtdb, 'commands'), gwCmd);
+
       auditService.log(AUDIT_ACTIONS.COMMAND_CREATED, {
         actor: actorUid, targetType: AUDIT_TARGETS.COMMAND, targetId: refDoc.id, meta: { deviceId, commandType },
       });
-      logger.info('Buyruq yaratildi:', commandType, deviceId);
+      logger.info('Buyruq yaratildi (Firestore + RTDB):', commandType, deviceId);
       return refDoc.id;
     } catch (e) { throw wrap(e, 'createCommand'); }
   },
