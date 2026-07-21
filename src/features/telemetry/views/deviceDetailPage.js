@@ -517,29 +517,55 @@ export function renderDeviceDetailPage(nav, deviceId) {
       ]),
     ]);
 
-    // Beautiful Aerator control & status card
-    const isAeratorOn = tel && (tel.aerator === 1 || tel.aerator === true);
-    const isAutoMode = tel && (tel.auto === 1 || tel.auto === true);
-    
+    // GW-FIX: firmware telemetriya maydonlari — aer (rele holati), manual
+    // (qo'lda rejim bayrog'i), mode (0=kislorod avto, 1=vaqt jadvali).
+    // Avvalgi kod mavjud bo'lmagan tel.aerator/tel.auto ni o'qib, doim
+    // noto'g'ri holat ko'rsatardi.
+    const isAeratorOn = tel && tel.aer === 1;
+    const isManual    = tel && tel.manual === 1;
+    const isVaqtMode  = tel && tel.mode === 1;
+    const isAutoMode  = !isManual;
+
+    // GW-FIX: QURILMA CHEGARALARI kartasi — node klaviaturasidan yoki
+    // ilovadan kiritilgan joriy qiymatlar (har telemetriyada keladi).
+    const fmtMg = (v) => (typeof v === 'number' && Number.isFinite(v)) ? `${v} mg/L` : '—';
+    const manRemainTxt = tel && typeof tel.man_remain === 'number' && tel.man_remain > 0
+      ? ` (${tel.man_remain} daq qoldi)` : '';
+    const thresholdsCard = mdCard([
+      el('div', { style: 'display:flex; align-items:center; justify-content:space-between; margin-bottom:8px' }, [
+        el('div', { style: 'display:flex; align-items:center; gap:8px' }, [
+          el('span', { html: icon('droplet', 18), style: 'color:var(--md-primary); display:inline-flex' }),
+          el('span', { style: 'font-weight:700; font-size:15px; color:var(--md-on-surface)', text: 'Qurilma sozlamalari (kislorod)' }),
+        ]),
+        tel && tel.alarm === 1
+          ? statusChip('critical', 'ALARM')
+          : statusChip('healthy', 'NORMAL'),
+      ]),
+      el('div', { class: 'sensor-grid' }, [
+        sensorCard({ label: 'Minimal DO',  value: tel && typeof tel.mindo  === 'number' ? tel.mindo  : null, unit: 'mg/L', isLive: isOnline }),
+        sensorCard({ label: 'Yetarli farq', value: tel && typeof tel.farqdo === 'number' ? tel.farqdo : null, unit: 'mg/L', isLive: isOnline }),
+        sensorCard({ label: 'Kritik DO',   value: tel && typeof tel.kritik === 'number' ? tel.kritik : null, unit: 'mg/L', isLive: isOnline }),
+      ]),
+      el('p', { style: 'font-size:11.5px; line-height:1.4; color:var(--md-on-surface-variant); margin:8px 0 0', 
+        text: `Ishlash mantig'i: DO ${fmtMg(tel ? tel.mindo : null)} dan tushsa aerator yoqiladi, ${
+          tel && typeof tel.mindo === 'number' && typeof tel.farqdo === 'number' ? fmtMg(tel.mindo + tel.farqdo) : '—'
+        } ga chiqsa o'chadi. ${fmtMg(tel ? tel.kritik : null)} dan pastda ALARM. Qiymatlar qurilma xotirasidan — klaviatura yoki ilovadan o'zgartirilsa shu yerda yangilanadi.` }),
+    ], { elevated: true });
+
     const turnOnBtn = mdButton({
       label: "Majburiy yoqish",
       icon: 'power',
-      variant: isAeratorOn ? 'filled' : 'outlined',
+      variant: isManual ? 'filled' : 'outlined',
       onClick: () => sendCommand(COMMAND_TYPES.AERATOR_ON)
     });
-    
-    const turnOffBtn = mdButton({
-      label: "O'chirish",
-      icon: 'power',
-      variant: (!isAeratorOn) ? 'tonal' : 'outlined',
-      onClick: () => sendCommand(COMMAND_TYPES.AERATOR_OFF)
-    });
-    
+
+    // GW-FIX: firmware'da majburiy "o'chirish" yo'q — aer:0 avto rejimga
+    // qaytaradi (kislorod yetarli bo'lsa node o'zi o'chiradi).
     const autoBtn = mdButton({
-      label: "Avto rejim",
+      label: "Avto rejimga qaytarish",
       icon: 'activity',
       variant: isAutoMode ? 'filled' : 'outlined',
-      onClick: () => sendCommand(COMMAND_TYPES.AUTO_ON)
+      onClick: () => sendCommand(COMMAND_TYPES.AERATOR_OFF)
     });
 
     async function sendCommand(type) {
@@ -565,14 +591,15 @@ export function renderDeviceDetailPage(nav, deviceId) {
       el('div', { style: 'display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-radius:8px; background:var(--md-surface-container-high); margin-bottom:12px; font-size:12.5px; font-weight:600; color:var(--md-on-surface-variant)' }, [
         el('span', { text: "Hozirgi Rejim:" }),
         el('span', { 
-          style: `color:${isAutoMode ? 'var(--md-success)' : 'var(--md-primary)'}; font-weight:700`, 
-          text: isAutoMode ? "🤖 AVTOMATIK REJIM" : "🔧 MEXANIK (QO'LDA)" 
+          style: `color:${isManual ? 'var(--md-warning)' : 'var(--md-success)'}; font-weight:700`, 
+          text: isManual
+            ? `🔧 QO'LDA YOQILGAN${manRemainTxt}`
+            : (isVaqtMode ? '🕐 AVTO (vaqt jadvali)' : '🤖 AVTO (kislorod bo\'yicha)')
         })
       ]),
 
       el('div', { style: 'display:flex; gap:8px; flex-wrap:wrap' }, [
         turnOnBtn,
-        turnOffBtn,
         autoBtn
       ])
     ], { elevated: true });
@@ -619,7 +646,7 @@ export function renderDeviceDetailPage(nav, deviceId) {
       el('p', { style: 'font-size:12px; line-height:1.4; color:var(--md-on-surface-variant); margin:0', text: `${sigText} (${rssiVal !== null ? 'Hozirgi RSSI kuchi: ' + rssiVal + ' dBm' : 'Signal kuchi mavjud emas'})` })
     ], { elevated: true });
 
-    const stackItems = [header, sensors, aeratorControlCard, signalExplanationNode, cmdPanel, info, history];
+    const stackItems = [header, sensors, thresholdsCard, aeratorControlCard, signalExplanationNode, cmdPanel, info, history];
 
     mount(content, el('div', { class: 'stack' }, stackItems));
   }
