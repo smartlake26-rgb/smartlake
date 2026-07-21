@@ -95,7 +95,7 @@ export function renderDeviceDetailPage(nav, deviceId) {
   });
 
   // --- Tarixiy ma'lumotlar tahlili va interaktiv SVG grafik ---
-  const chartContainer = el('div', { style: 'min-height:220px; display:flex; align-items:center; justify-content:center; position:relative; background:var(--md-surface-container-low, #f0f4f8); border-radius:12px; border:1px solid var(--md-outline-variant, #e0e0e0); padding:12px; margin-top:8px; overflow:hidden' });
+  const chartContainer = el('div', { style: 'min-height:220px; display:flex; align-items:center; justify-content:center; position:relative; background:var(--md-surface-container-lowest); border-radius:var(--shape-md); border:1px solid var(--md-outline-variant); padding:12px; margin-top:8px; overflow:hidden' });
   const statsEl = el('div', { style: 'margin-top:12px; display:flex; flex-direction:column; gap:8px' });
   let activeRange = '24h';
 
@@ -188,7 +188,7 @@ export function renderDeviceDetailPage(nav, deviceId) {
         y1: y,
         x2: margin.left + width,
         y2: y,
-        stroke: 'rgba(0,0,0,0.06)',
+        stroke: 'var(--chart-grid)',
         'stroke-width': 1,
         'stroke-dasharray': '2 3'
       }));
@@ -202,7 +202,7 @@ export function renderDeviceDetailPage(nav, deviceId) {
         y1: margin.top,
         x2: x,
         y2: margin.top + height,
-        stroke: 'rgba(0,0,0,0.06)',
+        stroke: 'var(--chart-grid)',
         'stroke-width': 1,
         'stroke-dasharray': '2 3'
       }));
@@ -213,7 +213,7 @@ export function renderDeviceDetailPage(nav, deviceId) {
         x: x,
         y: margin.top + height + 18,
         'text-anchor': 'middle',
-        fill: '#666',
+        fill: 'var(--chart-label)',
         'font-size': '10px',
         'font-family': 'monospace'
       }, [document.createTextNode(textLabel)]));
@@ -233,7 +233,7 @@ export function renderDeviceDetailPage(nav, deviceId) {
     if (doPathD) {
       lineElements.push(svgEl('path', {
         d: doPathD,
-        stroke: '#2563eb',
+        stroke: 'var(--chart-do)',
         'stroke-width': '2.5',
         fill: 'none',
         'stroke-linecap': 'round',
@@ -243,7 +243,7 @@ export function renderDeviceDetailPage(nav, deviceId) {
     if (tempPathD) {
       lineElements.push(svgEl('path', {
         d: tempPathD,
-        stroke: '#ef4444',
+        stroke: 'var(--chart-temp)',
         'stroke-width': '2.5',
         fill: 'none',
         'stroke-linecap': 'round',
@@ -253,7 +253,7 @@ export function renderDeviceDetailPage(nav, deviceId) {
     if (phPathD) {
       lineElements.push(svgEl('path', {
         d: phPathD,
-        stroke: '#10b981',
+        stroke: 'var(--chart-ph)',
         'stroke-width': '2.5',
         fill: 'none',
         'stroke-linecap': 'round',
@@ -265,29 +265,29 @@ export function renderDeviceDetailPage(nav, deviceId) {
     points.forEach(p => {
       const px = getX(p.ts);
       if (p.do != null) {
-        markers.push(svgEl('circle', { cx: px, cy: getDoY(p.do), r: 3, fill: '#2563eb' }));
+        markers.push(svgEl('circle', { cx: px, cy: getDoY(p.do), r: 3, fill: 'var(--chart-do)' }));
       }
       if (p.t != null) {
-        markers.push(svgEl('circle', { cx: px, cy: getTempY(p.t), r: 3, fill: '#ef4444' }));
+        markers.push(svgEl('circle', { cx: px, cy: getTempY(p.t), r: 3, fill: 'var(--chart-temp)' }));
       }
       if (p.ph != null) {
-        markers.push(svgEl('circle', { cx: px, cy: getPhY(p.ph), r: 3, fill: '#10b981' }));
+        markers.push(svgEl('circle', { cx: px, cy: getPhY(p.ph), r: 3, fill: 'var(--chart-ph)' }));
       }
     });
 
     const guideLine = svgEl('line', {
       x1: 0, y1: margin.top, x2: 0, y2: margin.top + height,
-      stroke: 'var(--md-primary, #00639b)', 'stroke-width': '1.5', 'stroke-dasharray': '3 3',
+      stroke: 'var(--md-primary)', 'stroke-width': '1.5', 'stroke-dasharray': '3 3',
       style: 'display:none'
     });
 
-    const hoverCircleDo = svgEl('circle', { r: 5.5, fill: '#2563eb', stroke: '#fff', 'stroke-width': 1.5, style: 'display:none' });
-    const hoverCircleTemp = svgEl('circle', { r: 5.5, fill: '#ef4444', stroke: '#fff', 'stroke-width': 1.5, style: 'display:none' });
-    const hoverCirclePh = svgEl('circle', { r: 5.5, fill: '#10b981', stroke: '#fff', 'stroke-width': 1.5, style: 'display:none' });
+    const hoverCircleDo = svgEl('circle', { r: 5.5, fill: 'var(--chart-do)', stroke: 'var(--chart-dot)', 'stroke-width': 2, style: 'display:none' });
+    const hoverCircleTemp = svgEl('circle', { r: 5.5, fill: 'var(--chart-temp)', stroke: 'var(--chart-dot)', 'stroke-width': 2, style: 'display:none' });
+    const hoverCirclePh = svgEl('circle', { r: 5.5, fill: 'var(--chart-ph)', stroke: 'var(--chart-dot)', 'stroke-width': 2, style: 'display:none' });
 
     const chartOuter = el('div', { style: 'position:relative; width:100%; display:flex; flex-direction:column' });
     const tooltip = el('div', {
-      style: 'position: absolute; display: none; background: rgba(15, 23, 42, 0.95); color: #fff; padding: 10px 12px; border-radius: 8px; font-size: 11px; pointer-events: none; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.25); line-height: 1.5; min-width: 150px; border: 1px solid rgba(255,255,255,0.1)'
+      style: 'position: absolute; display: none; background: rgba(6, 26, 22, 0.96); color: #fff; padding: 10px 12px; border-radius: 8px; font-size: 11px; pointer-events: none; z-index: 100; box-shadow: 0 4px 12px rgba(0,0,0,0.25); line-height: 1.5; min-width: 150px; border: 1px solid rgba(79,216,194,0.18)'
     });
 
     const svg = svgEl('svg', {
@@ -352,17 +352,17 @@ export function renderDeviceDetailPage(nav, deviceId) {
         const timeStr = `${pad(d.getHours())}:${pad(d.getMinutes())} (${pad(d.getDate())}.${pad(d.getMonth()+1)})`;
 
         tooltip.innerHTML = `
-          <div style="font-weight:700; border-bottom:1px solid rgba(255,255,255,0.15); padding-bottom:4px; margin-bottom:6px; color:#cbd5e1">${timeStr}</div>
+          <div style="font-weight:700; border-bottom:1px solid rgba(255,255,255,0.15); padding-bottom:4px; margin-bottom:6px; color:#9FEBDB">${timeStr}</div>
           <div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:3px">
-            <span style="color:#60a5fa; font-weight:600">● DO:</span>
+            <span style="color:#4FD8C2; font-weight:600">● DO:</span>
             <span style="font-family:monospace">${nearestPt.do != null ? nearestPt.do.toFixed(2) + ' mg/L' : '—'}</span>
           </div>
           <div style="display:flex; justify-content:space-between; gap:12px; margin-bottom:3px">
-            <span style="color:#f87171; font-weight:600">● Harorat:</span>
+            <span style="color:#F0955C; font-weight:600">● Harorat:</span>
             <span style="font-family:monospace">${nearestPt.t != null ? nearestPt.t.toFixed(1) + ' °C' : '—'}</span>
           </div>
           <div style="display:flex; justify-content:space-between; gap:12px">
-            <span style="color:#34d399; font-weight:600">● pH:</span>
+            <span style="color:#B79CF0; font-weight:600">● pH:</span>
             <span style="font-family:monospace">${nearestPt.ph != null ? nearestPt.ph.toFixed(2) : '—'}</span>
           </div>
         `;
@@ -401,13 +401,13 @@ export function renderDeviceDetailPage(nav, deviceId) {
     activeRange = rk;
     rangeButtonsEls.forEach((btn, key) => {
       if (key === rk) {
-        btn.style.background = 'var(--md-primary, #00639b)';
+        btn.style.background = 'var(--md-primary)';
         btn.style.color = '#ffffff';
-        btn.style.borderColor = 'var(--md-primary, #00639b)';
+        btn.style.borderColor = 'var(--md-primary)';
       } else {
         btn.style.background = 'transparent';
-        btn.style.color = 'var(--md-primary, #00639b)';
-        btn.style.borderColor = 'var(--md-outline-variant, #c4c7c5)';
+        btn.style.color = 'var(--md-primary)';
+        btn.style.borderColor = 'var(--md-outline-variant)';
       }
     });
 
@@ -427,7 +427,7 @@ export function renderDeviceDetailPage(nav, deviceId) {
         const stats = calculateStats(points);
         const buildStatRow = (color, label, sVal, unit) => {
           if (!sVal) return null;
-          return el('div', { style: 'display:flex; align-items:center; justify-content:space-between; font-size:12px; padding:6px 10px; background:var(--md-surface-container-high, #f5f5f5); border-radius:8px' }, [
+          return el('div', { style: 'display:flex; align-items:center; justify-content:space-between; font-size:12px; padding:6px 10px; background:var(--md-surface-container); border-radius:8px' }, [
             el('div', { style: 'display:flex; align-items:center; gap:6px' }, [
               el('span', { style: `width:8px; height:8px; border-radius:50%; background:${color}; display:inline-block` }),
               el('span', { style: 'font-weight:600', text: label })
@@ -445,9 +445,9 @@ export function renderDeviceDetailPage(nav, deviceId) {
         };
 
         const rows = [
-          buildStatRow('#2563eb', t('tm.do'), stats.do, 'mg/L'),
-          buildStatRow('#ef4444', t('tm.temp'), stats.temp, '°C'),
-          buildStatRow('#10b981', t('tm.ph'), stats.ph, '')
+          buildStatRow('var(--chart-do)', t('tm.do'), stats.do, 'mg/L'),
+          buildStatRow('var(--chart-temp)', t('tm.temp'), stats.temp, '°C'),
+          buildStatRow('var(--chart-ph)', t('tm.ph'), stats.ph, '')
         ].filter(Boolean);
 
         if (rows.length > 0) {
@@ -465,7 +465,7 @@ export function renderDeviceDetailPage(nav, deviceId) {
   const rangeButtonsEls = new Map();
   const rangeButtons = Object.keys(RANGES).map((rk) => {
     const b = el('button', {
-      style: 'background:transparent; color:var(--md-primary, #00639b); border-radius:20px; border:1px solid var(--md-outline-variant, #c4c7c5); padding:6px 12px; cursor:pointer; font-size:11px; font-weight:600; transition:all 0.2s; outline:none',
+      style: 'background:transparent; color:var(--md-primary); border-radius:20px; border:1px solid var(--md-outline-variant); padding:6px 12px; cursor:pointer; font-size:11px; font-weight:600; transition:all 0.2s; outline:none',
       text: t('tm.range_' + rk)
     });
     b.addEventListener('click', () => loadRangeData(rk));
@@ -505,8 +505,8 @@ export function renderDeviceDetailPage(nav, deviceId) {
         statusChip(status, t('tm.status_' + status)),
       ]),
       el('div', { class: 'row', style: 'justify-content:space-around;margin-top:8px' }, [
-        gauge({ value: tel ? tel.do : null, min: 0, max: 15, unit: 'DO', color: 'var(--md-primary)', size: 110 }),
-        gauge({ value: tel ? tel.t : null, min: 0, max: 40, unit: '°C', color: 'var(--md-tertiary)', size: 110 }),
+        gauge({ value: tel ? tel.do : null, min: 0, max: 15, unit: 'DO', color: 'var(--chart-do)', size: 110 }),
+        gauge({ value: tel ? tel.t : null, min: 0, max: 40, unit: '°C', color: 'var(--chart-temp)', size: 110 }),
       ]),
     ], { elevated: true, cls: isDeviceCritical ? 'bento-cell-critical' : '' });
 
