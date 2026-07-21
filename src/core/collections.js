@@ -66,6 +66,12 @@ export const COMMAND_TYPES = Object.freeze({
   SYNC_TIME: 'sync_time',
   REQUEST_STATUS: 'request_status',
   REQUEST_CONFIG: 'request_config',
+  // GW-BRIDGE: firmware haqiqatda qo'llab-quvvatlaydigan qo'shimcha buyruqlar
+  MODE_DO: 'mode_do',         // CMD_MODE val=0 — kislorod (avto) rejimi
+  MODE_TIME: 'mode_time',     // CMD_MODE val=1 — vaqt jadvali rejimi
+  SET_MINDO: 'set_mindo',     // CMD_MINDO — minimal DO chegarasi (mg/L)
+  SET_FARQ: 'set_farq',       // CMD_FARQ  — yetarli farq (gisterezis, mg/L)
+  SET_KRITIK: 'set_kritik',   // CMD_KRITIK— kritik DO chegarasi (mg/L)
 });
 
 /** So'rov statusi. */
