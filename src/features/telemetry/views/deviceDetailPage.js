@@ -21,6 +21,7 @@ import { telemetryAge, presence } from '../domain/freshness.js';
 import { renderCommandPanel } from '../../commands/index.js';
 import { COMMAND_TYPES } from '../../../core/collections.js';
 import { commandService } from '../../commands/services/commandService.js';
+import { createAckTracker } from '../../commands/domain/ackTracker.js';
 import { toast } from '../../../shared/toast.js';
 
 function svgEl(tag, props = {}, children = []) {
@@ -84,6 +85,14 @@ export function renderDeviceDetailPage(nav, deviceId) {
   if (!deviceId) { mount(content, emptyState({ icon: 'chip', title: t('error.deviceNotFound') })); return root; }
 
   const cmdPanel = renderCommandPanel(deviceId, s.uid);   // bir marta (o'z listeneri bilan)
+
+  // --- QURILMA TASDIG'I: aerator tugmalari uchun (render'dan tashqarida yashaydi) ---
+  const pageAck = createAckTracker((state) => {
+    if (state === 'waiting')  toast(t('cmd.waitAck'), 'info');
+    if (state === 'saved')    toast(t('cmd.savedOk'), 'ok');
+    if (state === 'timeout')  toast(t('cmd.ackTimeout'), 'err');
+    if (state === 'rejected') toast(t('cmd.ackRejected'), 'err');
+  });
 
   // --- Tarixiy ma'lumotlar tahlili va interaktiv SVG grafik ---
   const chartContainer = el('div', { style: 'min-height:220px; display:flex; align-items:center; justify-content:center; position:relative; background:var(--md-surface-container-low, #f0f4f8); border-radius:12px; border:1px solid var(--md-outline-variant, #e0e0e0); padding:12px; margin-top:8px; overflow:hidden' });
@@ -483,6 +492,7 @@ export function renderDeviceDetailPage(nav, deviceId) {
     const lake = st.lakes.find((l) => l.id === device.lakeId);
     const th = resolveThresholds(lake);
     const tel = st.telemetry.get(deviceId) || null;
+    pageAck.feed(tel);   // qurilma tasdig'ini tekshirish
     const status = deviceStatus(tel, th);
 
     const score = healthScore(tel, th);
@@ -572,7 +582,9 @@ export function renderDeviceDetailPage(nav, deviceId) {
       toast("Buyruq yuborilmoqda...", 'info');
       try {
         await commandService.createCommand({ deviceId, commandType: type, payload: null }, s.uid);
-        toast("Buyruq muvaffaqiyatli yuborildi!", 'ok');
+        // "Yuborildi" emas — endi haqiqiy tasdiqni kutamiz:
+        // qurilma ACK qaytarganda yashil "qurilmada saqlandi" chiqadi.
+        pageAck.expect(type);
         await dataStore.refresh();
       } catch (e) {
         toast("Xatolik: " + e.message, 'err');
@@ -656,7 +668,7 @@ export function renderDeviceDetailPage(nav, deviceId) {
 
   const unsub = dataStore.subscribe(render);
   render();
-  root.__cleanup = () => { unsub(); if (cmdPanel && typeof cmdPanel.__cleanup === 'function') cmdPanel.__cleanup(); };
+  root.__cleanup = () => { unsub(); pageAck.cancel(); if (cmdPanel && typeof cmdPanel.__cleanup === 'function') cmdPanel.__cleanup(); };
   return root;
 }
 
