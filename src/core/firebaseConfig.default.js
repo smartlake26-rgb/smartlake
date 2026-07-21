@@ -7,12 +7,16 @@
 //  Alohida dev/prod loyihasi yoki white-label kerak bo'lsa —
 //  `.env` dagi VITE_FB_* o'zgaruvchilari bu qiymatlarni ustidan
 //  yozadi (env.js dagi merge logikasi).
-//  (RTDB olib tashlandi — databaseURL yo'q.)
+//
+//  RTDB-BRIDGE: databaseURL QAYTARILDI — gateway firmware
+//  telemetriyani Realtime Database'ga yozadi (nodes/<AQid>/latest),
+//  ilova esa shu manzildan o'qiydi (telemetryService RTDB ko'prigi).
 // ============================================================
 
 export const DEFAULT_FIREBASE_CONFIG = Object.freeze({
   apiKey: 'AIzaSyA2JgIbG_kJCLSEjsU142kWyMqTBrUlTdE',
   authDomain: 'smartlake-6ce23.firebaseapp.com',
+  databaseURL: 'https://smartlake-6ce23-default-rtdb.europe-west1.firebasedatabase.app',
   projectId: 'smartlake-6ce23',
   storageBucket: 'smartlake-6ce23.firebasestorage.app',
   messagingSenderId: '920951270016',
