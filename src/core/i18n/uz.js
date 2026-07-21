@@ -204,4 +204,18 @@ uz.cmdGroup = Object.assign(uz.cmdGroup || {}, { aerator: 'Aerator', auto: 'Avto
 uz.cmdStatus = Object.assign(uz.cmdStatus || {}, { pending: 'Kutilmoqda', sent: 'Yuborildi', executed: 'Bajarildi', failed: 'Xato', expired: 'Muddati o\'tdi' });
 Object.assign(uz.error, { badTransition: "Noto'g'ri status o'tishi", badCommandType: "Noto'g'ri buyruq turi", badPayload: "Noto'g'ri payload", notOwner: 'Bu qurilma sizga tegishli emas' });
 
+// --- GW-BRIDGE: firmware'dagi haqiqiy buyruqlar + kislorod chegaralari ---
+Object.assign(uz.cmd, {
+  aeratorOn: 'Aerator YOQ (qo\'lda)', aeratorOff: 'AVTO rejimga qaytarish',
+  modeDo: 'Kislorod rejimi', modeTime: 'Vaqt jadvali rejimi',
+  setMindo: 'Minimal DO (mg/L)', setFarq: 'Yetarli farq (mg/L)', setKritik: 'Kritik DO (mg/L)',
+  send: 'Yuborish',
+  deviceNow: 'Qurilmada hozir: {v} mg/L',
+  thresholdsHint: "Qiymatlar qurilma xotirasiga yoziladi. Qurilma klaviaturasidan o'zgartirilsa, shu yerda avtomatik yangilanadi.",
+  rangeErr: 'Qiymat {min} dan {max} gacha butun son bo\'lishi kerak',
+  ackOk: 'Qurilma tasdiqladi ✓ ({ts})', ackFail: 'Qurilma buyruqni RAD ETDI ({ts})',
+});
+uz.cmdGroup = Object.assign(uz.cmdGroup, { mode: 'Ishlash rejimi', thresholds: 'Kislorod chegaralari (qurilma)' });
+Object.assign(uz.error, { cmdUnsupported: "Bu buyruq qurilma tomonidan qo'llab-quvvatlanmaydi yoki qiymat noto'g'ri" });
+
 export default uz;
