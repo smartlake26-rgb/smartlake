@@ -214,6 +214,11 @@ Object.assign(uz.cmd, {
   thresholdsHint: "Qiymatlar qurilma xotirasiga yoziladi. Qurilma klaviaturasidan o'zgartirilsa, shu yerda avtomatik yangilanadi.",
   rangeErr: 'Qiymat {min} dan {max} gacha butun son bo\'lishi kerak',
   ackOk: 'Qurilma tasdiqladi ✓ ({ts})', ackFail: 'Qurilma buyruqni RAD ETDI ({ts})',
+  waitAck: "⏳ Yuborildi — qurilma javobi kutilmoqda...",
+  ackedMid: "Qurilma qabul qildi — saqlanishi tekshirilmoqda...",
+  savedOk: "✓ O'zgarish qurilmada SAQLANDI",
+  ackRejected: "✗ Qurilma o'zgarishni RAD ETDI",
+  ackTimeout: "⚠ Qurilma javob bermadi — aloqani tekshiring (LCD'dagi antenna belgisi)",
 });
 uz.cmdGroup = Object.assign(uz.cmdGroup, { mode: 'Ishlash rejimi', thresholds: 'Kislorod chegaralari (qurilma)' });
 Object.assign(uz.error, { cmdUnsupported: "Bu buyruq qurilma tomonidan qo'llab-quvvatlanmaydi yoki qiymat noto'g'ri" });
