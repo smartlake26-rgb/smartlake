@@ -24,6 +24,7 @@ import { mdCard, mdButton, input } from '../../../shared/ui/index.js';
 import { COMMAND_TYPES, COMMAND_STATUS } from '../../../core/collections.js';
 import { commandService } from '../services/commandService.js';
 import { COMMAND_DEFS, COMMAND_TTL_MS, THRESHOLD_LIMITS } from '../constants/commandConstants.js';
+import { createAckTracker } from '../domain/ackTracker.js';
 import { isExpired } from '../domain/commandLifecycle.js';
 import * as dataStore from '../../../farmer/dataStore.js';
 
@@ -62,12 +63,36 @@ export function renderCommandPanel(deviceId, ownerUid) {
   const buttons = [];
   function setDisabled(v) { buttons.forEach((b) => { b.disabled = v; }); }
 
+  // --- QURILMA TASDIG'I (ackTracker) ---
+  // 'waiting' -> kulrang "javob kutilmoqda", 'acked' -> ko'k oraliq,
+  // 'saved' -> YASHIL "qurilmada saqlandi" + toast, 'timeout'/'rejected' -> ogohlantirish.
+  const ackEl = el('div', { class: 't-body-sm', style: 'margin-top:6px;font-weight:600', text: '' });
+  const ack = createAckTracker((state, p) => {
+    const map = {
+      waiting:  ['cmd.waitAck',    'var(--md-on-surface-variant)'],
+      acked:    ['cmd.ackedMid',   'var(--md-primary)'],
+      saved:    ['cmd.savedOk',    'var(--md-success)'],
+      rejected: ['cmd.ackRejected','var(--md-critical)'],
+      timeout:  ['cmd.ackTimeout', 'var(--md-warning)'],
+    };
+    const [key, color] = map[state] || map.waiting;
+    ackEl.textContent = t(key);
+    ackEl.style.color = color;
+    if (state === 'saved')    toast(t('cmd.savedOk'), 'ok');
+    if (state === 'timeout')  toast(t('cmd.ackTimeout'), 'err');
+    if (state === 'rejected') toast(t('cmd.ackRejected'), 'err');
+  });
+
   async function send(type, payload = null) {
     if (sending) return false;
     sending = true; setDisabled(true);
     try {
       await commandService.createCommand({ deviceId, commandType: type, payload }, ownerUid);
-      toast(t('cmd.sent'), 'ok');
+      // Chegara buyrug'i bo'lsa — "saqlandi" faqat qiymat qurilmadan qaytganda.
+      const thrRow = THRESHOLD_ROWS.find(([tt]) => tt === type);
+      ack.expect(type, thrRow
+        ? { value: payload && payload.value, telKey: thrRow[2] }
+        : {});
       return true;
     } catch (e) {
       toast(t(handleError(e, 'command.create').messageKey), 'err');
@@ -121,10 +146,7 @@ export function renderCommandPanel(deviceId, ownerUid) {
     ]);
   });
 
-  // --- Qurilma ACK holati (telemetriyadan) ---
-  const ackEl = el('div', { class: 't-body-sm muted', style: 'margin-top:6px', text: '' });
-
-  // Telemetriya obunasi: joriy chegaralar + ACK jonli yangilanadi.
+  // Telemetriya obunasi: joriy chegaralar jonli yangilanadi + tracker'ga oziq.
   // Node klaviaturasidan o'zgartirilsa ham keyingi telemetriyada shu yerda ko'rinadi.
   const unsubTel = dataStore.subscribe((st) => {
     const tel = st.telemetry && st.telemetry.get ? st.telemetry.get(deviceId) : null;
@@ -137,12 +159,7 @@ export function renderCommandPanel(deviceId, ownerUid) {
         if (!thrPrefilled.has(type) && !inp.value) { inp.value = String(Math.round(v)); thrPrefilled.add(type); }
       }
     }
-    if (typeof tel.last_cmd === 'number') {
-      const ok = tel.last_cmd_ok === 1;
-      const ts = typeof tel.last_cmd_ts === 'number' ? new Date(tel.last_cmd_ts).toLocaleTimeString() : '';
-      ackEl.textContent = t(ok ? 'cmd.ackOk' : 'cmd.ackFail', { ts });
-      ackEl.style.color = ok ? 'var(--md-success)' : 'var(--md-critical)';
-    }
+    ack.feed(tel);   // qurilma tasdig'ini tekshirish
   });
 
   // --- Oxirgi buyruqlar ro'yxati (Firestore tarixi) ---
@@ -178,7 +195,7 @@ export function renderCommandPanel(deviceId, ownerUid) {
     listEl,
   ], { elevated: true });
 
-  card.__cleanup = () => { unsubCmd(); unsubTel(); };
+  card.__cleanup = () => { unsubCmd(); unsubTel(); ack.cancel(); };
   return card;
 }
 
