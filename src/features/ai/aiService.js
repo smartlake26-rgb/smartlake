@@ -36,7 +36,7 @@ function slopePerHour(points) {
   return d ? (n * sxy - sx * sy) / d : null;
 }
 
-export async function buildContext({ lake, devs, telemetry, th, meta, uid }) {
+export async function buildContext({ lake, devs, telemetry, th, meta, uid, weather = null }) {
   const firstId = devs.length ? devs[0].id : null;
   const now = firstId ? (telemetry.get(firstId) || {}) : {};
 
@@ -71,7 +71,8 @@ export async function buildContext({ lake, devs, telemetry, th, meta, uid }) {
       doMin: wkDo.length ? Math.min(...wkDo) : null,
       doAvg: wkDo.length ? wkDo.reduce((a, b) => a + b, 0) / wkDo.length : null,
     },
-    feedPlan: meta ? computeFeedPlan({ fish: meta.fish || [], feed: meta.feed || {}, tempC: now.t }) : null,
+    weather: weather ? { code: weather.code ?? null, temp: weather.temp ?? null, label: weather.label ?? null } : null,
+    feedPlan: meta ? computeFeedPlan({ fish: meta.fish || [], feed: meta.feed || {}, tempC: now.t, weather }) : null,
     devices: { total: devs.length, online },
   };
 }

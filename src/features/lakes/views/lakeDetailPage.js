@@ -210,7 +210,7 @@ export function renderLakeDetailPage(nav, lakeId) {
           const st2 = dataStore.getState();
           const lk = st2.lakes.find((l) => l.id === lakeId) || st2.archivedLakes.find((l) => l.id === lakeId) || { id: lakeId, name: '' };
           const devs2 = st2.devices.filter((d) => d.lakeId === lakeId);
-          return { lake: lk, devs: devs2, telemetry: st2.telemetry, th: resolveThresholds(lk), meta: lakeMeta, uid: s.uid };
+          return { lake: lk, devs: devs2, telemetry: st2.telemetry, th: resolveThresholds(lk), meta: lakeMeta, uid: s.uid, weather: weatherData };
         },
         onGoTab: (tabId) => { activeTab = tabId; render(); },
       });
@@ -1010,7 +1010,7 @@ export function renderLakeDetailPage(nav, lakeId) {
     ]);
 
     // --- YEM TAVSIYASI (C-bosqich: feedEngine + lakeMeta) ---
-    const feedPlan = lakeMeta ? computeFeedPlan({ fish: lakeMeta.fish || [], feed: lakeMeta.feed || {}, tempC: a.avgTemp }) : null;
+    const feedPlan = lakeMeta ? computeFeedPlan({ fish: lakeMeta.fish || [], feed: lakeMeta.feed || {}, tempC: a.avgTemp, weather: weatherData }) : null;
     let feedBody;
     if (feedPlan) {
       const fr = (lab, val, col = 'var(--md-on-surface)') => el('div', { class: 'row-between', style: 'padding:5px 0;border-bottom:1px solid var(--md-outline-variant);font-size:12.5px' }, [
@@ -1018,15 +1018,19 @@ export function renderLakeDetailPage(nav, lakeId) {
         el('span', { style: `font-weight:800;font-variant-numeric:tabular-nums;color:${col}`, text: val }),
       ]);
       feedBody = el('div', {}, [
-        el('div', { style: 'display:flex;gap:8px;margin-bottom:8px' }, feedPlan.meals.map((m) =>
+        el('div', { style: 'display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap' }, feedPlan.meals.map((m) =>
           el('div', { style: 'flex:1;text-align:center;padding:8px 4px;border-radius:var(--shape-sm);background:color-mix(in srgb, var(--md-tertiary) 8%, var(--md-surface-container-lowest));border:1px solid color-mix(in srgb, var(--md-tertiary) 18%, var(--md-outline-variant))' }, [
             el('div', { class: 't-caption', style: 'font-weight:700', text: m.time }),
             el('div', { style: 'font-weight:800;font-size:15px;color:var(--md-tertiary);font-variant-numeric:tabular-nums', text: `${m.kg.toFixed(1)} kg` }),
           ]))),
+        ...(feedPlan.notes || []).map((n) => el('div', { class: 't-caption', style: 'color:var(--md-warning);font-weight:700;margin-bottom:4px', text: '⚠ ' + n.text })),
         fr(isUz ? 'Biomassa' : 'Биомасса', `${feedPlan.biomass.toFixed(0)} kg`),
         fr(isUz ? `Stavka (${a.avgTemp != null ? a.avgTemp + '°C' : '—'})` : `Ставка (${a.avgTemp != null ? a.avgTemp + '°C' : '—'})`, `${feedPlan.ratePct}% / ${isUz ? 'kun' : 'день'}`),
         fr(isUz ? 'Bugun jami' : 'Всего сегодня', `${feedPlan.dailyKg.toFixed(1)} kg`, 'var(--md-tertiary)'),
         fr(isUz ? 'Taxminiy narxi' : 'Стоимость', feedPlan.dailyCost != null ? `${Math.round(feedPlan.dailyCost).toLocaleString()} ${isUz ? "so'm" : 'сум'}` : '—', 'var(--md-primary)'),
+        el('div', { class: 't-caption', style: 'margin-top:5px', text: isUz
+          ? "Stavkalar professional yem jadvali (harorat × baliq vazni) asosida; issiqda mahallar ko'payadi, bulutli kunda 50% kamayadi."
+          : 'Ставки по проф. таблице (темп. × вес рыбы); в жару больше кормлений, в пасмурно −50%.' }),
       ]);
     } else {
       feedBody = el('div', {}, [

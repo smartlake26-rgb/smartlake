@@ -58,6 +58,34 @@ export function evaluateRules(ctx, isUz = true) {
       action: { label: 'AUTO', tab: 'holat' } });
   }
 
+  // 4.5) PLAKAT QOIDALARI (professional yem jadvali asosida)
+  // Jazirama issiq: aerator + "zamur" (kislorod tanqisligidan qirilish) oldini olish
+  if (now.t != null && now.t >= 33) {
+    A.push({ severity: 'crit', icon: 'thermometer',
+      title: isUz ? "Jazirama issiq — 'zamur' xavfi" : 'Экстремальная жара — риск замора',
+      text: isUz
+        ? `Suv ${now.t}°C. Aeratorlarni qo'shing, suv kirish-chiqish aylanmasi va kislorod muhitiga katta ahamiyat bering — 'zamur' (baliq qirilishi) xavfi yuqori. Yem 4-5 mahalga bo'lib, kamaytirilib beriladi.`
+        : `Вода ${now.t}°C. Включите аэраторы, следите за циркуляцией и кислородом — высок риск замора. Корм дробно 4-5 раз.`,
+      action: { label: isUz ? 'Aerator boshqaruvi' : 'Аэратор', tab: 'holat' } });
+  }
+  // Bulutli/yomg'irli kun: yem 50% (feedPlan buni avtomatik qilgan bo'ladi)
+  if (ctx.feedPlan && Array.isArray(ctx.feedPlan.notes) && ctx.feedPlan.notes.some((n) => n.id === 'weather')) {
+    A.push({ severity: 'info', icon: 'sun',
+      title: isUz ? "Ob-havo yomon — yem 50% kamaytirildi" : 'Плохая погода — корм снижен на 50%',
+      text: isUz
+        ? "Bulutli/shamolli kunlarda baliq ishtahasi pasayadi — bugungi yem rejasi avtomatik 50% ga qisqartirildi (yem jadvali qoidasi)."
+        : 'В пасмурные дни аппетит ниже — план корма автоматически снижен на 50%.',
+      action: { label: isUz ? 'Yem rejasi' : 'План корма', tab: 'holat' } });
+  }
+  // pH plakat normasi: 7.5–8.5
+  if (now.ph != null && (now.ph < 6.8 || now.ph > 8.8)) {
+    A.push({ severity: 'warn', icon: 'activity',
+      title: isUz ? "pH me'yordan chetda" : 'pH вне нормы',
+      text: isUz
+        ? `Hozir pH ${now.ph}. Tavsiya etilgan norma 7.5–8.5. Holatga qarab suvni tekshiring; keskin o'zgartirmang — asta-sekin korrektsiya qiling (mutaxassis bilan maslahatlashib).`
+        : `pH ${now.ph}. Норма 7.5–8.5. Корректируйте постепенно.` });
+  }
+
   // 5) Batareya / aloqa
   if (now.battery != null && now.battery < th.battery.warn) {
     A.push({ severity: 'warn', icon: 'battery',
