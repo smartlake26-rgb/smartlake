@@ -19,7 +19,7 @@ import { el, mount } from '../../../shared/dom.js';
 import { icon } from '../../../shared/icons.js';
 import { t, detectLocale } from '../../../core/i18n/index.js';
 import {
-  appBar, mdIconButton, statCard, mdCard, statusChip, skeletonCards, emptyState,
+  appBar, mdIconButton, statCard, mdCard, statusChip, skeletonCards, emptyState, openDialog,
 } from '../../../shared/ui/index.js';
 import { authStore } from '../../auth/index.js';
 import * as dataStore from '../../../farmer/dataStore.js';
@@ -104,19 +104,100 @@ export function renderHomeTab(nav) {
       });
   }
 
-  function stats(st) {
-    const online = st.devices.filter((d) => d.lakeId && presence((st.telemetry.get(d.id) || {}).ts) === 'online').length;
-    let alerts = 0;
+  // DS-E: har ko'l bo'yicha Online/Offline/Ogohlantirish tahlili
+  function lakeStatusLists(st) {
+    const onlineLakes = [], offlineLakes = [], alerts = [];
     st.lakes.forEach((lk) => {
-      const a = aggregateLake(st.devices.filter((d) => d.lakeId === lk.id), st.telemetry, resolveThresholds(lk));
-      if (a.hasAlarm) alerts += 1;
+      const th = resolveThresholds(lk);
+      const devs = st.devices.filter((d) => d.lakeId === lk.id);
+      const a = aggregateLake(devs, st.telemetry, th);
+      const lastTs = a.lastUpdate ?? null;
+      const anyOnline = devs.some((d) => presence((st.telemetry.get(d.id) || {}).ts) === 'online');
+      (anyOnline ? onlineLakes : offlineLakes).push({ lake: lk, lastTs });
+
+      // Ogohlantirish sabablari (aniq parametr bo'yicha)
+      const msgs = [];
+      if (a.avgDo != null && a.avgDo < th.do.crit) msgs.push(`DO KRITIK: ${a.avgDo} mg/L (< ${th.do.crit})`);
+      else if (a.avgDo != null && a.avgDo < th.do.warn) msgs.push(`DO past: ${a.avgDo} mg/L (< ${th.do.warn})`);
+      if (a.avgTemp != null && (a.avgTemp < th.temp.warnMin || a.avgTemp > th.temp.warnMax)) msgs.push(`Harorat: ${a.avgTemp}°C (${th.temp.warnMin}–${th.temp.warnMax} tashqarisida)`);
+      if (a.avgPh != null && (a.avgPh < th.ph.warnMin || a.avgPh > th.ph.warnMax)) msgs.push(`pH: ${a.avgPh} (${th.ph.warnMin}–${th.ph.warnMax} tashqarisida)`);
+      if (devs.length && !anyOnline) msgs.push("Barcha qurilmalar oflayn");
+      if (a.hasAlarm || msgs.length) alerts.push({ lake: lk, ts: lastTs, msgs: msgs.length ? msgs : ['Ogohlantirish holati'] });
     });
-    return el('div', { class: 'md-stats', style: 'margin-bottom:var(--section-gap)' }, [
-      statCard({ icon: 'droplet', value: st.lakes.length, label: t('home.lakes'), color: 'var(--md-primary)' }),
-      statCard({ icon: 'chip', value: st.devices.length, label: t('home.devices'), color: 'var(--md-tertiary)' }),
-      statCard({ icon: 'wifi', value: online, label: t('home.online'), color: 'var(--md-success)' }),
-      statCard({ icon: 'bell', value: alerts, label: t('home.alerts'), color: alerts ? 'var(--md-critical)' : 'var(--md-neutral)' }),
+    return { onlineLakes, offlineLakes, alerts };
+  }
+
+  // Dialog ichidagi ko'l qatori (bosilsa ko'lga o'tadi)
+  function lakeRow({ lake, lastTs, sub }) {
+    const row = el('div', { class: 'md-listitem tap', style: 'padding:11px 6px' }, [
+      el('div', { class: 'grow' }, [
+        el('div', { style: 'font-weight:700;font-size:13.5px', text: lake.name }),
+        sub ? el('div', { class: 't-caption', style: 'margin-top:2px;line-height:1.45', html: sub }) : null,
+      ]),
+      el('div', { class: 't-caption', style: 'text-align:right;flex:none', text: fmtAge(lastTs) }),
     ]);
+    row.addEventListener('click', () => {
+      document.querySelectorAll('.md-scrim').forEach((x) => x.remove());
+      nav.push((n) => renderLakeDetailPage(n, lake.id));
+    });
+    return row;
+  }
+  function openListDialog(title, items, emptyText) {
+    openDialog({
+      title,
+      body: el('div', { class: 'md-list', style: 'max-height:55vh;overflow-y:auto' },
+        items.length ? items : [el('div', { class: 't-body-sm muted', style: 'padding:12px 0', text: emptyText })]),
+      actions: [{ label: 'Yopish', variant: 'text' }],
+    });
+  }
+
+  function stats(st) {
+    const { onlineLakes, offlineLakes, alerts } = lakeStatusLists(st);
+    const onlineDev = st.devices.filter((d) => d.lakeId && presence((st.telemetry.get(d.id) || {}).ts) === 'online').length;
+
+    const cLakes = statCard({ icon: 'droplet', value: st.lakes.length, label: t('home.lakes'), color: 'var(--md-primary)' });
+    const cDevs = statCard({ icon: 'chip', value: st.devices.length, label: t('home.devices'), color: 'var(--md-tertiary)' });
+    const cOnline = statCard({ icon: 'wifi', value: onlineLakes.length, label: t('home.online'), color: 'var(--md-success)' });
+    const cOffline = statCard({ icon: 'power', value: offlineLakes.length, label: 'Offline', color: offlineLakes.length ? 'var(--md-critical)' : 'var(--md-neutral)' });
+
+    // DS-E: kartalar BOSILADIGAN — ro'yxat oynalari
+    cLakes.classList.add('tap'); cLakes.style.cursor = 'pointer';
+    cLakes.addEventListener('click', () => nav.switchTab('lakes'));
+    cDevs.classList.add('tap'); cDevs.style.cursor = 'pointer';
+    cDevs.addEventListener('click', () => nav.switchTab('devices'));
+    cOnline.style.cursor = 'pointer';
+    cOnline.addEventListener('click', () => openListDialog(
+      `${t('home.online')} — ${onlineLakes.length}`,
+      onlineLakes.map((x) => lakeRow(x)),
+      "Onlayn ko'l yo'q"));
+    cOffline.style.cursor = 'pointer';
+    cOffline.addEventListener('click', () => openListDialog(
+      `Offline — ${offlineLakes.length}`,
+      offlineLakes.map((x) => lakeRow(x)),
+      "Barcha ko'llar onlayn ✓"));
+
+    // Ogohlantirish — keng karta: qaysi ko'l / qachon / nima
+    const alertBar = el('div', {
+      class: 'md-stat', style: `grid-column:1/-1;cursor:pointer;display:flex;align-items:center;gap:12px;`
+        + (alerts.length ? 'border-color:color-mix(in srgb, var(--md-critical) 35%, var(--md-outline-variant))' : ''),
+    }, [
+      el('div', { class: 's-ic', style: `margin-bottom:0;background:${alerts.length ? 'var(--md-critical-soft)' : 'var(--md-neutral-soft)'};color:${alerts.length ? 'var(--md-critical)' : 'var(--md-neutral)'}`, html: icon('bell', 20) }),
+      el('div', { class: 'grow' }, [
+        el('div', { class: 's-val', style: `font-size:20px;color:${alerts.length ? 'var(--md-critical)' : 'var(--md-on-surface)'}`, text: String(alerts.length) }),
+        el('div', { class: 's-lab', style: 'margin-top:2px', text: t('home.alerts') + (alerts.length ? ` — ${alerts[0].lake.name}${alerts.length > 1 ? ` +${alerts.length - 1}` : ''}` : '') }),
+      ]),
+      el('span', { html: icon('chevronRight', 18), style: 'color:var(--md-on-surface-variant);display:inline-flex' }),
+    ]);
+    alertBar.addEventListener('click', () => openListDialog(
+      `${t('home.alerts')} — ${alerts.length}`,
+      alerts.map((x) => lakeRow({ lake: x.lake, lastTs: x.ts,
+        sub: x.msgs.map((m) => `<span style="color:var(--md-critical);font-weight:600">• ${m}</span>`).join('<br>') })),
+      "Ogohlantirish yo'q ✓"));
+
+    const grid = el('div', { class: 'md-stats', style: 'margin-bottom:var(--section-gap)' }, [
+      cLakes, cDevs, cOnline, cOffline, alertBar,
+    ]);
+    return grid;
   }
 
   function lakeCard(lk, st, index = 0) {
