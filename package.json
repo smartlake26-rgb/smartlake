@@ -15,11 +15,15 @@
     "test:all": "npm run test && npm run test:rules"
   },
   "dependencies": {
-    "firebase": "^10.12.2"
+    "firebase": "^10.12.2",
+    "xlsx": "^0.18.5",
+    "jspdf": "^2.5.1",
+    "jspdf-autotable": "^3.8.2"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^3.0.4",
     "firebase-tools": "^15.22.4",
+    "jsdom": "^29.1.1",
     "vite": "^5.2.0",
     "vitest": "^1.5.0"
   }

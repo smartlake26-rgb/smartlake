@@ -160,6 +160,22 @@ service cloud.firestore {
     }
 
     // ---------- default: taqiq ----------
+    // ---------- telemetriya ARXIVI (B-bosqich: ilova yozadi) ----------
+    match /telemetryArchive/{docId} {
+      allow read: if owns(resource.data.ownerUid) || isAdmin();
+      allow create: if owns(request.resource.data.ownerUid);
+      allow update: if owns(resource.data.ownerUid) && owns(request.resource.data.ownerUid);
+      allow delete: if isAdmin();
+    }
+
+    // ---------- ko'l meta (energiya sozlamalari: kW, tarif) ----------
+    match /lakeMeta/{lakeId} {
+      allow read: if owns(resource.data.ownerUid) || isAdmin();
+      allow create: if owns(request.resource.data.ownerUid);
+      allow update: if owns(resource.data.ownerUid) && owns(request.resource.data.ownerUid);
+      allow delete: if isAdmin();
+    }
+
     match /{document=**} {
       allow read, write: if false;
     }

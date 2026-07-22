@@ -17,6 +17,7 @@ import { initTheme } from '../shared/ui/theme.js';
 import { mdButton, loader } from '../shared/ui/index.js';
 import { authService, authStore, renderAuth, AUTH_SCREENS } from '../features/auth/index.js';
 import * as dataStore from './dataStore.js';
+import { startArchiver } from '../features/telemetry/services/archiveService.js';
 import { createShell } from './shell.js';
 
 window.addEventListener('error', (ev) => handleError(ev.error || ev.message, 'window.onerror'));
@@ -89,7 +90,7 @@ function main() {
     if (shell) { shell.destroy(); shell = null; }
     if (next === 'auth') { dataStore.stop(); authMode = AUTH_SCREENS.LOGIN; renderAuthScreen(); }
     else if (next === 'blocked') { dataStore.stop(); root.replaceChildren(blockedScreen('home.suspended', logout)); }
-    else { dataStore.start(s.uid); shell = createShell(root, { onLogout: logout }); }
+    else { dataStore.start(s.uid); startArchiver(dataStore, s.uid); shell = createShell(root, { onLogout: logout }); }
   });
 
   root.replaceChildren(loadingScreen());

@@ -35,6 +35,7 @@ import { detectLocale } from '../../../core/i18n/index.js';
 import { icon } from '../../../shared/icons.js';
 import { historyService, RANGES } from '../../telemetry/services/historyService.js';
 import { presence } from '../../telemetry/domain/freshness.js';
+import { buildHistoryTab } from '../../telemetry/views/historyTab.js';
 import { commandService } from '../../commands/services/commandService.js';
 import { createAckTracker } from '../../commands/domain/ackTracker.js';
 import { COMMAND_TYPES } from '../../../core/collections.js';
@@ -172,6 +173,23 @@ export function renderLakeDetailPage(nav, lakeId) {
       pageAck.expect(type);
     } catch (e) { toast(t(handleError(e, 'aerator').messageKey), 'err'); }
     finally { aerBusy = false; }
+  }
+
+  // --- TARIX tabi (B-bosqich): bir marta, birinchi ochilishda quriladi ---
+  let historyTabNode = null;
+  function getHistoryTabNode() {
+    if (!historyTabNode) {
+      historyTabNode = buildHistoryTab({
+        lakeId, uid: s.uid, isUz,
+        getDevs: () => dataStore.getState().devices.filter((d) => d.lakeId === lakeId),
+        getTh: () => {
+          const st2 = dataStore.getState();
+          const lk = st2.lakes.find((l) => l.id === lakeId) || st2.archivedLakes.find((l) => l.id === lakeId);
+          return resolveThresholds(lk);
+        },
+      });
+    }
+    return historyTabNode;
   }
 
   // --- 24h TREND/DO-grafik keshi (Joriy holat uchun) ---
@@ -968,14 +986,6 @@ export function renderLakeDetailPage(nav, lakeId) {
       ]),
     ]);
 
-    // --- TARIX tabi eslatmasi ---
-    const tarixNote = el('div', { class: 'md-banner info' , style: 'margin-top:2px'}, [
-      el('span', { html: icon('info', 15), style: 'display:inline-flex;flex:none' }),
-      el('span', { text: isUz
-        ? "Jadval, Excel/CSV/PDF eksport va elektr/yem hisoblari B-bosqichda qo'shiladi."
-        : 'Таблица, экспорт Excel/CSV/PDF и расчёты — на этапе B.' }),
-    ]);
-
     // --- SOZLAMALAR tabi eslatmasi ---
     const setupNote = el('div', { class: 'md-banner info' }, [
       el('span', { html: icon('info', 15), style: 'display:inline-flex;flex:none' }),
@@ -987,7 +997,7 @@ export function renderLakeDetailPage(nav, lakeId) {
     // ================= TAB KOMPOZITSIYASI =================
     tabBtns.forEach((b, id) => b.classList.toggle('active', id === activeTab));
     let components;
-    if (activeTab === 'tarix') components = [historyCard, tarixNote];
+    if (activeTab === 'tarix') components = [historyCard, getHistoryTabNode()];
     else if (activeTab === 'ai') components = [advisor];
     else if (activeTab === 'sozlama') components = [devicesCard, setupNote, ...actions];
     else {
