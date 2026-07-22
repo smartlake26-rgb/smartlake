@@ -37,6 +37,7 @@ import { historyService, RANGES } from '../../telemetry/services/historyService.
 import { presence } from '../../telemetry/domain/freshness.js';
 import { buildHistoryTab } from '../../telemetry/views/historyTab.js';
 import { buildLakeSettingsTab } from './lakeSettingsTab.js';
+import { buildAiTab } from '../../ai/views/aiTab.js';
 import { computeFeedPlan } from '../../telemetry/domain/feedEngine.js';
 import { loadLakeMeta } from '../../telemetry/services/archiveService.js';
 import { commandService } from '../../commands/services/commandService.js';
@@ -198,6 +199,24 @@ export function renderLakeDetailPage(nav, lakeId) {
   // --- LAKE META (C-bosqich: pasport/baliq/yem/aeratorlar) ---
   let lakeMeta = null;
   loadLakeMeta(lakeId).then((m) => { lakeMeta = m; render(); }).catch(() => {});
+
+  // --- AI TAVSIYA tabi (D-bosqich): bir marta quriladi ---
+  let aiTabNode = null;
+  function getAiTabNode() {
+    if (!aiTabNode) {
+      aiTabNode = buildAiTab({
+        isUz,
+        getParams: () => {
+          const st2 = dataStore.getState();
+          const lk = st2.lakes.find((l) => l.id === lakeId) || st2.archivedLakes.find((l) => l.id === lakeId) || { id: lakeId, name: '' };
+          const devs2 = st2.devices.filter((d) => d.lakeId === lakeId);
+          return { lake: lk, devs: devs2, telemetry: st2.telemetry, th: resolveThresholds(lk), meta: lakeMeta, uid: s.uid };
+        },
+        onGoTab: (tabId) => { activeTab = tabId; render(); },
+      });
+    }
+    return aiTabNode;
+  }
 
   // --- SOZLAMALAR tabi (C-bosqich): bir marta quriladi ---
   let settingsTabNode = null;
@@ -1032,7 +1051,7 @@ export function renderLakeDetailPage(nav, lakeId) {
     tabBtns.forEach((b, id) => b.classList.toggle('active', id === activeTab));
     let components;
     if (activeTab === 'tarix') components = [historyCard, getHistoryTabNode()];
-    else if (activeTab === 'ai') components = [advisor];
+    else if (activeTab === 'ai') components = [getAiTabNode()];
     else if (activeTab === 'sozlama') components = [getSettingsTabNode(), devicesCard, ...actions];
     else {
       components = [header, sensors, doMiniCard, aeratorCard, connCard];
