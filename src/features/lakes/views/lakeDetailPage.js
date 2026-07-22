@@ -1,7 +1,14 @@
 // ============================================================
-//  features/lakes/views/lakeDetailPage.js — Ko'l tafsilotlari
-//  Gauge + sensor kartalari + qurilmalar (biriktirish/ajratish) +
-//  amallar (tahrirlash, faol/nofaol, arxivlash). Realtime.
+//  features/lakes/views/lakeDetailPage.js — Ko'l sahifasi v3 (DS-A)
+//  4 TAB: Joriy holat / Tarix / AI tavsiya / Sozlamalar.
+//  Joriy holat: salomatlik (baho bilan), suv parametrlari (me'yor+
+//  holat+trend), 24h DO grafigi (min/o'rta/maks), aerator boshqaruvi
+//  (qurilma tasdig'i bilan), aloqa sifati, ob-havo, yem tavsiya joyi.
+//  Tarix: mavjud interaktiv grafik (davrlar bilan) — SAQLANGAN.
+//  AI: mavjud aiAdvisorCard — SAQLANGAN (D-bosqichda kengayadi).
+//  Sozlamalar: qurilmalar biriktirish/ajratish + ko'l amallari —
+//  SAQLANGAN (C-bosqichda pasport qo'shiladi).
+//  Firmware/Firebase sinxroniga TEGILMAGAN — faqat ilova qatlami.
 // ============================================================
 
 import { el, mount } from '../../../shared/dom.js';
@@ -27,6 +34,10 @@ import { getLakeWeather, getWeatherIcon } from '../../telemetry/services/weather
 import { detectLocale } from '../../../core/i18n/index.js';
 import { icon } from '../../../shared/icons.js';
 import { historyService, RANGES } from '../../telemetry/services/historyService.js';
+import { presence } from '../../telemetry/domain/freshness.js';
+import { commandService } from '../../commands/services/commandService.js';
+import { createAckTracker } from '../../commands/domain/ackTracker.js';
+import { COMMAND_TYPES } from '../../../core/collections.js';
 
 function svgEl(tag, props = {}, children = []) {
   const node = document.createElementNS('http://www.w3.org/2000/svg', tag);
@@ -72,6 +83,45 @@ function formatTimeLabel(ts, rk) {
 
 function healthColor(s) { return s >= 90 ? 'var(--md-success)' : s >= 60 ? 'var(--md-warning)' : 'var(--md-critical)'; }
 
+/** 100-ballik baho -> so'z (DS-A: topshiriq bo'yicha). */
+function healthGrade(sc, isUz) {
+  if (sc >= 90) return isUz ? "A'lo" : 'Отлично';
+  if (sc >= 75) return isUz ? 'Yaxshi' : 'Хорошо';
+  if (sc >= 60) return isUz ? 'Ogohlantirish' : 'Внимание';
+  return isUz ? 'Kritik' : 'Критично';
+}
+
+/** RSSI -> sifat yorlig'i. */
+function rssiQuality(v, isUz) {
+  if (v == null) return { label: '—', color: 'var(--md-neutral)' };
+  if (v >= -60) return { label: isUz ? "A'lo" : 'Отлично', color: 'var(--md-success)' };
+  if (v >= -80) return { label: isUz ? 'Yaxshi' : 'Хорошо', color: 'var(--md-success)' };
+  if (v >= -100) return { label: isUz ? "O'rtacha" : 'Средне', color: 'var(--md-warning)' };
+  return { label: isUz ? 'Zaif' : 'Слабый', color: 'var(--md-critical)' };
+}
+
+/** Oxirgi aloqa vaqti formati. */
+function fmtAgo(ts, isUz) {
+  if (ts == null) return '—';
+  const m = Math.floor((Date.now() - ts) / 60000);
+  if (m < 1) return isUz ? 'hozirgina' : 'только что';
+  if (m < 60) return `${m} ${isUz ? 'daq oldin' : 'мин назад'}`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} ${isUz ? 'soat oldin' : 'ч назад'}`;
+  return `${Math.floor(h / 24)} ${isUz ? 'kun oldin' : 'дн назад'}`;
+}
+
+/** Trend: oxirgi 3 nuqta vs avvalgi 3 nuqta o'rtachasi. */
+function calcTrend(pts, key) {
+  const vals = pts.map((x) => x[key]).filter((v) => typeof v === 'number' && Number.isFinite(v));
+  if (vals.length < 4) return null;
+  const last = vals.slice(-3), prev = vals.slice(-6, -3).length ? vals.slice(-6, -3) : vals.slice(0, -3);
+  const avg = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+  const d = avg(last) - avg(prev);
+  if (Math.abs(d) < 0.05) return { dir: 0, d };
+  return { dir: d > 0 ? 1 : -1, d };
+}
+
 export function renderLakeDetailPage(nav, lakeId) {
   const s = authStore.getState();
   const content = el('div', { class: 'md-content no-nav' });
@@ -84,6 +134,60 @@ export function renderLakeDetailPage(nav, lakeId) {
     ]),
     content,
   ]);
+
+  const isUz = detectLocale() === 'uz';
+
+  // --- TAB TIZIMI (DS-A) ---
+  let activeTab = 'holat';
+  const TAB_DEFS = [
+    ['holat', isUz ? 'Joriy holat' : 'Текущее', 'activity'],
+    ['tarix', isUz ? 'Tarix' : 'История', 'chip'],
+    ['ai', isUz ? 'AI tavsiya' : 'AI совет', 'sun'],
+    ['sozlama', isUz ? 'Sozlamalar' : 'Настройки', 'settings'],
+  ];
+  const tabBtns = new Map();
+  const tabBar = el('div', { class: 'md-tabs' }, TAB_DEFS.map(([id, label, ic]) => {
+    const b = el('button', { class: 'md-tab' + (id === activeTab ? ' active' : ''),
+      html: icon(ic, 15) + `<span>${label}</span>` });
+    b.addEventListener('click', () => { if (activeTab !== id) { activeTab = id; render(); } });
+    tabBtns.set(id, b);
+    return b;
+  }));
+  root.insertBefore(tabBar, content);
+
+  // --- AERATOR: tanlangan qurilma + qurilma tasdig'i (ackTracker) ---
+  let selectedDevId = null;
+  const pageAck = createAckTracker((state) => {
+    if (state === 'waiting') toast(t('cmd.waitAck'), 'info');
+    if (state === 'saved') toast(t('cmd.savedOk'), 'ok');
+    if (state === 'timeout') toast(t('cmd.ackTimeout'), 'err');
+    if (state === 'rejected') toast(t('cmd.ackRejected'), 'err');
+  });
+  let aerBusy = false;
+  async function sendAer(type) {
+    if (!selectedDevId || aerBusy) return;
+    aerBusy = true;
+    try {
+      await commandService.createCommand({ deviceId: selectedDevId, commandType: type, payload: null }, s.uid);
+      pageAck.expect(type);
+    } catch (e) { toast(t(handleError(e, 'aerator').messageKey), 'err'); }
+    finally { aerBusy = false; }
+  }
+
+  // --- 24h TREND/DO-grafik keshi (Joriy holat uchun) ---
+  let trendPts = [];
+  let trendKey = '';
+  function loadTrend(devs) {
+    const firstId = devs.length ? devs[0].id : null;
+    const key = firstId || 'none';
+    if (key === trendKey) return;
+    trendKey = key;
+    trendPts = [];
+    if (!firstId) return;
+    historyService.getHistory(firstId, '24h')
+      .then((pts) => { trendPts = pts || []; render(); })
+      .catch(() => {});
+  }
 
   let weatherData = null;
   let weatherLoading = false;
@@ -146,10 +250,10 @@ export function renderLakeDetailPage(nav, lakeId) {
 
   function buildSvgChart(points, range) {
     if (!points || points.length === 0) {
-      return el('div', { style: 'display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:var(--ink-soft); min-height:180px; width:100%' }, [
+      return el('div', { style: 'display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:var(--md-on-surface-variant); min-height:180px; width:100%' }, [
         el('div', { style: 'color:var(--md-outline); opacity:0.6; display:flex; justify-content:center; margin-bottom:4px;', html: icon('activity', 36) }),
         el('span', { style: 'font-size:13px; font-weight:600; color:var(--md-on-surface)', text: t('common.noData') }),
-        el('span', { style: 'font-size:11px; text-align:center; max-width:260px; opacity:0.7; color:var(--ink-soft)', text: 'Tanlangan vaqt oralig\'ida ko\'lga bog\'langan qurilmalardan olingan o\'lchov ma\'lumotlari mavjud emas.' })
+        el('span', { style: 'font-size:11px; text-align:center; max-width:260px; opacity:0.7; color:var(--md-on-surface-variant)', text: 'Tanlangan vaqt oralig\'ida ko\'lga bog\'langan qurilmalardan olingan o\'lchov ma\'lumotlari mavjud emas.' })
       ]);
     }
 
@@ -421,8 +525,8 @@ export function renderLakeDetailPage(nav, lakeId) {
     });
 
     mount(chartContainer, el('div', { style: 'display:flex; flex-direction:column; align-items:center; gap:8px' }, [
-      el('div', { class: 'spinner', style: 'width:20px; height:20px' }),
-      el('span', { style: 'font-size:11px; color:var(--ink-soft)', text: t('app.loading') })
+      el('div', { class: 'sk', style: 'width:22px;height:22px;border-radius:50%' }),
+      el('span', { style: 'font-size:11px; color:var(--md-on-surface-variant)', text: t('app.loading') })
     ]));
 
     statsEl.replaceChildren();
@@ -432,10 +536,10 @@ export function renderLakeDetailPage(nav, lakeId) {
       const currentDevs = st.devices.filter((d) => d.lakeId === lakeId);
       
       if (!currentDevs.length) {
-        mount(chartContainer, el('div', { style: 'display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:var(--ink-soft); min-height:180px; width:100%' }, [
+        mount(chartContainer, el('div', { style: 'display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; color:var(--md-on-surface-variant); min-height:180px; width:100%' }, [
           el('div', { style: 'color:var(--md-outline); opacity:0.6; display:flex; justify-content:center; margin-bottom:4px;', html: icon('chip', 36) }),
           el('span', { style: 'font-size:13px; font-weight:600; color:var(--md-on-surface)', text: t('lake.noDevices') }),
-          el('span', { style: 'font-size:11px; text-align:center; max-width:260px; opacity:0.7; color:var(--ink-soft)', text: 'Bu ko\'lga birorta ham qurilma biriktirilmagan.' })
+          el('span', { style: 'font-size:11px; text-align:center; max-width:260px; opacity:0.7; color:var(--md-on-surface-variant)', text: 'Bu ko\'lga birorta ham qurilma biriktirilmagan.' })
         ]));
         return;
       }
@@ -466,7 +570,7 @@ export function renderLakeDetailPage(nav, lakeId) {
               el('span', { style: `width:8px; height:8px; border-radius:50%; background:${color}; display:inline-block` }),
               el('span', { style: 'font-weight:600', text: label })
             ]),
-            el('div', { style: 'color:var(--ink-soft); font-size:11px' }, [
+            el('div', { style: 'color:var(--md-on-surface-variant); font-size:11px' }, [
               document.createTextNode(`Min: `),
               el('span', { style: 'font-family:monospace; font-weight:600; color:var(--ink-dark)', text: String(sVal.min) }),
               document.createTextNode(` | Max: `),
@@ -492,7 +596,7 @@ export function renderLakeDetailPage(nav, lakeId) {
         }
       }
     } catch (e) {
-      mount(chartContainer, el('div', { class: 'banner err', text: t(handleError(e, 'history').messageKey) }));
+      mount(chartContainer, el('div', { class: 'md-banner warn', text: t(handleError(e, 'history').messageKey) }));
     }
   }
 
@@ -507,12 +611,12 @@ export function renderLakeDetailPage(nav, lakeId) {
     return b;
   });
 
-  const historyCard = el('div', { class: 'card', style: 'padding:14px' }, [
+  const historyCard = el('div', { class: 'md-card' }, [
     el('div', { style: 'font-weight:700; margin-bottom:4px; display:flex; align-items:center; gap:6px' }, [
       el('span', { html: icon('activity', 18), style: 'display:inline-flex; color:var(--md-primary); vertical-align:middle' }),
       el('span', { text: t('tm.history') })
     ]),
-    el('div', { style: 'font-size:11px; color:var(--ink-soft); margin-bottom:8px', text: t('tm.historyHint') }),
+    el('div', { style: 'font-size:11px; color:var(--md-on-surface-variant); margin-bottom:8px', text: t('tm.historyHint') }),
     el('div', { style: 'display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px' }, rangeButtons),
     chartContainer,
     statsEl
@@ -541,6 +645,13 @@ export function renderLakeDetailPage(nav, lakeId) {
     const a = aggregateLake(devs, st.telemetry, th);
     const assignable = st.devices.filter((d) => !d.lakeId);
 
+    // DS-A: 24h trend ma'lumoti + aerator uchun tanlangan qurilma + tasdiq
+    loadTrend(devs);
+    if (!selectedDevId || !devs.some((d) => d.id === selectedDevId)) {
+      selectedDevId = devs.length ? devs[0].id : null;
+    }
+    pageAck.feed(selectedDevId ? st.telemetry.get(selectedDevId) : null);
+
     // Header: status + health gauge
     const header = mdCard([
       el('div', { class: 'row-between' }, [
@@ -554,15 +665,55 @@ export function renderLakeDetailPage(nav, lakeId) {
       el('div', { style: 'display:flex;justify-content:center;margin-top:8px' }, [
         gauge({ value: a.healthScore, min: 0, max: 100, unit: t('tm.health'), color: healthColor(a.healthScore) }),
       ]),
-      el('div', { class: 't-body-sm muted', style: 'text-align:center', text: `${a.online}/${a.deviceCount} ${t('tm.online')}` }),
+      el('div', { style: 'text-align:center;margin-top:2px' }, [
+        el('span', { class: 't-title-sm', style: `color:${healthColor(a.healthScore)};font-weight:800;letter-spacing:.02em`,
+          text: healthGrade(a.healthScore, isUz) }),
+      ]),
+      el('div', { class: 't-body-sm muted', style: 'text-align:center;margin-top:2px', text: `${a.online}/${a.deviceCount} ${t('tm.online')}` }),
     ], { elevated: true, cls: a.healthScore <= 60 ? 'bento-cell-critical' : '' });
 
-    // Sensor grid
+    // DS-A: SUV PARAMETRLARI — qiymat + me'yor + holat + trend
+    const evalDo = (v) => v == null ? 'unknown' : v < th.do.crit ? 'critical' : v < th.do.warn ? 'warning' : 'healthy';
+    const evalTemp = (v) => v == null ? 'unknown' : (v < th.temp.critMin || v > th.temp.critMax) ? 'critical'
+      : (v < th.temp.warnMin || v > th.temp.warnMax) ? 'warning' : 'healthy';
+    const evalPh = (v) => v == null ? 'unknown' : (v < th.ph.critMin || v > th.ph.critMax) ? 'critical'
+      : (v < th.ph.warnMin || v > th.ph.warnMax) ? 'warning' : 'healthy';
+    const stColor = (x) => x === 'healthy' ? 'var(--md-success)' : x === 'warning' ? 'var(--md-warning)'
+      : x === 'critical' ? 'var(--md-critical)' : 'var(--md-neutral)';
+    const trendBadge = (tr) => {
+      if (!tr) return el('span', { class: 't-caption', text: '' });
+      const up = tr.dir > 0, flat = tr.dir === 0;
+      const col = flat ? 'var(--md-neutral)' : up ? 'var(--md-success)' : 'var(--md-warning)';
+      return el('span', { style: `font-size:11px;font-weight:800;color:${col}`,
+        text: flat ? (isUz ? '— barqaror' : '— стабильно') : (up ? '▲' : '▼') + ` ${Math.abs(tr.d).toFixed(1)}` });
+    };
+    const paramCard = ({ label, ic, value, unit, color, norm, stKey, tr }) => el('div', {
+      class: 'sensor-card',
+      style: `text-align:left;border-color:color-mix(in srgb, ${color} 20%, var(--md-outline-variant))`,
+    }, [
+      el('div', { class: 'row-between' }, [
+        el('span', { class: 'sc-lab', style: 'display:flex;align-items:center;gap:5px' }, [
+          el('span', { html: icon(ic, 13), style: `color:${color};display:inline-flex` }),
+          el('span', { text: label }),
+        ]),
+        el('span', { style: `width:8px;height:8px;border-radius:50%;background:${stColor(stKey)};box-shadow:0 0 5px ${stColor(stKey)}` }),
+      ]),
+      el('div', { class: 't-num-md', style: `color:${color};margin-top:6px`, text: value != null ? `${value}` : '—' }),
+      el('div', { class: 't-caption', style: 'margin-top:2px', text: `${unit ? unit + ' · ' : ''}${isUz ? "me'yor" : 'норма'}: ${norm}` }),
+      el('div', { style: 'margin-top:5px' }, [trendBadge(tr)]),
+    ]);
     const sensors = el('div', { class: 'sensor-grid' }, [
-      sensorCard({ label: 'DO', value: a.avgDo, unit: 'mg/L', isLive: a.online > 0 }),
-      sensorCard({ label: t('tm.temp'), value: a.avgTemp, unit: '°C', isLive: a.online > 0 }),
-      sensorCard({ label: 'pH', value: a.avgPh, isLive: a.online > 0 }),
-      sensorCard({ label: t('tm.online'), value: `${a.online}/${a.deviceCount}`, isLive: a.online > 0 }),
+      paramCard({ label: 'Kislorod (DO)', ic: 'waves', value: a.avgDo, unit: 'mg/L', color: 'var(--chart-do)',
+        norm: `≥${th.do.warn}`, stKey: evalDo(a.avgDo), tr: calcTrend(trendPts, 'do') }),
+      paramCard({ label: t('tm.temp'), ic: 'thermometer', value: a.avgTemp, unit: '°C', color: 'var(--chart-temp)',
+        norm: `${th.temp.warnMin}–${th.temp.warnMax}`, stKey: evalTemp(a.avgTemp), tr: calcTrend(trendPts, 't') }),
+      paramCard({ label: 'pH', ic: 'activity', value: a.avgPh, unit: '', color: 'var(--chart-ph)',
+        norm: `${th.ph.warnMin}–${th.ph.warnMax}`, stKey: evalPh(a.avgPh), tr: calcTrend(trendPts, 'ph') }),
+      paramCard({ label: isUz ? 'Batareya' : 'Батарея', ic: 'battery', value: (() => {
+          const b = devs.map((d) => (st.telemetry.get(d.id) || {}).battery).filter((v) => v != null);
+          return b.length ? Math.round(b.reduce((x, y) => x + y, 0) / b.length) : null;
+        })(), unit: '%', color: 'var(--md-secondary)', norm: `≥${th.battery.warn}%`,
+        stKey: 'healthy', tr: null }),
     ]);
 
     // Devices
@@ -682,16 +833,175 @@ export function renderLakeDetailPage(nav, lakeId) {
 
     const advisor = aiAdvisorCard({ lake, devs, telemetry: st.telemetry, weather: weatherData });
 
-    const components = [header, sensors, historyCard];
-    if (weatherCardNode) components.push(weatherCardNode);
-    components.push(advisor, devicesCard, ...actions);
+    // ================= DS-A: JORIY HOLAT bloklari =================
 
-    mount(content, el('div', { class: 'stack' }, components));
+    // --- 24h KISLOROD grafigi (min/o'rta/maks bilan) ---
+    const doVals = trendPts.map((x) => x.do).filter((v) => typeof v === 'number' && Number.isFinite(v));
+    let doMiniCard = null;
+    {
+      let body;
+      if (doVals.length >= 2) {
+        const w = 560, h = 120, minV = Math.min(...doVals), maxV = Math.max(...doVals);
+        const span = (maxV - minV) || 1;
+        const xs = trendPts.filter((x) => typeof x.do === 'number');
+        const coord = xs.map((pt, i) => [ (i / (xs.length - 1)) * w, h - 12 - ((pt.do - minV) / span) * (h - 28) ]);
+        const line = coord.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+        const area = `M ${coord[0][0].toFixed(1)} ${h} ` + coord.map(([x, y]) => `L ${x.toFixed(1)} ${y.toFixed(1)}`).join(' ') + ` L ${coord[coord.length-1][0].toFixed(1)} ${h} Z`;
+        const warnY = h - 12 - ((th.do.warn - minV) / span) * (h - 28);
+        const thLine = (th.do.warn >= minV && th.do.warn <= maxV)
+          ? `<line x1="0" y1="${warnY.toFixed(1)}" x2="${w}" y2="${warnY.toFixed(1)}" class="chart-threshold" stroke="var(--md-warning)"/>` : '';
+        body = el('div', { html: `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" preserveAspectRatio="none">
+          <defs><linearGradient id="doarea-${lakeId}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="var(--chart-do)" stop-opacity=".2"/>
+            <stop offset="100%" stop-color="var(--chart-do)" stop-opacity="0"/></linearGradient></defs>
+          <path d="${area}" fill="url(#doarea-${lakeId})"/>${thLine}
+          <polyline points="${line}" fill="none" stroke="var(--chart-do)" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round"/></svg>` });
+      } else {
+        body = el('div', { class: 't-body-sm muted', style: 'text-align:center;padding:22px 0',
+          text: isUz ? "Ma'lumot to'planmoqda..." : 'Данные накапливаются...' });
+      }
+      const stat = (lab, v, col) => el('div', { style: 'flex:1;text-align:center;padding:8px;border-radius:var(--shape-sm);background:var(--md-surface-container-low)' }, [
+        el('div', { class: 't-caption', text: lab }),
+        el('div', { class: 't-num-md', style: `font-size:17px;color:${col}`, text: v != null ? v.toFixed(1) : '—' }),
+      ]);
+      const avg = doVals.length ? doVals.reduce((x, y) => x + y, 0) / doVals.length : null;
+      doMiniCard = mdCard([
+        el('div', { class: 'row-between', style: 'margin-bottom:6px' }, [
+          el('span', { class: 't-title-sm', style: 'display:flex;align-items:center;gap:6px' }, [
+            el('span', { html: icon('waves', 16), style: 'color:var(--chart-do);display:inline-flex' }),
+            el('span', { text: isUz ? 'Kislorod — oxirgi 24 soat' : 'Кислород — за 24 часа' }),
+          ]),
+        ]),
+        body,
+        el('div', { style: 'display:flex;gap:8px;margin-top:10px' }, [
+          stat(isUz ? 'Minimum' : 'Минимум', doVals.length ? Math.min(...doVals) : null, 'var(--md-critical)'),
+          stat(isUz ? "O'rtacha" : 'Среднее', avg, 'var(--chart-do)'),
+          stat(isUz ? 'Maksimum' : 'Максимум', doVals.length ? Math.max(...doVals) : null, 'var(--md-success)'),
+        ]),
+      ]);
+    }
+
+    // --- AERATOR BOSHQARUVI (qurilma tasdig'i bilan) ---
+    const selTel = selectedDevId ? st.telemetry.get(selectedDevId) : null;
+    const selOnline = selTel ? presence(selTel.ts) === 'online' : false;
+    const isManual = selTel && selTel.manual === 1;
+    const aerOn = selTel && selTel.aer === 1;
+    const devChips = devs.length > 1 ? el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px' },
+      devs.map((d) => {
+        const b = el('button', { class: 'md-tab' + (d.id === selectedDevId ? ' active' : ''),
+          style: 'flex:none;padding:6px 12px;font-size:11px', text: d.id.slice(-4) });
+        b.addEventListener('click', () => { selectedDevId = d.id; render(); });
+        return b;
+      })) : null;
+    const aerRow = (lab, val) => el('div', { class: 'row-between', style: 'padding:6px 0;border-bottom:1px solid var(--md-outline-variant);font-size:12.5px' }, [
+      el('span', { class: 'muted', text: lab }),
+      el('span', { style: 'font-weight:700;font-variant-numeric:tabular-nums', text: val }),
+    ]);
+    const btnAuto = mdButton({ label: 'AUTO', icon: 'activity', variant: (!isManual && selOnline) ? 'filled' : 'outlined',
+      onClick: () => sendAer(COMMAND_TYPES.AERATOR_OFF) });
+    const btnOn = mdButton({ label: isUz ? 'Majburiy YOQISH' : 'Принуд. ВКЛ', icon: 'power', variant: isManual ? 'filled' : 'tonal',
+      onClick: () => sendAer(COMMAND_TYPES.AERATOR_ON) });
+    const btnOff = mdButton({ label: isUz ? "Majburiy O'CHIRISH" : 'Принуд. ВЫКЛ', icon: 'power', variant: 'outlined', onClick: () => {} });
+    btnOff.disabled = true;
+    if (!selectedDevId || !selOnline) { btnAuto.disabled = true; btnOn.disabled = true; }
+    const aeratorCard = mdCard([
+      el('div', { class: 'row-between', style: 'margin-bottom:8px' }, [
+        el('span', { class: 't-title-sm', style: 'display:flex;align-items:center;gap:6px' }, [
+          el('span', { html: icon('power', 16), style: 'color:var(--md-primary);display:inline-flex' }),
+          el('span', { text: isUz ? 'Aerator boshqaruvi' : 'Управление аэратором' }),
+        ]),
+        statusChip(aerOn ? 'healthy' : 'offline', aerOn ? (isUz ? 'ISHLAMOQDA' : 'РАБОТАЕТ') : (isUz ? "TO'XTATILGAN" : 'ОСТАНОВЛЕН')),
+      ]),
+      devChips,
+      el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px' }, [btnAuto, btnOn, btnOff]),
+      el('div', { class: 't-caption', style: 'margin-bottom:8px', text: isUz
+        ? "Majburiy o'chirish qurilmada yo'q — AUTO rejimda kislorod yetarli bo'lsa qurilma o'zi o'chiradi (baliq himoyasi)."
+        : 'Принудительного ВЫКЛ в устройстве нет — в AUTO устройство отключает само при достатке кислорода.' }),
+      aerRow(isUz ? 'Hozirgi rejim' : 'Режим', isManual
+        ? (isUz ? "QO'LDA" : 'РУЧНОЙ') + (selTel && selTel.man_remain > 0 ? ` (${selTel.man_remain} ${isUz ? 'daq' : 'мин'})` : '')
+        : (selTel && selTel.mode === 1 ? (isUz ? 'AVTO (vaqt)' : 'АВТО (время)') : (isUz ? 'AVTO (kislorod)' : 'АВТО (кислород)'))),
+      aerRow(isUz ? 'Oxirgi buyruq' : 'Последняя команда', selTel && selTel.last_cmd_ts ? fmtAgo(selTel.last_cmd_ts, isUz) : '—'),
+      aerRow(isUz ? 'Bugun ishlagan vaqti' : 'Наработка сегодня', '—'),
+      aerRow(isUz ? 'Bugungi elektr sarfi' : 'Расход эл-ва сегодня', '—'),
+      el('div', { class: 't-caption', style: 'margin-top:6px', text: isUz
+        ? "Ish vaqti va elektr hisobi Tarix bosqichi (B) bilan yoqiladi."
+        : 'Наработка и расход включатся на этапе Истории (B).' }),
+    ]);
+
+    // --- ALOQA SIFATI ---
+    const connCard = mdCard([
+      el('div', { class: 't-title-sm', style: 'display:flex;align-items:center;gap:6px;margin-bottom:8px' }, [
+        el('span', { html: icon('wifi', 16), style: 'color:var(--md-primary);display:inline-flex' }),
+        el('span', { text: isUz ? 'Aloqa sifati' : 'Качество связи' }),
+      ]),
+      ...(devs.length ? devs.map((d) => {
+        const tel = st.telemetry.get(d.id) || null;
+        const pres = tel ? presence(tel.ts) : 'offline';
+        const q = rssiQuality(tel && tel.rssi != null ? Number(tel.rssi) : null, isUz);
+        return el('div', { class: 'row-between', style: 'padding:8px 0;border-bottom:1px solid var(--md-outline-variant)' }, [
+          el('div', {}, [
+            el('div', { class: 't-mono', style: 'font-size:12.5px;font-weight:700', text: d.id }),
+            el('div', { class: 't-caption', text: `${isUz ? 'Oxirgi aloqa' : 'Связь'}: ${fmtAgo(tel && tel.ts, isUz)}`
+              + (tel && tel.battery != null ? ` · ${isUz ? 'Batareya' : 'Батарея'} ${tel.battery}%` : '') }),
+          ]),
+          el('div', { style: 'text-align:right' }, [
+            statusChip(pres === 'online' ? 'healthy' : 'offline', pres === 'online' ? 'Online' : 'Offline'),
+            el('div', { class: 't-caption', style: `margin-top:3px;color:${q.color};font-weight:700;font-variant-numeric:tabular-nums`,
+              text: tel && tel.rssi != null ? `RSSI ${tel.rssi} dBm · ${q.label}` : 'RSSI —' }),
+          ]),
+        ]);
+      }) : [el('div', { class: 't-body-sm muted', text: t('lake.noDevices') })]),
+    ]);
+
+    // --- YEM TAVSIYASI (C/D bosqichlarga tayyor joy) ---
+    const feedCard = mdCard([
+      el('div', { class: 't-title-sm', style: 'display:flex;align-items:center;gap:6px;margin-bottom:6px' }, [
+        el('span', { html: icon('droplet', 16), style: 'color:var(--md-tertiary);display:inline-flex' }),
+        el('span', { text: isUz ? 'Yem tavsiyasi' : 'Рекомендация корма' }),
+      ]),
+      el('div', { class: 't-body-sm muted', text: isUz
+        ? "Aniq hisob uchun Sozlamalar tabida baliq turi, soni va vaznini kiriting — tizim soat, kg va narxni avtomatik hisoblaydi."
+        : 'Для расчёта укажите в Настройках вид, количество и вес рыбы — система рассчитает часы, кг и стоимость.' }),
+      el('div', { style: 'margin-top:10px' }, [
+        mdButton({ label: isUz ? 'Sozlamalarga o\'tish' : 'К настройкам', variant: 'tonal',
+          onClick: () => { activeTab = 'sozlama'; render(); } }),
+      ]),
+    ]);
+
+    // --- TARIX tabi eslatmasi ---
+    const tarixNote = el('div', { class: 'md-banner info' , style: 'margin-top:2px'}, [
+      el('span', { html: icon('info', 15), style: 'display:inline-flex;flex:none' }),
+      el('span', { text: isUz
+        ? "Jadval, Excel/CSV/PDF eksport va elektr/yem hisoblari B-bosqichda qo'shiladi."
+        : 'Таблица, экспорт Excel/CSV/PDF и расчёты — на этапе B.' }),
+    ]);
+
+    // --- SOZLAMALAR tabi eslatmasi ---
+    const setupNote = el('div', { class: 'md-banner info' }, [
+      el('span', { html: icon('info', 15), style: 'display:inline-flex;flex:none' }),
+      el('span', { text: isUz
+        ? "Ko'l pasporti (maydon, chuqurlik, 4 baliq turi, yem, aeratorlar) C-bosqichda shu yerga qo'shiladi."
+        : 'Паспорт озера (площадь, глубина, рыба, корм, аэраторы) добавится на этапе C.' }),
+    ]);
+
+    // ================= TAB KOMPOZITSIYASI =================
+    tabBtns.forEach((b, id) => b.classList.toggle('active', id === activeTab));
+    let components;
+    if (activeTab === 'tarix') components = [historyCard, tarixNote];
+    else if (activeTab === 'ai') components = [advisor];
+    else if (activeTab === 'sozlama') components = [devicesCard, setupNote, ...actions];
+    else {
+      components = [header, sensors, doMiniCard, aeratorCard, connCard];
+      if (weatherCardNode) components.push(weatherCardNode);
+      components.push(feedCard);
+    }
+    mount(content, el('div', { class: 'stack anim-up' }, components));
   }
 
   const unsub = dataStore.subscribe(render);
   render();
-  root.__cleanup = unsub;
+  root.__cleanup = () => { unsub(); pageAck.cancel(); };
   return root;
 }
 
