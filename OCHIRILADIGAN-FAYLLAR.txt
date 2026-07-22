@@ -1,0 +1,22 @@
+F-BOSQICH: O'LIK KOD TOZALASH — quyidagi 10 faylni loyihadan O'CHIRING.
+Tekshirildi: hech qayerdan chaqirilmaydi (importlar index fayllardan olib
+tashlangan, build va barcha testlar ularsiz muvaffaqiyatli o'tdi).
+
+git ishlatsangiz, bitta buyruq:
+
+git rm src/features/telemetry/views/dashboardView.js src/features/telemetry/views/deviceDetailView.js src/features/auth/views/profileView.js src/features/auth/views/settingsView.js src/features/lakes/views/lakeDetailView.js src/features/lakes/views/lakeFormView.js src/features/lakes/views/lakesListView.js src/features/ownership/views/pendingRequestsView.js src/features/devices/views/claimView.js src/shared/base.css
+
+Yoki qo'lda o'chiring:
+  src/features/telemetry/views/dashboardView.js
+  src/features/telemetry/views/deviceDetailView.js
+  src/features/auth/views/profileView.js
+  src/features/auth/views/settingsView.js
+  src/features/lakes/views/lakeDetailView.js
+  src/features/lakes/views/lakeFormView.js
+  src/features/lakes/views/lakesListView.js
+  src/features/ownership/views/pendingRequestsView.js
+  src/features/devices/views/claimView.js
+  src/shared/base.css
+
+MUHIM: bu zipdagi 5 ta index.js fayli o'sha o'chirishlarga moslangan —
+avval zipni qo'ying, keyin fayllarni o'chiring, so'ng `npm run build`.

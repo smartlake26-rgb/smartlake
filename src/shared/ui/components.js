@@ -18,7 +18,7 @@ export function mdButton({ label, variant = 'filled', icon: ic, onClick, disable
 }
 
 export function mdIconButton({ icon: ic, onClick, label }) {
-  const b = el('button', { class: 'md-iconbtn', html: icon(ic, 22), title: label || '' });
+  const b = el('button', { class: 'md-iconbtn', html: icon(ic, 22), title: label || '', 'aria-label': label || ic });
   if (onClick) b.addEventListener('click', onClick);
   return b;
 }
@@ -164,7 +164,7 @@ export function openDialog({ title, body, actions = [] }) {
   const close = () => scrim.remove();
   const actionRow = el('div', { class: 'row', style: 'justify-content:flex-end;gap:8px;margin-top:20px' },
     actions.map((a) => mdButton({ label: a.label, variant: a.variant || 'text', onClick: () => { close(); a.onClick && a.onClick(); } })));
-  const dialog = el('div', { class: 'md-dialog' }, [
+  const dialog = el('div', { class: 'md-dialog', role: 'dialog', 'aria-modal': 'true' }, [
     el('div', { class: 't-title', style: 'margin-bottom:8px', text: title }),
     ...(body ? [el('div', { class: 't-body muted' }, typeof body === 'string' ? [el('span', { text: body })] : [body])] : []),
     actionRow,

@@ -77,7 +77,7 @@ export function renderHomeTab(nav) {
       title: `${t('home.hi')}, ${s.profile ? s.profile.ism : ''}`,
       subtitle: t('role.' + (s.role || 'farmer')),
       leading: s.profile && s.profile.photoUrl
-        ? el('img', { src: s.profile.photoUrl, class: 'md-avatar', style: 'object-fit:cover;border:1px solid color-mix(in srgb, var(--md-primary) 18%, transparent)' })
+        ? el('img', { src: s.profile.photoUrl, alt: '', class: 'md-avatar', style: 'object-fit:cover;border:1px solid color-mix(in srgb, var(--md-primary) 18%, transparent)' })
         : el('div', { class: 'md-avatar', text: initials(s.profile) }),
       actions: [
         mdIconButton({ icon: 'bell', onClick: () => nav.switchTab('alerts') }),

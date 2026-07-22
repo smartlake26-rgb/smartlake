@@ -3,5 +3,4 @@
 // ============================================================
 
 export { ownershipService } from './services/ownershipService.js';
-export { renderPendingRequests } from './views/pendingRequestsView.js';
 export * as ownership from './ownership.js';

@@ -75,6 +75,7 @@ export function createShell(root, ctx = {}) {
     }
     if (subPage) { mountNode(subPage.render(nav)); return; }
     const tabNode = TABS[activeTab](nav);
+    tabNode.classList.add('anim-up');   // DS-F: sahifa o'tish animatsiyasi
     const shell = el('div', { class: 'md-app' }, [tabNode, bottomNav({ items: navItems(), active: activeTab, onSelect: nav.switchTab })]);
     shell.__cleanup = tabNode.__cleanup;
     mountNode(shell);

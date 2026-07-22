@@ -16,8 +16,6 @@ export { telemetryService } from './services/telemetryService.js';
 export { historyService, RANGES } from './services/historyService.js';
 
 // Views
-export { renderDashboard } from './views/dashboardView.js';
-export { renderDeviceDetail } from './views/deviceDetailView.js';
 
 // Constants
 export { DEVICE_STATUS, LEVEL, DEFAULT_THRESHOLDS } from './constants/telemetryConstants.js';
