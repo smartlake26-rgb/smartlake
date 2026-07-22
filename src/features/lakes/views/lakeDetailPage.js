@@ -779,7 +779,6 @@ export function renderLakeDetailPage(nav, lakeId) {
 
     // Beautiful dedicated Weather Card
     let weatherCardNode = null;
-    const isUz = detectLocale() === 'uz';
     if (weatherData) {
       const weatherIconName = getWeatherIcon(weatherData.code);
       const tomorrowIconName = getWeatherIcon(weatherData.code); // simple fallback
