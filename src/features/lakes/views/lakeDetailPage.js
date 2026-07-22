@@ -36,6 +36,9 @@ import { icon } from '../../../shared/icons.js';
 import { historyService, RANGES } from '../../telemetry/services/historyService.js';
 import { presence } from '../../telemetry/domain/freshness.js';
 import { buildHistoryTab } from '../../telemetry/views/historyTab.js';
+import { buildLakeSettingsTab } from './lakeSettingsTab.js';
+import { computeFeedPlan } from '../../telemetry/domain/feedEngine.js';
+import { loadLakeMeta } from '../../telemetry/services/archiveService.js';
 import { commandService } from '../../commands/services/commandService.js';
 import { createAckTracker } from '../../commands/domain/ackTracker.js';
 import { COMMAND_TYPES } from '../../../core/collections.js';
@@ -190,6 +193,22 @@ export function renderLakeDetailPage(nav, lakeId) {
       });
     }
     return historyTabNode;
+  }
+
+  // --- LAKE META (C-bosqich: pasport/baliq/yem/aeratorlar) ---
+  let lakeMeta = null;
+  loadLakeMeta(lakeId).then((m) => { lakeMeta = m; render(); }).catch(() => {});
+
+  // --- SOZLAMALAR tabi (C-bosqich): bir marta quriladi ---
+  let settingsTabNode = null;
+  function getSettingsTabNode() {
+    if (!settingsTabNode) {
+      settingsTabNode = buildLakeSettingsTab({
+        lakeId, uid: s.uid, isUz,
+        onSaved: (m) => { lakeMeta = m; render(); },
+      });
+    }
+    return settingsTabNode;
   }
 
   // --- 24h TREND/DO-grafik keshi (Joriy holat uchun) ---
@@ -971,27 +990,42 @@ export function renderLakeDetailPage(nav, lakeId) {
       }) : [el('div', { class: 't-body-sm muted', text: t('lake.noDevices') })]),
     ]);
 
-    // --- YEM TAVSIYASI (C/D bosqichlarga tayyor joy) ---
+    // --- YEM TAVSIYASI (C-bosqich: feedEngine + lakeMeta) ---
+    const feedPlan = lakeMeta ? computeFeedPlan({ fish: lakeMeta.fish || [], feed: lakeMeta.feed || {}, tempC: a.avgTemp }) : null;
+    let feedBody;
+    if (feedPlan) {
+      const fr = (lab, val, col = 'var(--md-on-surface)') => el('div', { class: 'row-between', style: 'padding:5px 0;border-bottom:1px solid var(--md-outline-variant);font-size:12.5px' }, [
+        el('span', { class: 'muted', text: lab }),
+        el('span', { style: `font-weight:800;font-variant-numeric:tabular-nums;color:${col}`, text: val }),
+      ]);
+      feedBody = el('div', {}, [
+        el('div', { style: 'display:flex;gap:8px;margin-bottom:8px' }, feedPlan.meals.map((m) =>
+          el('div', { style: 'flex:1;text-align:center;padding:8px 4px;border-radius:var(--shape-sm);background:color-mix(in srgb, var(--md-tertiary) 8%, var(--md-surface-container-lowest));border:1px solid color-mix(in srgb, var(--md-tertiary) 18%, var(--md-outline-variant))' }, [
+            el('div', { class: 't-caption', style: 'font-weight:700', text: m.time }),
+            el('div', { style: 'font-weight:800;font-size:15px;color:var(--md-tertiary);font-variant-numeric:tabular-nums', text: `${m.kg.toFixed(1)} kg` }),
+          ]))),
+        fr(isUz ? 'Biomassa' : 'Биомасса', `${feedPlan.biomass.toFixed(0)} kg`),
+        fr(isUz ? `Stavka (${a.avgTemp != null ? a.avgTemp + '°C' : '—'})` : `Ставка (${a.avgTemp != null ? a.avgTemp + '°C' : '—'})`, `${feedPlan.ratePct}% / ${isUz ? 'kun' : 'день'}`),
+        fr(isUz ? 'Bugun jami' : 'Всего сегодня', `${feedPlan.dailyKg.toFixed(1)} kg`, 'var(--md-tertiary)'),
+        fr(isUz ? 'Taxminiy narxi' : 'Стоимость', feedPlan.dailyCost != null ? `${Math.round(feedPlan.dailyCost).toLocaleString()} ${isUz ? "so'm" : 'сум'}` : '—', 'var(--md-primary)'),
+      ]);
+    } else {
+      feedBody = el('div', {}, [
+        el('div', { class: 't-body-sm muted', text: isUz
+          ? "Aniq hisob uchun Sozlamalar tabida baliq turi, soni va vaznini kiriting — tizim soat, kg va narxni avtomatik hisoblaydi."
+          : 'Для расчёта укажите в Настройках вид, количество и вес рыбы.' }),
+        el('div', { style: 'margin-top:10px' }, [
+          mdButton({ label: isUz ? 'Sozlamalarga o\'tish' : 'К настройкам', variant: 'tonal',
+            onClick: () => { activeTab = 'sozlama'; render(); } }),
+        ]),
+      ]);
+    }
     const feedCard = mdCard([
-      el('div', { class: 't-title-sm', style: 'display:flex;align-items:center;gap:6px;margin-bottom:6px' }, [
+      el('div', { class: 't-title-sm', style: 'display:flex;align-items:center;gap:6px;margin-bottom:8px' }, [
         el('span', { html: icon('droplet', 16), style: 'color:var(--md-tertiary);display:inline-flex' }),
         el('span', { text: isUz ? 'Yem tavsiyasi' : 'Рекомендация корма' }),
       ]),
-      el('div', { class: 't-body-sm muted', text: isUz
-        ? "Aniq hisob uchun Sozlamalar tabida baliq turi, soni va vaznini kiriting — tizim soat, kg va narxni avtomatik hisoblaydi."
-        : 'Для расчёта укажите в Настройках вид, количество и вес рыбы — система рассчитает часы, кг и стоимость.' }),
-      el('div', { style: 'margin-top:10px' }, [
-        mdButton({ label: isUz ? 'Sozlamalarga o\'tish' : 'К настройкам', variant: 'tonal',
-          onClick: () => { activeTab = 'sozlama'; render(); } }),
-      ]),
-    ]);
-
-    // --- SOZLAMALAR tabi eslatmasi ---
-    const setupNote = el('div', { class: 'md-banner info' }, [
-      el('span', { html: icon('info', 15), style: 'display:inline-flex;flex:none' }),
-      el('span', { text: isUz
-        ? "Ko'l pasporti (maydon, chuqurlik, 4 baliq turi, yem, aeratorlar) C-bosqichda shu yerga qo'shiladi."
-        : 'Паспорт озера (площадь, глубина, рыба, корм, аэраторы) добавится на этапе C.' }),
+      feedBody,
     ]);
 
     // ================= TAB KOMPOZITSIYASI =================
@@ -999,7 +1033,7 @@ export function renderLakeDetailPage(nav, lakeId) {
     let components;
     if (activeTab === 'tarix') components = [historyCard, getHistoryTabNode()];
     else if (activeTab === 'ai') components = [advisor];
-    else if (activeTab === 'sozlama') components = [devicesCard, setupNote, ...actions];
+    else if (activeTab === 'sozlama') components = [getSettingsTabNode(), devicesCard, ...actions];
     else {
       components = [header, sensors, doMiniCard, aeratorCard, connCard];
       if (weatherCardNode) components.push(weatherCardNode);

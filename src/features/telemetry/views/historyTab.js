@@ -15,6 +15,7 @@ import { historyService } from '../services/historyService.js';
 import {
   fetchArchive, aggregateSamples, aeratorRuntimeMs, loadLakeMeta, saveLakeMeta,
 } from '../services/archiveService.js';
+import { computeFeedPlan, periodFeedTotals } from '../domain/feedEngine.js';
 
 const DAY = 24 * 3600e3;
 
@@ -126,6 +127,7 @@ export function buildHistoryTab({ lakeId, uid, isUz, getDevs, getTh }) {
       renderTable();
       renderSummary(fromTs, toTs);
       renderEnergy(fromTs, toTs);
+      renderFeed();
     } finally { loading = false; }
   }
 
@@ -275,22 +277,48 @@ export function buildHistoryTab({ lakeId, uid, isUz, getDevs, getTh }) {
       : 'Наработка восстанавливается по состоянию реле в телеметрии; расчёт за выбранный период.' }),
   ]);
 
-  // ---------- yem bo'limi (C-bosqichga tayyor karkas) ----------
+  // ---------- yem hisobi (C-bosqich: feedEngine + lakeMeta) ----------
+  const feedBox2 = el('div', {});
+  function renderFeed() {
+    const fr = (lab, val, col = 'var(--md-on-surface)') => el('div', { class: 'row-between', style: 'padding:6px 0;border-bottom:1px solid var(--md-outline-variant);font-size:12.5px' }, [
+      el('span', { class: 'muted', text: lab }),
+      el('span', { style: `font-weight:800;font-variant-numeric:tabular-nums;color:${col}`, text: val }),
+    ]);
+    const fish = (meta && meta.fish) || [];
+    const feed = (meta && meta.feed) || {};
+    // Davr o'rtacha harorati (qatorlardan) -> stavka realroq bo'ladi
+    const temps = rows.map((r) => r.t).filter((v) => v != null);
+    const avgT = temps.length ? temps.reduce((a, b) => a + b, 0) / temps.length : null;
+    const plan = computeFeedPlan({ fish, feed, tempC: avgT });
+    if (!plan) {
+      mount(feedBox2, el('div', { class: 't-body-sm muted', text: isUz
+        ? "Sozlamalar tabida baliq va yem ma'lumotlarini kiriting — hisob avtomatik yoqiladi."
+        : 'Укажите данные о рыбе и корме в Настройках — расчёт включится автоматически.' }));
+      return;
+    }
+    const kg = (v) => `${v.toFixed(1)} kg`;
+    const sum = (v) => v != null ? `${Math.round(v).toLocaleString()} ${isUz ? "so'm" : 'сум'}` : '—';
+    const week = periodFeedTotals(plan, 7), month = periodFeedTotals(plan, 30);
+    const [fromTs, toTs] = rangeFor(filter);
+    const days = Math.max(1, Math.round((toTs - fromTs) / DAY));
+    const period = periodFeedTotals(plan, days);
+    mount(feedBox2,
+      fr(isUz ? 'Bugungi yem' : 'Корм сегодня', kg(plan.dailyKg), 'var(--md-tertiary)'),
+      fr(isUz ? 'Haftalik' : 'За неделю', kg(week.kg)),
+      fr(isUz ? 'Oylik' : 'За месяц', kg(month.kg)),
+      fr(isUz ? `Tanlangan davr (${days} kun)` : `Период (${days} дн)`, kg(period.kg), 'var(--md-tertiary)'),
+      fr(isUz ? 'Davr xarajati' : 'Затраты периода', sum(period.cost), 'var(--md-primary)'),
+    );
+  }
   const feedCard = mdCard([
     el('div', { class: 't-title-sm', style: 'display:flex;align-items:center;gap:6px;margin-bottom:8px' }, [
       el('span', { html: icon('droplet', 16), style: 'color:var(--md-tertiary);display:inline-flex' }),
       el('span', { text: isUz ? 'Yem hisobi' : 'Учёт корма' }),
     ]),
-    el('div', {}, [
-      ...[[isUz ? 'Bugungi yem' : 'Корм сегодня'], [isUz ? 'Haftalik' : 'За неделю'], [isUz ? 'Oylik' : 'За месяц'], [isUz ? 'Jami yem' : 'Всего корма'], [isUz ? 'Jami xarajat' : 'Всего затрат']]
-        .map(([lab]) => el('div', { class: 'row-between', style: 'padding:6px 0;border-bottom:1px solid var(--md-outline-variant);font-size:12.5px' }, [
-          el('span', { class: 'muted', text: lab }),
-          el('span', { style: 'font-weight:800', text: '—' }),
-        ])),
-    ]),
+    feedBox2,
     el('div', { class: 't-caption', style: 'margin-top:6px', text: isUz
-      ? "Hisob Sozlamalar (C-bosqich)da baliq soni, vazni va yem narxi kiritilgach avtomatik yoqiladi."
-      : 'Расчёт включится после ввода данных о рыбе и корме в Настройках (этап C).' }),
+      ? "Stavka davr o'rtacha haroratiga bog'liq; jami — kunlik reja × kunlar (taxminiy)."
+      : 'Ставка зависит от средней темп. периода; итог — дневной план × дни (оценка).' }),
   ]);
 
   // ---------- yig'ish ----------
@@ -316,6 +344,7 @@ export function buildHistoryTab({ lakeId, uid, isUz, getDevs, getTh }) {
     meta = m;
     if (m && m.energy) { if (m.energy.kw) kwIn.value = m.energy.kw; if (m.energy.tariff) tarifIn.value = m.energy.tariff; }
     const [f, t2] = rangeFor(filter); renderEnergy(f, t2);
+    renderFeed();
   });
   loadData();
 
