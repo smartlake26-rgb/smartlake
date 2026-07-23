@@ -307,9 +307,14 @@ export function buildReportTab({ lakeId, uid, isUz, getDevs, lakeName = '' }) {
       const seen = new Set(arch.map((x) => Math.floor(x.ts / 300e3)));
       samples = arch.concat(rtdb.filter((x) => !seen.has(Math.floor(x.ts / 300e3))))
         .sort((a, b) => a.ts - b.ts);
-      renderAll();
-    } catch (e) { renderError(); }
-    finally { loading = false; }
+    } catch (e) {
+      // Arxiv o'qishda xato (masalan, ruxsat yo'q) — samples bo'sh qoladi,
+      // lekin yem/elektr/moliya meta'dan hisob-lanadi va ko'rsatiladi
+      samples = [];
+    } finally {
+      loading = false;
+    }
+    renderAll();   // xato bo'lsa ham meta'dan hisoblangan ma'lumotlar ko'rsatiladi
   }
 
   const node = el('div', { class: 'sl-stack' }, [
