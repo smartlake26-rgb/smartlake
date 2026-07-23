@@ -41,12 +41,13 @@ import {
 } from '../services/archiveService.js';
 import { getLakeWeather, getWeatherIcon } from '../services/weatherService.js';
 import { renderLakeDetailPage } from '../../lakes/views/lakeDetailPage.js';
-import { toggleTheme, getTheme } from '../../../shared/ui/theme.js';
 import {
   slIcon, ICONS, slIconButton, slCard, slStatCard,
   slLakeCard, slAiCard, slWeatherCard, slEmptyState, slKvRow,
-  slBadge, slCountUp,
+  slBadge, slCountUp, slFeedSchedule, slLakeMonitorCard, slButton,
 } from '../../../design-system/index.js';
+import { fetchAnnouncements } from '../../announcements/announcementsService.js';
+import { announcementCard } from '../../announcements/views/announcementsTab.js';
 
 /* ------------------------------------------------------------
    Modul-darajali keshlar (tab qayta ochilganda ham ishlaydi)
@@ -160,13 +161,17 @@ export function renderHomeTab(nav) {
     const overall = withDev.length
       ? Math.round(withDev.reduce((sum, x) => sum + x.a.healthScore, 0) / withDev.length) : null;
     const alerts = perLake.filter((x) => x.a.hasAlarm || x.msgs.length);
+    const assigned = st.devices.filter((d) => d.lakeId);
+    const onlineDevs = assigned.filter((d) => presence((st.telemetry.get(d.id) || {}).ts) === 'online').length;
     return {
       perLake,
       overall,
       online: perLake.filter((x) => x.anyOnline),
       offline: perLake.filter((x) => !x.anyOnline),
       alerts,
-      onlineDevs: st.devices.filter((d) => d.lakeId && presence((st.telemetry.get(d.id) || {}).ts) === 'online').length,
+      activeDevices: assigned.length,
+      onlineDevs,
+      offlineDevs: assigned.length - onlineDevs,
     };
   }
 
@@ -177,7 +182,7 @@ export function renderHomeTab(nav) {
       snap.perLake.map((x) => [x.lake.id, x.lake.name, x.a.status, x.a.healthScore,
         x.a.avgDo, x.a.avgTemp, x.a.avgPh, x.a.online, x.a.offline,
         Math.floor((x.a.lastUpdate || 0) / 60000)]),
-      st.lakes.length, st.devices.length,
+      st.lakes.length, st.devices.length, snap.onlineDevs,
       [...weatherCache.keys()].map((k) => (weatherCache.get(k).data || {}).temp),
     ]);
   }
@@ -228,135 +233,52 @@ export function renderHomeTab(nav) {
   }
 
   /* ----------------------------------------------------------
-     1 · TIZIM SALOMATLIGI (hero)
+     DASH-V4: 4 STAT KARTA (heroCard/aiCard/energyBox o'chirildi)
      ---------------------------------------------------------- */
-  const heroNum = el('span', { class: 'sl-num-lg', style: 'font-size:44px' });
-  function heroCard(snap) {
-    const g = gradeOf(snap.overall ?? 0);
-    const card = slCard([
-      el('div', { class: 'sl-row-between' }, [
-        el('div', {}, [
-          el('div', { class: 'sl-label', style: 'color:var(--sl-text-secondary)', text: t('dash.systemHealth') }),
-          el('div', { class: 'sl-row', style: 'align-items:baseline;gap:6px;margin-top:6px' }, [
-            heroNum,
-            el('span', { class: 'sl-num-md', style: `color:var(${g.colorVar})`, text: snap.overall == null ? '' : '%' }),
-          ]),
-          el('div', { style: `margin-top:4px;font-weight:700;color:var(${g.colorVar})`,
-            text: snap.overall == null ? t('common.noData') : t(g.key) }),
-        ]),
-        el('div', { style: `width:64px;height:64px;border-radius:50%;flex:none;
-          display:flex;align-items:center;justify-content:center;
-          background:color-mix(in srgb, var(${g.colorVar}) 12%, transparent);
-          color:var(${g.colorVar})`, html: slIcon('waves', 30) }),
-      ]),
-    ], {
-      elevated: true, premium: snap.overall != null && snap.overall >= 90,
-      critical: snap.overall != null && snap.overall < 60,
-      ariaLabel: t('dash.systemHealth'),
-      onClick: () => openListDialog(
-        t('dash.healthDetail'),
-        snap.perLake.map((x) => el('div', { class: 'sl-kv-row' }, [
-          el('span', { class: 'kv-key', text: x.lake.name }),
-          el('span', { class: 'kv-val', style: `color:var(${gradeOf(x.a.healthScore).colorVar})`,
-            text: `${x.a.healthScore}%` }),
-        ])),
-        t('common.noData')),
-    });
-    slCountUp(heroNum, snap.overall, { decimals: 0 });
-    if (snap.overall == null) heroNum.textContent = '—';
-    heroNum.style.color = `var(${g.colorVar})`;
-    return card;
+  function statsRow(snap) {
+    return el('div', { class: 'sl-grid-2' }, [
+      slStatCard({ icon: 'chip', value: snap.activeDevices, label: t('dash.activeDevices'),
+        color: 'var(--sl-primary)', ariaLabel: t('dash.activeDevices'),
+        onClick: () => nav.switchTab('devices') }),
+      slStatCard({ icon: 'wifi', value: snap.onlineDevs, label: t('dash.onlineDevices'),
+        color: 'var(--sl-online)', ariaLabel: t('dash.onlineDevices'),
+        onClick: () => openListDialog(`${t('dash.onlineLakes')} — ${snap.online.length}`,
+          snap.online.map((x) => lakeRow(x, { showSignal: true })), t('dash.noOnline')) }),
+      slStatCard({ icon: 'power', value: snap.offlineDevs, label: t('dash.offlineDevices'),
+        color: snap.offlineDevs ? 'var(--sl-critical)' : 'var(--sl-offline)',
+        ariaLabel: t('dash.offlineDevices'),
+        onClick: () => openListDialog(`${t('dash.offlineLakes')} — ${snap.offline.length}`,
+          snap.offline.map((x) => lakeRow(x, { showSignal: true })), t('dash.allOnline')) }),
+      slStatCard({ icon: 'bell', value: snap.alerts.length, label: t('dash.alerts'),
+        color: snap.alerts.length ? 'var(--sl-critical)' : 'var(--sl-offline)',
+        ariaLabel: t('dash.alerts'),
+        onClick: () => openListDialog(`${t('dash.alerts')} — ${snap.alerts.length}`,
+          snap.alerts.map((x) => lakeRow(x, { showMsgs: true })), t('dash.noAlerts'),
+          { label: t('dash.openAlertsPage'), variant: 'text', onClick: () => nav.switchTab('alerts') }) }),
+    ]);
   }
 
-  /* ----------------------------------------------------------
-     2 · ONLINE / OFFLINE + mini statlar
-     ---------------------------------------------------------- */
-  function connectivityRow(snap, st) {
-    const on = slStatCard({ icon: 'wifi', value: snap.online.length, label: t('dash.onlineLakes'),
-      color: 'var(--sl-online)', ariaLabel: t('dash.onlineLakes'),
-      onClick: () => openListDialog(`${t('dash.onlineLakes')} — ${snap.online.length}`,
-        snap.online.map((x) => lakeRow(x, { showSignal: true })), t('dash.noOnline')) });
-    const off = slStatCard({ icon: 'power', value: snap.offline.length, label: t('dash.offlineLakes'),
-      color: snap.offline.length ? 'var(--sl-critical)' : 'var(--sl-offline)',
-      ariaLabel: t('dash.offlineLakes'),
-      onClick: () => openListDialog(`${t('dash.offlineLakes')} — ${snap.offline.length}`,
-        snap.offline.map((x) => lakeRow(x, { showSignal: true })), t('dash.allOnline')) });
-    // v2 dagi Ko'llar/Qurilmalar sanagichlari saqlanadi (ixcham)
-    const lakesMini = slStatCard({ icon: 'droplet', value: st.lakes.length, label: t('home.lakes'),
-      color: 'var(--sl-primary)', onClick: () => nav.switchTab('lakes'), ariaLabel: t('home.lakes') });
-    const devsMini = slStatCard({ icon: 'chip', value: st.devices.length, label: t('home.devices'),
-      color: 'var(--sl-info)', onClick: () => nav.switchTab('devices'), ariaLabel: t('home.devices') });
-    return el('div', { class: 'sl-grid-2' }, [on, off, lakesMini, devsMini]);
-  }
-
-  /* ----------------------------------------------------------
-     3 · OGOHLANTIRISHLAR (premium karta)
-     ---------------------------------------------------------- */
-  const alertNum = el('span', { class: 'sl-num-md' });
-  function alertsCard(snap) {
-    const n = snap.alerts.length;
-    const colorVar = n ? '--sl-critical' : '--sl-offline';
-    slCountUp(alertNum, n, { decimals: 0 });
-    alertNum.style.color = `var(${colorVar})`;
+  /* So'nggi ogohlantirishlar (faqat muammo bo'lsa ko'rinadi) */
+  function recentAlertsSection(snap) {
+    if (!snap.alerts.length) return null;
     return slCard([
-      el('div', { class: 'sl-row', style: 'gap:var(--sl-sp-3)' }, [
-        el('div', { style: `width:44px;height:44px;border-radius:var(--sl-r-md);flex:none;
-          display:flex;align-items:center;justify-content:center;
-          background:color-mix(in srgb, var(${colorVar}) 13%, transparent);color:var(${colorVar})`,
-          html: slIcon(ICONS.alert.bell, 22) }),
-        el('div', { class: 'sl-grow' }, [
-          el('div', { class: 'sl-row', style: 'align-items:baseline;gap:8px' }, [
-            alertNum,
-            el('span', { class: 'sl-label', text: t('dash.alerts') }),
-          ]),
-          el('div', { class: 'sl-body-sm sl-text-secondary', style: 'margin-top:2px',
-            text: n ? `${snap.alerts[0].lake.name}${n > 1 ? ` +${n - 1}` : ''}` : t('dash.allCalm') }),
+      el('div', { class: 'sl-card-head' }, [
+        el('div', { class: 'sl-card-title', style: 'display:flex;align-items:center;gap:6px' }, [
+          el('span', { style: 'color:var(--sl-critical);display:inline-flex', html: slIcon(ICONS.alert.bell, 18) }),
+          el('span', { text: t('dash.recentAlerts') }),
         ]),
-        el('span', { style: 'color:var(--sl-border-strong);display:inline-flex',
-          html: slIcon(ICONS.navigation.forward, 20) }),
+        slBadge({ type: 'critical', label: String(snap.alerts.length) }),
       ]),
-    ], {
-      premium: n > 0, ariaLabel: t('dash.alerts'),
-      cls: n > 0 ? '' : '',
-      onClick: () => openListDialog(`${t('dash.alerts')} — ${n}`,
-        snap.alerts.map((x) => lakeRow(x, { showMsgs: true })), t('dash.noAlerts'),
-        { label: t('dash.openAlertsPage'), variant: 'text', onClick: () => nav.switchTab('alerts') }),
-    });
+      el('div', { class: 'sl-stack-sm', style: 'gap:0' },
+        snap.alerts.slice(0, 3).map((x) => lakeRow(x, { showMsgs: true }))),
+      snap.alerts.length > 3 ? el('div', { style: 'margin-top:var(--sl-sp-2)' }, [
+        slButton({ label: t('dash.openAlertsPage'), variant: 'text', size: 'sm',
+          onClick: () => nav.switchTab('alerts') }),
+      ]) : null,
+    ].filter(Boolean), { premium: true });
   }
 
-  /* ----------------------------------------------------------
-     4 · AI TAVSIYASI (markaziy karta) — predictiveAdvisor reuse
-     ---------------------------------------------------------- */
-  function aiCard(snap) {
-    let advice = null; let srcLake = null;
-    if (snap.perLake.length) {
-      // eng muammoli ko'l bo'yicha (severity tartibi)
-      const sorted = snap.perLake.slice().sort((p, q) =>
-        (SEV_ORDER[p.a.status] ?? 9) - (SEV_ORDER[q.a.status] ?? 9));
-      srcLake = sorted[0];
-      const w = weatherCache.get(srcLake.lake.id);
-      advice = generateSmartAdvice(srcLake.lake, srcLake.devs,
-        dataStore.getState().telemetry, isUz ? 'uz' : 'ru', new Date(), w ? w.data : null);
-    }
-    const body = advice
-      ? `${advice.analysis}${advice.recommendations && advice.recommendations[0] ? `\n→ ${advice.recommendations[0]}` : ''}`
-      : t('dash.aiPlaceholder');
-    const badgeType = advice
-      ? (advice.status === 'critical' ? 'critical' : advice.status === 'warning' ? 'warning' : 'healthy')
-      : 'ai';
-    const card = slAiCard({
-      tag: t('dash.aiTitle'),
-      title: srcLake ? srcLake.lake.name : null,
-      body,
-      badges: advice ? [{ type: badgeType, label: t('tm.status_' + (srcLake.a.status || 'unknown')) }] : [],
-      onClick: () => nav.switchTab('ai'),
-      ariaLabel: t('dash.aiTitle'),
-    });
-    card.querySelector('.sl-body').style.whiteSpace = 'pre-line';
-    return card;
-  }
-
-  /* ----------------------------------------------------------
+    /* ----------------------------------------------------------
      5 · KO'LLAR (muammolisi birinchi) — v2 tarkibi saqlangan
      ---------------------------------------------------------- */
   function loadWeather(lk) {
@@ -377,7 +299,7 @@ export function renderHomeTab(nav) {
       const w = weatherCache.get(x.lake.id);
       const g = gradeOf(x.a.healthScore);
 
-      // Ob-havo qatori (v2 funksiyasi saqlangan)
+      // Ob-havo qatori
       const extra = [];
       if (w && w.data) {
         extra.push(el('div', { style: 'margin-top:10px' }, [slWeatherCard({
@@ -385,6 +307,17 @@ export function renderHomeTab(nav) {
           text: `${w.data.district}: ${w.data.temp}°C (${w.data.label})`,
           next: `${t('dash.weatherTomorrow')}: ${w.data.tomorrowTempMax}°C`,
         })]));
+      }
+      // Bugungi yem jadvali (slFeedSchedule — reusable)
+      const m = metaCache.get(x.lake.id);
+      if (m !== undefined) {
+        const plan = m ? computeFeedPlan({ fish: m.fish || [], feed: m.feed || {}, tempC: x.a.avgTemp, weather: w ? w.data : null }) : null;
+        extra.push(slFeedSchedule({
+          title: t('dash.todayFeed'),
+          totalKg: plan ? plan.dailyKg : null,
+          meals: plan ? plan.meals : [],
+          emptyText: t('dash.feedNoData'),
+        }));
       }
       // Qurilmalar bo'linmasi (v2 funksiyasi saqlangan, DS uslubida)
       if (x.devs.length) {
@@ -438,123 +371,33 @@ export function renderHomeTab(nav) {
   }
 
   /* ----------------------------------------------------------
-     6 · BUGUNGI YEM — feedEngine reuse (meta lazy)
+     E'LONLAR — oxirgisi, lazy
      ---------------------------------------------------------- */
-  const feedBox = el('div');
-  function ensureMeta(lakeId) {
-    if (metaCache.has(lakeId)) return Promise.resolve(metaCache.get(lakeId));
-    return loadLakeMeta(lakeId).then((m) => { metaCache.set(lakeId, m); return m; })
-      .catch(() => { metaCache.set(lakeId, null); return null; });
-  }
-  function renderFeedCard(snap) {
-    let totalKg = 0; let totalCost = 0; let hasCost = false; let anyPlan = false;
-    snap.perLake.forEach((x) => {
-      const m = metaCache.get(x.lake.id);
-      if (!m || !m.fish || !m.fish.length) return;
-      const w = weatherCache.get(x.lake.id);
-      const plan = computeFeedPlan({ fish: m.fish, feed: m.feed || {},
-        tempC: x.a.avgTemp, weather: w ? w.data : null });
-      if (!plan) return;
-      anyPlan = true;
-      totalKg += plan.dailyKg;
-      if (plan.dailyCost != null) { totalCost += plan.dailyCost; hasCost = true; }
-    });
-    const numEl = el('span', { class: 'sl-num-lg', style: 'color:var(--sl-chart-feed)' });
-    const card = slCard([
-      el('div', { class: 'sl-card-head' }, [
-        el('div', { class: 'sl-card-title', text: t('dash.feedToday') }),
-        slBadge({ type: 'success', label: 'kg', dot: false, icon: ICONS.sensor.feed }),
-      ]),
-      anyPlan ? el('div', {}, [
-        el('div', { class: 'sl-row', style: 'align-items:baseline;gap:6px' }, [
-          numEl, el('span', { class: 'sl-caption', text: 'kg' }),
+  const annBox = el('div');
+  let annPreview;
+  function loadAnnPreview() {
+    if (annPreview !== undefined) return;
+    annPreview = null;
+    fetchAnnouncements().then((items) => {
+      if (!items || !items.length) { annBox.replaceChildren(); return; }
+      annPreview = items[0];
+      const card = announcementCard(annPreview, { compact: true, isUz });
+      card.classList.add('interactive');
+      card.setAttribute('role', 'button'); card.setAttribute('tabindex', '0');
+      const go = () => nav.switchTab('elonlar');
+      card.addEventListener('click', go);
+      card.addEventListener('keydown', (e) => { if (e.key === 'Enter') go(); });
+      mount(annBox, el('div', { class: 'sl-stack' }, [
+        el('div', { class: 'sl-row-between' }, [
+          el('div', { class: 'sl-label', style: 'color:var(--sl-text-secondary)', text: t('ann.onDash') }),
+          el('button', { class: 'sl-btn text sm', type: 'button', text: t('ann.seeAll'), onClick: go }),
         ]),
-        hasCost ? slKvRow({ icon: 'zap', key: t('dash.feedCost'),
-          value: `≈ ${Math.round(totalCost).toLocaleString()} ${isUz ? "so'm" : 'сум'}` }) : null,
-      ].filter(Boolean))
-        : el('div', { class: 'sl-body-sm sl-text-secondary', text: t('dash.feedPlaceholder') }),
-    ]);
-    if (anyPlan) slCountUp(numEl, totalKg, { decimals: 1 });
-    mount(feedBox, card);
+        card,
+      ]));
+    }).catch(() => {});
   }
 
-  /* ----------------------------------------------------------
-     7 · ELEKTR ENERGIYASI — lazy (fetchArchive talab bo'yicha)
-     ---------------------------------------------------------- */
-  const energyBox = el('div');
-  function totalKw(snap) {
-    return snap.perLake.reduce((sum, x) => {
-      const m = metaCache.get(x.lake.id);
-      return sum + ((m && m.energy && Number(m.energy.kw)) || 0);
-    }, 0);
-  }
-  function totalTariff(snap) {
-    const ts = snap.perLake
-      .map((x) => { const m = metaCache.get(x.lake.id); return (m && m.energy && Number(m.energy.tariff)) || 0; })
-      .filter(Boolean);
-    return ts.length ? ts.reduce((a, b) => a + b, 0) / ts.length : 0;
-  }
-  // Keshda FAQAT arxivdan olingan soat saqlanadi; kWh/narx esa render
-  // paytida joriy kW/tarif (meta) bilan hisoblanadi — meta keyinroq
-  // yuklansa ham raqamlar to'g'ri yangilanadi, qo'shimcha o'qish yo'q.
-  async function loadEnergyHours(period, st) {
-    const c = energyCache.get(period);
-    if (c && Date.now() - c.at < ENERGY_TTL) return c.hours;
-    const now = Date.now();
-    const start = period === 'today'
-      ? new Date(new Date().setHours(0, 0, 0, 0)).getTime()
-      : period === 'week' ? now - 7 * DAY : now - 30 * DAY;
-    const ids = st.devices.map((d) => d.id);
-    const samples = await fetchArchive(uid, ids, start, now);
-    const hours = aeratorRuntimeMs(samples) / 3600e3;
-    energyCache.set(period, { at: Date.now(), hours });
-    return hours;
-  }
-  function renderEnergyCard(snap, st) {
-    const rowsBox = el('div');
-    const periodRow = (label, period) => {
-      const valEl = el('span', { class: 'kv-val', text: '…' });
-      const row = el('div', { class: 'sl-kv-row' }, [
-        el('span', { class: 'kv-key' }, [
-          el('span', { style: 'display:inline-flex;opacity:.8', html: slIcon('zap', 15) }),
-          el('span', { text: label }),
-        ]), valEl,
-      ]);
-      loadEnergyHours(period, st).then((hours) => {
-        const kw = totalKw(snap);
-        const tariff = totalTariff(snap);
-        const kwh = kw ? hours * kw : null;
-        const cost = kwh != null && tariff ? Math.round(kwh * tariff) : null;
-        valEl.textContent = kwh != null
-          ? `${kwh.toFixed(1)} kWh${cost != null ? ` · ≈${cost.toLocaleString()} ${isUz ? "so'm" : 'сум'}` : ''}`
-          : `${hours.toFixed(1)} ${isUz ? 'soat' : 'ч'}`;
-      }).catch(() => { valEl.textContent = '—'; });
-      return row;
-    };
-    let expanded = false;
-    const moreBtn = el('button', { class: 'sl-btn text sm', type: 'button',
-      text: `${t('dash.energyWeek')} / ${t('dash.energyMonth')}` });
-    moreBtn.addEventListener('click', () => {
-      if (expanded) return;
-      expanded = true; moreBtn.remove();
-      rowsBox.append(periodRow(t('dash.energyWeek'), 'week'), periodRow(t('dash.energyMonth'), 'month'));
-    });
-    rowsBox.append(periodRow(t('dash.energyToday'), 'today'));
-    const card = slCard([
-      el('div', { class: 'sl-card-head' }, [
-        el('div', { class: 'sl-card-title', text: t('dash.energy') }),
-        slBadge({ type: 'info', label: 'kWh', dot: false, icon: ICONS.sensor.energy }),
-      ]),
-      rowsBox,
-      el('div', { class: 'sl-row', style: 'margin-top:8px;justify-content:space-between' }, [
-        el('div', { class: 'sl-caption', style: 'flex:1', text: t('dash.energyHint') }),
-        moreBtn,
-      ]),
-    ]);
-    mount(energyBox, card);
-  }
-
-  /* ----------------------------------------------------------
+    /* ----------------------------------------------------------
      8 · OB-HAVO (kichik karta — birinchi ko'l keshidan, o'qishsiz)
      ---------------------------------------------------------- */
   function weatherCard(snap) {
@@ -613,29 +456,17 @@ export function renderHomeTab(nav) {
     lastSig = sig;
 
     nav.setBell && nav.setBell(snap.alerts.length > 0);
+    loadAnnPreview();
 
     mount(content, el('div', { class: 'sl-stack' }, [
-      heroCard(snap),
-      connectivityRow(snap, st),
-      alertsCard(snap),
-      aiCard(snap),
+      statsRow(snap),
       lakeSection(snap, st),
-      feedBox,
-      energyBox,
-      weatherCard(snap),
-    ]));
+      recentAlertsSection(snap),
+      annBox,
+    ].filter(Boolean)));
 
-    renderFeedCard(snap);
-    renderEnergyCard(snap, st);
-
-    // Meta'lar fonda (bitta o'qishdan) — kelgach yem/elektr aniqlashadi
-    let pending = 0;
-    st.lakes.forEach((lk) => {
-      if (!metaCache.has(lk.id)) {
-        pending++;
-        ensureMeta(lk.id).then(() => { if (--pending === 0) { renderFeedCard(snap); renderEnergyCard(snap, st); } });
-      }
-    });
+    // Meta'lar fonda — kelgach ko'l kartalarida yem jadvali yangilanadi
+    st.lakes.forEach((lk) => ensureMeta(lk.id));
     firstRender = false;
   }
 
