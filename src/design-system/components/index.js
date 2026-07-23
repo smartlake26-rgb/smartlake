@@ -20,3 +20,4 @@ export {
   slGaugeChart, slTimeline,
 } from './chart.js';
 export { slCountUp } from './countup.js';
+export { slLakeMonitorCard } from './monitorCard.js';

@@ -157,3 +157,36 @@
 .sl-state .st-desc { font-size: var(--sl-fs-body-sm); margin-top: var(--sl-sp-1);
   max-width: 280px; margin-inline: auto; }
 .sl-state .st-action { margin-top: var(--sl-sp-4); display: flex; justify-content: center; }
+
+/* --- MONITOR CARD (Ko'llar sahifasi — "Apple Weather" uslubi) --- */
+.sl-monitor { padding: 0; overflow: hidden; }
+.sl-monitor.dim { opacity: .7; }
+.sl-monitor.dim .sl-monitor-cover { filter: saturate(.4); }
+
+.sl-monitor-cover { position: relative; height: 88px; color: #FFFFFF;
+  background: linear-gradient(135deg, var(--sl-lake-30) 0%, var(--sl-aqua-40) 100%);
+  display: flex; align-items: flex-end; }
+.sl-monitor-cover.st-warning  { background: linear-gradient(135deg, var(--sl-lake-30) 0%, var(--sl-warning) 130%); }
+.sl-monitor-cover.st-critical { background: linear-gradient(135deg, var(--sl-lake-20) 0%, var(--sl-critical) 130%); }
+.sl-monitor-cover.st-offline, .sl-monitor-cover.st-inactive, .sl-monitor-cover.st-archived {
+  background: linear-gradient(135deg, var(--sl-slate-30) 0%, var(--sl-slate-50) 100%); }
+[data-theme="dark"] .sl-monitor-cover { background: linear-gradient(135deg, var(--sl-lake-20) 0%, var(--sl-aqua-30) 100%); }
+[data-theme="dark"] .sl-monitor-cover.st-offline,
+[data-theme="dark"] .sl-monitor-cover.st-inactive,
+[data-theme="dark"] .sl-monitor-cover.st-archived {
+  background: linear-gradient(135deg, #22302D 0%, #33433F 100%); }
+
+.sl-monitor-cover .mn-waves { position: absolute; inset: 0; pointer-events: none; }
+.sl-monitor-cover .mn-waves svg { width: 100%; height: 100%; display: block; }
+.sl-monitor-cover .mn-dot { position: absolute; top: var(--sl-sp-3); right: var(--sl-sp-3);
+  width: 11px; height: 11px; border-radius: 50%; }
+.sl-monitor-cover .mn-cover-txt { position: relative; padding: var(--sl-sp-3) var(--sl-sp-4);
+  text-shadow: 0 1px 2px rgba(3, 17, 15, .35); min-width: 0; }
+.sl-monitor-cover .mn-name { font-size: var(--sl-fs-title); font-weight: var(--sl-fw-title);
+  letter-spacing: var(--sl-ls-title); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sl-monitor-cover .mn-meta { font-size: var(--sl-fs-caption); font-weight: 500; opacity: .85; margin-top: 1px; }
+
+.sl-monitor-body { padding: var(--sl-card-pad); }
+.sl-monitor-foot { display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sl-sp-3); margin-top: var(--sl-sp-3);
+  font-size: var(--sl-fs-caption); color: var(--sl-text-secondary); }

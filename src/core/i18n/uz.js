@@ -255,6 +255,20 @@ uz.menu = {
   alerts: 'Bildirishnomalar', alertsDesc: 'Ogohlantirishlar tarixi',
   theme: "Tungi rejim", themeDesc: "Ko'rinishni almashtirish",
 };
+// --- LAKES-V3: Ko'llar sahifasi (premium monitoring) ---
+uz.lakespg = {
+  total: 'Jami', online: 'Onlayn', offline: 'Oflayn', alerts: 'Ogohlantirish',
+  searchPh: "Ko'l nomi bo'yicha qidirish...",
+  sortBy: 'Saralash', sort_name: 'Nomi', sort_health: 'Salomatlik',
+  sort_online: 'Onlayn holati', sort_updated: 'Yangilanish',
+  noResults: 'Qidiruv bo\'yicha ko\'l topilmadi',
+  slowLoad: "Yuklash odatdagidan uzoq davom etmoqda",
+  loadErrorDesc: "Internet aloqasini tekshirib, qayta urinib ko'ring",
+  retry: "Qayta urinish",
+  offlineNet: "Internet aloqasi yo'q — keshdagi oxirgi ma'lumot ko'rsatilmoqda",
+  updated: 'Yangilandi',
+};
+
 uz.reports = {
   title: 'Hisobot',
   pickLake: "Ko'lni tanlang",
