@@ -171,8 +171,8 @@ service cloud.firestore {
     // ---------- ko'l meta (energiya sozlamalari: kW, tarif) ----------
     match /lakeMeta/{lakeId} {
       allow read: if owns(resource.data.ownerUid) || isAdmin();
-      allow create: if owns(request.resource.data.ownerUid);
-      allow update: if owns(resource.data.ownerUid) && owns(request.resource.data.ownerUid);
+      allow create: if owns(request.resource.data.ownerUid) || isAdmin();
+      allow update: if (owns(resource.data.ownerUid) && owns(request.resource.data.ownerUid)) || isAdmin();
       allow delete: if isAdmin();
     }
 

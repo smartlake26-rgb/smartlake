@@ -41,8 +41,6 @@ function provisioningCard() {
          + 'font-family:var(--mono);font-weight:700;color:var(--md-on-surface-variant);font-size:14px',
     text: 'Yuklanmoqda...',
   });
-  // Mavjud qurilmalar sonini olib, keyingi raqamni ko'rsatish
-  adminStore.refresh && adminStore.refresh();
   function refreshSerial() {
     const st = adminStore.getState();
     const next = st.devices.length + 1;
@@ -185,7 +183,12 @@ function provisioningCard() {
 
 export function renderAdminDevices() {
   const wrap = el('div', {});
-  const isSuper = authStore.getState().userDoc?.role === ROLES.SUPER;
+  const isSuper = (authStore.getState().role === ROLES.SUPER)
+    || (authStore.getState().userDoc?.role === ROLES.SUPER);
+  // MUHIM: karta BIR MARTA yaratiladi — har store-emit'da qayta qurilsa
+  // inputga yozayotganda fokus va qiymat yo'qoladi
+  const provCard = isSuper ? provisioningCard() : null;
+  const tableBox = el('div');
 
   function render() {
     const st = adminStore.getState();
@@ -252,10 +255,9 @@ export function renderAdminDevices() {
       filters: [{ key: 'status', label: t('tm.status'), options: ['healthy', 'good', 'warning', 'critical', 'offline', 'unknown'].map((s) => ({ value: s, label: t('tm.status_' + s) })) }],
     });
 
-    // Provisioning kartasi + jadval. Karta faqat super adminga ko'rinadi.
-    mount(wrap, el('div', { class: 'stack' },
-      isSuper ? [provisioningCard(), table] : [table]));
+    mount(tableBox, table);
   }
+  mount(wrap, el('div', { class: 'stack' }, [provCard, tableBox].filter(Boolean)));
   const unsub = adminStore.subscribe(render); render(); wrap.__cleanup = unsub; return wrap;
 }
 export default renderAdminDevices;
