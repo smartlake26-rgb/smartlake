@@ -31,19 +31,23 @@ const isUz = () => detectLocale() === 'uz';
 /* ============================================================
    QR KOD — tashqi kutubxonasiz, SVG QR (yengil, dynamic import)
    ============================================================ */
-async function renderQr(text, size = 200) {
-  try {
-    const QRCode = (await import('qrcode')).default;
-    const dataUrl = await QRCode.toDataURL(text, { width: size, margin: 1, color: { dark: '#0E7C6B', light: '#fff' } });
-    return el('img', { src: dataUrl, alt: 'QR', style: `width:${size}px;height:${size}px;border-radius:8px;display:block` });
-  } catch {
-    // qrcode yo'q bo'lsa — matn fallback
-    return el('div', {
-      style: `width:${size}px;height:${size}px;display:flex;align-items:center;justify-content:center;`
-           + 'border:2px dashed var(--sl-border);border-radius:8px;font-size:11px;text-align:center;padding:8px;color:var(--sl-text-secondary)',
-      text: text,
-    });
-  }
+// QR rendering — qrcode lib yo'q, shuning uchun Google Charts API dan olamiz
+// (internet bo'lsa) yoki matn ko'rsatamiz
+function renderQrEl(text, size = 180) {
+  const url = `https://chart.googleapis.com/chart?chs=${size}x${size}&cht=qr&chl=${encodeURIComponent(text)}&choe=UTF-8`;
+  const img = el('img', { src: url, alt: 'QR', width: String(size), height: String(size),
+    style: `width:${size}px;height:${size}px;border-radius:8px;display:block;margin:0 auto` });
+  img.onerror = () => {
+    // Internet yo'q — matn
+    mount(img.parentElement || img, el('div', {
+      style: `width:${size}px;height:${size}px;display:flex;flex-direction:column;align-items:center;justify-content:center;`
+           + 'border:2px dashed var(--sl-border);border-radius:8px;font-size:10px;text-align:center;padding:8px;gap:4px',
+    }, [
+      el('div', { html: slIcon('info', 18), style: 'opacity:.4' }),
+      el('div', { text: text, style: 'font-family:monospace;word-break:break-all' }),
+    ]));
+  };
+  return img;
 }
 
 /* ============================================================
@@ -82,7 +86,14 @@ async function downloadPdf({ deviceId, activationKey, lakeName, qrDataUrl }) {
     doc.text(activationKey, 6, 51);
 
     if (qrDataUrl) {
-      doc.addImage(qrDataUrl, 'PNG', 15, 57, 50, 50);
+      try {
+        const resp = await fetch(qrDataUrl);
+        const blob = await resp.blob();
+        const b64 = await new Promise((res) => {
+          const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob);
+        });
+        doc.addImage(b64, 'PNG', 15, 57, 50, 50);
+      } catch { /* QR rasm yuklanmasa — skip */ }
     }
 
     doc.setFontSize(6); doc.setFont('helvetica', 'normal');
@@ -143,12 +154,9 @@ export function openDeviceProvisionModal({ lakeId, lakeName, nav }) {
       currentKey = result.activationKey;
       const qrText = `${result.deviceId}|${currentKey}`;
 
-      // QR hosil qilish
-      try {
-        const QRCode = (await import('qrcode')).default;
-        qrDataUrl = await QRCode.toDataURL(qrText, { width: 160, margin: 1 });
-        qrImg = el('img', { src: qrDataUrl, alt: 'QR', style: 'width:160px;height:160px;border-radius:8px;display:block;margin:0 auto' });
-      } catch { qrImg = null; }
+      // QR hosil qilish (Google Charts API — kutubxonasiz)
+      qrDataUrl = `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(qrText)}&choe=UTF-8`;
+      qrImg = renderQrEl(qrText, 160);
 
       mount(resultBox, el('div', { class: 'sl-stack' }, [
         slCard([

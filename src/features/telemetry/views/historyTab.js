@@ -188,89 +188,151 @@ export function buildHistoryTab({ lakeId, uid, isUz, getDevs, getTh, lakeName = 
   ];
   let activeRange = '24h';
   const rangeBtns = new Map();
-  const chartFrame = el('div', { class: 'sl-chart-frame', style: 'min-height:220px' });
+  const chartFrame = el('div', { style: 'min-height:240px' });
 
   function getChartLabel(r) { return isUz ? r.labelUz : r.labelRu; }
 
-  // Diapazonni rows dan kesilgan nuqtalar
+  /* Faqat MAVJUD ma'lumot ichida ko'rsatish:
+     rows'dagi birinchi va oxirgi ts orasidagi diapazonni hisoblaymiz,
+     tanlangan diapazon bu chegaradan o'tmasin. */
   function rangePoints() {
+    if (!rows.length) return [];
     const rDef = RANGES.find((r) => r.id === activeRange) || RANGES[1];
-    const cutoff = Date.now() - rDef.ms;
-    return rows.filter((r) => r.ts >= cutoff);
+    const lastTs = rows[rows.length - 1].ts;
+    const cutoff = lastTs - rDef.ms;
+    // Kamida bitta nuqta borligiga kafolat
+    const filtered = rows.filter((r) => r.ts >= cutoff);
+    return filtered.length ? filtered : rows;
   }
 
   function fmtXRange(ts) {
     const rDef = RANGES.find((r) => r.id === activeRange) || RANGES[1];
-    if (rDef.ms <= 24 * 3600e3) return fmtTime(ts);
-    if (rDef.ms <= 7 * 24 * 3600e3)
+    const pts = rangePoints();
+    const span = pts.length > 1 ? pts[pts.length-1].ts - pts[0].ts : rDef.ms;
+    if (span <= 24 * 3600e3) return fmtTime(ts);
+    if (span <= 7 * 24 * 3600e3)
       return `${p2(new Date(ts).getDate())}.${p2(new Date(ts).getMonth()+1)} ${fmtTime(ts)}`;
     return `${p2(new Date(ts).getDate())}.${p2(new Date(ts).getMonth()+1)}`;
   }
 
+  /* Inline SVG grafik — chiziq + nuqtalar, 3 seriya, chiroyli */
   function drawChart() {
     const th = getTh();
     const pts = rangePoints();
 
-    // Uch seriya bitta grafikda: DO, Harorat, pH
-    // Y-o'qlari har xil birlikda — normalize qilamiz displey uchun
-    // (slLineChart har seriyaga o'z Y shkalasini quradi)
-    const hasData = pts.some((p) =>
-      typeof p.do === 'number' || typeof p.t === 'number' || typeof p.ph === 'number'
-    );
-
-    if (!hasData) {
-      mount(chartFrame, slEmptyState({ icon: 'activity', title: t('hist.empty'), desc: t('hist.emptyDesc') }));
+    if (!pts.length) {
+      mount(chartFrame, el('div', { style: 'display:flex;align-items:center;justify-content:center;height:240px;color:var(--sl-text-disabled);flex-direction:column;gap:8px' }, [
+        el('div', { html: slIcon('activity', 32), style: 'opacity:.25' }),
+        el('div', { text: isUz ? "Ma'lumot yo'q" : 'Нет данных' }),
+      ]));
       return;
     }
 
-    // Nuqtalar: har seriya uchun kerak kalit
-    const points = pts.map((r) => ({
-      x: r.ts,
-      do:   r.do,
-      temp: r.t,
-      ph:   r.ph,
-    }));
+    const W = 340, H = 200, PAD = { t: 12, r: 8, b: 32, l: 38 };
+    const IW = W - PAD.l - PAD.r, IH = H - PAD.t - PAD.b;
 
-    mount(chartFrame, el('div', {}, [
-      slLineChart({
-        points,
-        height: 220,
-        series: [
-          { key: 'do',   label: 'DO',         unit: 'mg/L', area: false },
-          { key: 'temp', label: t('tm.temp'), unit: '°C',   area: false },
-          { key: 'ph',   label: 'pH',         unit: '',     area: false },
-        ],
-        thresholds: [{ seriesKey: 'do', value: th.do.crit }],
-        formatX: fmtXRange,
-        ariaLabel: 'DO · Harorat · pH',
-      }),
-      slChartLegend([
-        { key: 'do',   label: `DO (mg/L)` },
-        { key: 'temp', label: `${t('tm.temp')} (°C)` },
-        { key: 'ph',   label: 'pH' },
-      ]),
+    // Har seriya uchun range
+    const series = [
+      { key: 'do',   color: 'var(--sl-chart-do)',   label: 'DO', unit: 'mg/L' },
+      { key: 't',    color: 'var(--sl-chart-temp)',  label: isUz ? 'Harorat' : 'Темп.', unit: '°C' },
+      { key: 'ph',   color: 'var(--sl-chart-ph)',    label: 'pH', unit: '' },
+    ];
+
+    // Normalize: har seriya 0..1 ga siqish (turli birliklar bitta grafikda)
+    const ranges = {};
+    series.forEach(({ key }) => {
+      const vals = pts.map((p) => p[key]).filter((v) => typeof v === 'number');
+      if (!vals.length) { ranges[key] = null; return; }
+      const mn = Math.min(...vals), mx = Math.max(...vals);
+      const pad = (mx - mn) * 0.1 || 1;
+      ranges[key] = { min: mn - pad, max: mx + pad };
+    });
+
+    const xMin = pts[0].ts, xMax = pts[pts.length - 1].ts;
+    const xRange = xMax - xMin || 1;
+    const toX = (ts) => PAD.l + ((ts - xMin) / xRange) * IW;
+    const toY = (v, key) => {
+      const r = ranges[key]; if (!r) return null;
+      return PAD.t + IH - ((v - r.min) / (r.max - r.min)) * IH;
+    };
+
+    // X o'qi yorliqlari
+    const xLabels = [];
+    const labelCount = Math.min(5, pts.length);
+    const step = Math.floor(pts.length / labelCount) || 1;
+    for (let i = 0; i < pts.length; i += step) {
+      xLabels.push({ x: toX(pts[i].ts), label: fmtXRange(pts[i].ts) });
+    }
+
+    // Har seriya uchun path + circles
+    const seriesSvg = series.map(({ key, color }) => {
+      if (!ranges[key]) return '';
+      const valid = pts.filter((p) => typeof p[key] === 'number');
+      if (!valid.length) return '';
+      // Chiziq
+      const d = valid.map((p, i) => `${i ? 'L' : 'M'}${toX(p.ts).toFixed(1)},${toY(p[key], key).toFixed(1)}`).join(' ');
+      // Nuqtalar
+      const dots = valid.map((p) => `<circle cx="${toX(p.ts).toFixed(1)}" cy="${toY(p[key], key).toFixed(1)}" r="3" fill="${color}" stroke="#fff" stroke-width="1.5"/>`).join('');
+      return `<path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>${dots}`;
+    }).join('');
+
+    // DO kritik chiziq
+    const critY = ranges['do'] ? toY(th.do.crit, 'do') : null;
+    const critLine = critY != null
+      ? `<line x1="${PAD.l}" y1="${critY.toFixed(1)}" x2="${PAD.l+IW}" y2="${critY.toFixed(1)}" stroke="var(--sl-critical)" stroke-width="1" stroke-dasharray="4,3" opacity=".6"/>`
+      : '';
+
+    // Grid gorizontal chiziqlar
+    const gridLines = [0.25, 0.5, 0.75].map((f) => {
+      const y = (PAD.t + IH * (1 - f)).toFixed(1);
+      return `<line x1="${PAD.l}" y1="${y}" x2="${PAD.l+IW}" y2="${y}" stroke="var(--sl-divider)" stroke-width="0.5"/>`;
+    }).join('');
+
+    const svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg"
+      style="width:100%;height:${H}px;overflow:visible">
+      ${gridLines}
+      <line x1="${PAD.l}" y1="${PAD.t}" x2="${PAD.l}" y2="${PAD.t+IH}" stroke="var(--sl-divider)" stroke-width="1"/>
+      <line x1="${PAD.l}" y1="${PAD.t+IH}" x2="${PAD.l+IW}" y2="${PAD.t+IH}" stroke="var(--sl-divider)" stroke-width="1"/>
+      ${critLine}
+      ${seriesSvg}
+      ${xLabels.map(({ x, label }) =>
+        `<text x="${x.toFixed(1)}" y="${H - 4}" text-anchor="middle" font-size="9" fill="var(--sl-text-secondary)" font-family="var(--sl-font-sans,sans-serif)">${label}</text>`
+      ).join('')}
+    </svg>`;
+
+    // Legend
+    const legend = el('div', { style: 'display:flex;gap:12px;flex-wrap:wrap;margin-top:8px;padding:0 4px' },
+      series.filter(({ key }) => ranges[key]).map(({ color, label, unit }) =>
+        el('div', { style: 'display:flex;align-items:center;gap:5px;font-size:11px;color:var(--sl-text-secondary)' }, [
+          el('span', { style: `width:20px;height:3px;border-radius:2px;background:${color};display:inline-block` }),
+          el('span', { text: unit ? `${label} (${unit})` : label }),
+        ])));
+
+    mount(chartFrame, el('div', { style: 'padding:4px 0' }, [
+      el('div', { html: svg, style: 'overflow:visible' }),
+      legend,
     ]));
   }
 
   function renderCharts() {
-    // Diapazon tugmalari
-    const rangeRow = el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:var(--sl-sp-3)' },
+    const rangeRow = el('div', { style: 'display:flex;gap:5px;flex-wrap:wrap;margin-bottom:var(--sl-sp-3)' },
       RANGES.map((r) => {
+        const active = r.id === activeRange;
         const btn = el('button', {
           type: 'button',
-          class: 'sl-btn outlined sm' + (r.id === activeRange ? ' active' : ''),
-          style: r.id === activeRange
-            ? 'background:var(--sl-primary);color:#fff;border-color:var(--sl-primary)'
-            : '',
+          style: `padding:4px 12px;border-radius:20px;border:1.5px solid;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;`
+               + (active
+                 ? 'background:var(--sl-primary);color:#fff;border-color:var(--sl-primary)'
+                 : 'background:transparent;color:var(--sl-text-secondary);border-color:var(--sl-border)'),
           text: getChartLabel(r),
         });
         btn.addEventListener('click', () => {
           activeRange = r.id;
           rangeBtns.forEach((b, id) => {
-            const active = id === activeRange;
-            b.style.background = active ? 'var(--sl-primary)' : '';
-            b.style.color = active ? '#fff' : '';
-            b.style.borderColor = active ? 'var(--sl-primary)' : '';
+            const a = id === activeRange;
+            b.style.background = a ? 'var(--sl-primary)' : 'transparent';
+            b.style.color = a ? '#fff' : 'var(--sl-text-secondary)';
+            b.style.borderColor = a ? 'var(--sl-primary)' : 'var(--sl-border)';
           });
           drawChart();
         });
@@ -281,10 +343,10 @@ export function buildHistoryTab({ lakeId, uid, isUz, getDevs, getTh, lakeName = 
     drawChart();
 
     mount(chartsBox, slCard([
-      el('div', { class: 'sl-card-head', style: 'margin-bottom:var(--sl-sp-3)' }, [
-        el('div', { class: 'sl-card-title' }, [
-          el('span', { html: slIcon('activity', 16), style: 'display:inline-flex;margin-right:6px;color:var(--sl-primary)' }),
-          el('span', { text: isUz ? 'Sensor grafigi' : 'График сенсоров' }),
+      el('div', { class: 'sl-card-head', style: 'margin-bottom:var(--sl-sp-2)' }, [
+        el('div', { class: 'sl-card-title', style: 'display:flex;align-items:center;gap:6px' }, [
+          el('span', { html: slIcon('activity', 16), style: 'display:inline-flex;color:var(--sl-primary)' }),
+          el('span', { text: isUz ? 'DO · Harorat · pH' : 'DO · Темп. · pH' }),
         ]),
       ]),
       rangeRow,
