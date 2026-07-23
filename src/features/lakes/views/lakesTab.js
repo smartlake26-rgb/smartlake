@@ -25,7 +25,7 @@
 // ============================================================
 
 import { el, mount } from '../../../shared/dom.js';
-import { t } from '../../../core/i18n/index.js';
+import { t, detectLocale } from '../../../core/i18n/index.js';
 import { appBar, mdFab, mdIconButton } from '../../../shared/ui/index.js';
 import * as dataStore from '../../../farmer/dataStore.js';
 import { resolveThresholds } from '../../telemetry/domain/thresholds.js';
@@ -36,6 +36,7 @@ import { computeFeedPlan } from '../../telemetry/domain/feedEngine.js';
 import { loadLakeMeta } from '../../telemetry/services/archiveService.js';
 import { renderLakeDetailPage } from './lakeDetailPage.js';
 import { renderLakeFormPage } from './lakeFormPage.js';
+import { openDeviceProvisionModal } from '../../devices/views/deviceClaimFlow.js';
 import { LAKE_STATUS } from '../../../core/collections.js';
 import {
   slLakeMonitorCard, slFeedSchedule, slField, slEmptyState, slButton,
@@ -201,7 +202,19 @@ export function renderLakesTab(nav) {
       ],
       updatedText: `${t('lakespg.updated')}: ${fmtAge(vm.a.lastUpdate)}`,
       signalText: vm.bestRssi != null ? `${t('dash.signal')}: ${t('dash.signal_' + q)}` : '',
-      extra: [feedBox],
+      extra: [feedBox,
+        // ⊕ Qurilma tugmasi — kartaning pastida
+        el('div', { style: 'margin-top:var(--sl-sp-3);padding-top:var(--sl-sp-2);border-top:1px solid var(--sl-divider)' }, [
+          slButton({
+            label: detectLocale() === 'uz' ? '⊕ Qurilma ulash' : '⊕ Подключить устройство',
+            variant: 'text', size: 'sm',
+            onClick: (e) => {
+              e.stopPropagation();
+              openDeviceProvisionModal({ lakeId: vm.lk.id, lakeName: vm.lk.name, nav });
+            },
+          }),
+        ]),
+      ],
       dim: vm.kind === 'archived' || vm.kind === 'inactive',
       ariaLabel: vm.lk.name,
       onClick: () => nav.push((n) => renderLakeDetailPage(n, vm.lk.id)),   // navigatsiya O'ZGARMAGAN

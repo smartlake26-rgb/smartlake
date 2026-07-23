@@ -64,7 +64,25 @@ export const deviceService = {
     return { deviceId, activationKey };
   },
 
-  /** Qurilmani o'qish (yo'q bo'lsa null). */
+  /** Qurilmaning activationKey ni yangilash (qayta ulash uchun).
+   *  deviceId O'ZGARMAYDI — faqat yangi maxfiy kalit hosil bo'ladi.
+   *  FAQAT Super Admin (rules). */
+  async regenerateKey(deviceId, actorUid) {
+    const id = String(deviceId || '').toUpperCase().trim();
+    if (!id) throw new DataError('deviceId majburiy', { messageKey: 'error.generic' });
+    const newKey = generateActivationKey();
+    try {
+      await updateDoc(ref(id), { activationKey: newKey, updatedAt: serverTimestamp() });
+    } catch (e) { throw wrap(e, 'regenerateKey'); }
+    auditService.log(AUDIT_ACTIONS.DEVICE_CREATED, {
+      actor: actorUid, targetType: AUDIT_TARGETS.DEVICE, targetId: id,
+      meta: { action: 'regenerateKey' },
+    });
+    logger.info('activationKey yangilandi:', id);
+    return { deviceId: id, activationKey: newKey };
+  },
+
+
   async getDevice(deviceId) {
     if (!deviceId) return null;                 // null yo'l -> Firestore'ga bormaymiz
     try {
