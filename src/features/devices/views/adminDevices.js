@@ -34,68 +34,131 @@ function provisioningCard() {
     style: 'text-transform:uppercase;font-family:var(--mono)',
   });
   const regionIn = input({ type: 'text', placeholder: 'Masalan: Xorazm' });
-  const serialIn = input({ type: 'text', placeholder: 'Ixtiyoriy' });
+
+  // Seriya raqami — faqat ko'rsatish, avtomatik beriladi
+  const serialDisplay = el('div', {
+    style: 'padding:8px 12px;border-radius:8px;background:var(--md-surface-container);'
+         + 'font-family:var(--mono);font-weight:700;color:var(--md-on-surface-variant);font-size:14px',
+    text: 'Yuklanmoqda...',
+  });
+  // Mavjud qurilmalar sonini olib, keyingi raqamni ko'rsatish
+  adminStore.refresh && adminStore.refresh();
+  function refreshSerial() {
+    const st = adminStore.getState();
+    const next = st.devices.length + 1;
+    serialDisplay.textContent = `SL-${String(next).padStart(4, '0')}`;
+  }
+  refreshSerial();
+
+  // PDF yaratish funksiyasi
+  async function makePdf({ deviceId, serialNumber, region, activationKey }) {
+    const { jsPDF } = await import('jspdf');
+    const doc = new jsPDF({ format: [90, 130], unit: 'mm' });
+    const qrUrl = `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(deviceId + '|' + activationKey)}&choe=UTF-8&chld=M|1`;
+
+    doc.setFillColor(14, 124, 107);
+    doc.rect(0, 0, 90, 22, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14); doc.setFont('helvetica', 'bold');
+    doc.text('SmartLake', 7, 10);
+    doc.setFontSize(7); doc.setFont('helvetica', 'normal');
+    doc.text("Qurilma faollashtirish kartasi", 7, 17);
+
+    doc.setTextColor(20, 20, 20);
+    let y = 30;
+    const row = (label, value, mono = false) => {
+      doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(120, 120, 120);
+      doc.text(label + ':', 7, y);
+      doc.setFontSize(10); doc.setTextColor(14, 60, 50);
+      doc.setFont(mono ? 'courier' : 'helvetica', 'bold');
+      doc.text(value || '—', 7, y + 6); y += 14;
+    };
+    row("Seriya raqami", serialNumber);
+    row("Device ID", deviceId, true);
+    row("Hudud", region);
+
+    // Faollashtirish kodi — ajratilgan blok
+    doc.setFillColor(240, 255, 250);
+    doc.roundedRect(5, y - 2, 80, 14, 2, 2, 'F');
+    doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(14, 124, 107);
+    doc.text("Faollashtirish kodi:", 8, y + 3);
+    doc.setFontSize(11); doc.setFont('courier', 'bold'); doc.setTextColor(14, 80, 60);
+    doc.text(activationKey, 8, y + 10); y += 18;
+
+    // QR kod
+    try {
+      const resp = await fetch(qrUrl);
+      const blob = await resp.blob();
+      const b64 = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
+      doc.addImage(b64, 'PNG', 20, y, 50, 50); y += 54;
+    } catch { y += 4; }
+
+    doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(160, 160, 160);
+    doc.text("Bu kartani saqlab qo'ying — qurilmani ulash uchun kerak.", 7, y + 4, { maxWidth: 76 });
+
+    return doc.output('blob');
+  }
+
+  // PDF blob keshlash (qurilma ID -> blob)
+  const pdfBlobs = new Map();
 
   function showErr(msg) { err.textContent = msg; err.style.display = 'flex'; }
 
-  const submit = mdButton({ label: 'Kalit yaratish (provisioning)', full: true, onClick: async () => {
+  const submit = mdButton({ label: 'Kalit yaratish', full: true, onClick: async () => {
     err.style.display = 'none';
     const deviceId = idIn.value.toUpperCase().trim();
-
     if (!DEVICE_ID_PATTERN.test(deviceId)) {
       showErr("Device ID formati: AQ + 8 ta hex belgi (masalan AQ84E991BE)");
       return;
     }
     if (!regionIn.value.trim()) {
-      showErr("Hudud (region) majburiy — claim so'rovlari hudud bo'yicha tasdiqlanadi");
-      return;
-    }
-    // Takroriy provisioning oldi olinadi (mavjud kalit ustidan yozilib ketmasin)
-    const st = adminStore.getState();
-    if (st.devices.some((d) => d.id === deviceId)) {
-      showErr(`${deviceId} allaqachon ro'yxatda — kaliti mavjud. Yangi kalit kerak bo'lsa, avval qurilmani super admin orqali o'chiring.`);
+      showErr("Hudud (region) majburiy");
       return;
     }
 
+    const serialNumber = serialDisplay.textContent.trim();
     submit.disabled = true;
+
     try {
       const actorUid = authStore.getState().uid;
-      const { activationKey } = await deviceService.provision({
-        deviceId,
+      const st = adminStore.getState();
+
+      // Mavjud qurilma — kalit yangilanadi, ID o'zgarmaydi
+      let result;
+      if (st.devices.some((d) => d.id === deviceId)) {
+        result = await deviceService.regenerateKey(deviceId, actorUid);
+        // Mavjud qurilmaning serialNumber ini olish
+        const existing = st.devices.find((d) => d.id === deviceId);
+        result.serialNumber = existing?.serialNumber || serialNumber;
+      } else {
+        result = await deviceService.provision({
+          deviceId, region: regionIn.value.trim(), serialNumber,
+          firmwareVersion: '', hardwareRevision: '',
+        }, actorUid);
+        result.serialNumber = serialNumber;
+      }
+
+      // PDF yaratish va avtomatik yuklab olish
+      const pdfBlob = await makePdf({
+        deviceId: result.deviceId,
+        serialNumber: result.serialNumber,
         region: regionIn.value.trim(),
-        serialNumber: serialIn.value.trim(),
-        firmwareVersion: '',
-        hardwareRevision: '',
-      }, actorUid);
-
-      // Kalit shu dialogda ko'rsatiladi — darhol yozib oling / nusxalang.
-      const keyEl = el('div', {
-        class: 't-mono',
-        style: 'font-size:20px;letter-spacing:1px;padding:12px;border:1px dashed var(--md-outline);border-radius:8px;text-align:center;user-select:all',
-        text: activationKey,
+        activationKey: result.activationKey,
       });
-      openDialog({
-        title: `${deviceId} — faollashtirish kaliti`,
-        body: el('div', { class: 'stack' }, [
-          keyEl,
-          el('div', { class: 't-body muted', style: 'margin-top:8px',
-            text: "Kalitni fermerga bering (qadoq stikeri). Fermer 'Qurilma qo'shish' ekranida shu kalitni kiritadi." }),
-        ]),
-        actions: [
-          { label: 'Nusxalash', variant: 'filled', onClick: () => {
-            navigator.clipboard.writeText(activationKey)
-              .then(() => toast('Kalit nusxalandi', 'ok'))
-              .catch(() => toast("Nusxalab bo'lmadi — qo'lda ko'chiring", 'err'));
-          } },
-          { label: 'Yopish', variant: 'text' },
-        ],
-      });
+      pdfBlobs.set(result.deviceId, pdfBlob);
 
-      idIn.value = ''; serialIn.value = '';
-      toast(`${deviceId} ro'yxatga olindi`, 'ok');
-      adminStore.refresh();   // jadval yangilanadi
+      // PDF yuklab olish
+      const url = URL.createObjectURL(pdfBlob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `smartlake-${result.deviceId}.pdf`; a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+
+      idIn.value = '';
+      toast(`${result.deviceId} tayyor — PDF yuklanmoqda`, 'ok');
+      await adminStore.refresh();
+      refreshSerial();
     } catch (e) {
-      showErr(e && e.message ? e.message : 'Provisioning xatosi');
+      showErr(e && e.message ? e.message : 'Xato');
     } finally {
       submit.disabled = false;
     }
@@ -104,12 +167,17 @@ function provisioningCard() {
   return mdCard([
     el('div', { class: 't-title', style: 'margin-bottom:4px', text: 'Yangi qurilma (provisioning)' }),
     el('div', { class: 't-body muted', style: 'margin-bottom:12px',
-      text: "Qurilma ID sini kiriting — faollashtirish kaliti avtomatik yaratiladi va ko'rsatiladi." }),
+      text: "Qurilma ID sini kiriting — seriya raqami avtomatik beriladi, faollashtirish kaliti yaratiladi va PDF yuklanadi." }),
     err,
     el('div', { class: 'stack' }, [
       field('Device ID (AQ + 8 hex)', idIn),
       field('Hudud (region)', regionIn),
-      field('Seriya raqami', serialIn),
+      el('div', {}, [
+        el('label', { class: 't-label', style: 'display:block;margin-bottom:4px', text: 'Seriya raqami (avtomatik)' }),
+        serialDisplay,
+        el('div', { class: 't-body muted', style: 'font-size:11px;margin-top:3px',
+          text: "Tizim tomonidan beriladi. Qayta ulanganda o'sha raqam saqlanadi." }),
+      ]),
       submit,
     ]),
   ]);
@@ -130,11 +198,55 @@ export function renderAdminDevices() {
     const table = dataTable({
       columns: [
         { key: 'id', label: t('device.deviceId'), render: (r) => el('span', { class: 't-mono', text: r.id }) },
+        { key: 'serialNumber', label: 'Seriya №', render: (r) => el('span', { class: 't-mono', text: r.serialNumber || '—' }) },
         { key: 'ownerName', label: t('tm.owner') },
         { key: 'lakeName', label: t('tm.lake') },
         { key: 'region', label: t('tm.region') },
         { key: 'lifecycle', label: t('device.lifecycle'), render: (r) => pill(r.lifecycle || '—', 'neutral') },
         { key: 'status', label: t('tm.status'), render: (r) => pill(t('tm.status_' + r.status), r.status) },
+        { key: '_pdf', label: 'PDF', render: (r) => {
+          const btn = mdButton({ label: 'PDF', variant: 'text' });
+          btn.addEventListener('click', async () => {
+            btn.disabled = true;
+            try {
+              const actorUid = authStore.getState().uid;
+              // Yangi kalit generatsiya (PDF uchun)
+              let key;
+              try { const res = await deviceService.regenerateKey(r.id, actorUid); key = res.activationKey; }
+              catch { key = '????-????-????-????'; }
+              const { jsPDF } = await import('jspdf');
+              const doc = new jsPDF({ format: [90, 130], unit: 'mm' });
+              const qrUrl = `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(r.id + '|' + key)}&choe=UTF-8`;
+              doc.setFillColor(14, 124, 107); doc.rect(0, 0, 90, 22, 'F');
+              doc.setTextColor(255, 255, 255); doc.setFontSize(13); doc.setFont('helvetica', 'bold');
+              doc.text('SmartLake', 7, 10);
+              doc.setFontSize(7); doc.setFont('helvetica', 'normal');
+              doc.text("Qurilma faollashtirish kartasi", 7, 17);
+              doc.setTextColor(20, 20, 20);
+              let y = 30;
+              const rf = (lb, v, mono) => { doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(120,120,120); doc.text(lb+':', 7, y); doc.setFontSize(10); doc.setTextColor(14,60,50); doc.setFont(mono?'courier':'helvetica','bold'); doc.text(v||'—', 7, y+6); y+=14; };
+              rf("Seriya raqami", r.serialNumber || '—');
+              rf("Device ID", r.id, true);
+              rf("Hudud", r.region || '—');
+              doc.setFillColor(240, 255, 250); doc.roundedRect(5, y-2, 80, 14, 2, 2, 'F');
+              doc.setFontSize(7); doc.setFont('helvetica','normal'); doc.setTextColor(14,124,107);
+              doc.text("Faollashtirish kodi (yangi):", 8, y+3);
+              doc.setFontSize(11); doc.setFont('courier','bold'); doc.setTextColor(14,80,60);
+              doc.text(key, 8, y+10); y+=18;
+              try {
+                const resp = await fetch(qrUrl); const blob = await resp.blob();
+                const b64 = await new Promise((res) => { const rdr = new FileReader(); rdr.onload = () => res(rdr.result); rdr.readAsDataURL(blob); });
+                doc.addImage(b64, 'PNG', 20, y, 50, 50); y+=54;
+              } catch {}
+              const url = URL.createObjectURL(doc.output('blob'));
+              const a = document.createElement('a'); a.href=url; a.download=`smartlake-${r.id}.pdf`; a.click();
+              setTimeout(() => URL.revokeObjectURL(url), 5000);
+              toast(`PDF yuklandi (${r.id})`, 'ok');
+            } catch (e) { toast(e && e.message, 'err'); }
+            finally { btn.disabled = false; }
+          });
+          return btn;
+        }},
       ],
       rows, pageSize: 14,
       filters: [{ key: 'status', label: t('tm.status'), options: ['healthy', 'good', 'warning', 'critical', 'offline', 'unknown'].map((s) => ({ value: s, label: t('tm.status_' + s) })) }],

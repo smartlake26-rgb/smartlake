@@ -216,12 +216,13 @@ export function renderLakeDetailPage(nav, lakeId) {
   }
 
   let settingsTabNode = null;
+  let currentDevicesCard = null;   // har render'da yangilanadi
+
   function getSettingsTabNode() {
     if (!settingsTabNode) {
-      // devicesCard Sozlamalar ichiga ko'chirildi (topshiriq: qurilmalar eng yuqorida)
       settingsTabNode = buildLakeSettingsTab({
         lakeId, uid: s.uid, isUz,
-        devicesCard,           // biriktirilgan qurilmalar kartasi — eng yuqori bo'lim
+        devicesCard: currentDevicesCard,
         onSaved: (m) => { lakeMeta = m; render(); },
       });
     }
@@ -723,15 +724,15 @@ export function renderLakeDetailPage(nav, lakeId) {
       } });
       assignRow.push(el('div', { class: 'sl-row', style: 'gap:8px;margin-top:10px' }, [el('div', { class: 'sl-grow' }, [sel]), btn]));
     }
-    const devicesCard = slCard([
+    currentDevicesCard = slCard([
       el('div', { class: 'sl-card-title', style: 'margin-bottom:4px', text: t('lake.attachedDevices') }),
       el('div', {}, deviceRows),
       ...assignRow,
     ]);
-    // devicesCard har render'da yangilanadi — settingsTabNode ni yangilash kerak
+    // settingsTabNode allaqachon qurilgan bo'lsa — slot yangilanadi
     if (settingsTabNode) {
       const slot = settingsTabNode.querySelector('.sl-devices-slot');
-      if (slot) slot.replaceWith(devicesCard);
+      if (slot) slot.replaceChildren(currentDevicesCard);
     }
 
     const archived = lake.status === LAKE_STATUS.ARCHIVED;
@@ -782,8 +783,16 @@ export function renderLakeDetailPage(nav, lakeId) {
         components = [devTabs, historyForDevice(historyDevId)].filter(Boolean);
       }
     } else if (activeTab === 'ai') components = [getAiTabNode()];
-    // Sozlamalar: devicesCard SettingsTab ichida (birinchi blok) — bu yerda takrorlanmaydi
-    else if (activeTab === 'sozlama') components = [getSettingsTabNode(), ...actions];
+    // Sozlamalar: devicesCard SettingsTab ichida (birinchi blok)
+    else if (activeTab === 'sozlama') {
+      // currentDevicesCard render() da quriladi — settingsTabNode ga uzatiladi
+      if (!settingsTabNode) settingsTabNode = buildLakeSettingsTab({
+        lakeId, uid: s.uid, isUz,
+        devicesCard: currentDevicesCard,
+        onSaved: (m) => { lakeMeta = m; render(); },
+      });
+      components = [settingsTabNode, ...actions];
+    }
     else {
       components = [healthHero, sensors, ...deviceChartCards];
       components.push(aeratorCard);
