@@ -394,6 +394,21 @@ uz.lset = {
   legacy: '(eski yozuv)',
 };
 
+// --- SENSOR-STATE: sensor holat matni (AI + UI) ---
+uz.sensor = {
+  absent:       'Sensor mavjud emas',
+  disconnected: 'Aloqa uzilgan',
+  disabled:     "Sensor o'chirilgan",
+  faulty:       'Sensor nosoz',
+  calibration:  'Kalibrovka talab qilinadi',
+  // AI tushuntirish matni
+  noDoAdvice:   "Kislorod (DO) sensori ma'lumoti mavjud emas — kislorod bo'yicha tavsiya shakllantirib bo'lmadi.",
+  noTempAdvice: "Harorat sensori ma'lumoti mavjud emas — haroratga bog'liq tavsiyalar chiqarilmadi.",
+  noPhAdvice:   "pH sensori o'rnatilmagan — pH tahlili bajarilmadi.",
+  noDataAdvice: "Sensorlardan ishonchli ma'lumot kelmayapti. Qurilma ulanishini tekshiring.",
+  partialAdvice:"Ba'zi sensorlar ishlamayapti — faqat mavjud ma'lumotlar asosida tavsiya berildi.",
+};
+
 uz.reports = {
   title: 'Hisobot',
   pickLake: "Ko'lni tanlang",

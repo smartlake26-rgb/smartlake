@@ -11,6 +11,7 @@
 import { historyService } from '../telemetry/services/historyService.js';
 import { fetchArchive } from '../telemetry/services/archiveService.js';
 import { computeFeedPlan } from '../telemetry/domain/feedEngine.js';
+import { sensorState, lakeSensorState, SENSOR_STATE } from '../telemetry/domain/sensorState.js';
 import { ruleProvider } from './providers/ruleProvider.js';
 import { geminiProvider, claudeProvider, openaiProvider, localLlmProvider } from './providers/llmProviders.js';
 
@@ -40,6 +41,21 @@ export async function buildContext({ lake, devs, telemetry, th, meta, uid, weath
   const firstId = devs.length ? devs[0].id : null;
   const now = firstId ? (telemetry.get(firstId) || {}) : {};
 
+  // SENSOR HOLATLARI: AI tavsiyadan oldin har kanal tekshiriladi.
+  // Ko'l darajasida (bir nechta qurilmada "present" bo'lsa — present).
+  const allTels = devs.map((d) => telemetry.get(d.id) || null);
+  const sensorStates = {
+    do:   lakeSensorState(allTels, 'do'),
+    t:    lakeSensorState(allTels, 't'),
+    ph:   lakeSensorState(allTels, 'ph'),
+    tds:  lakeSensorState(allTels, 'tds'),
+    nh3:  lakeSensorState(allTels, 'nh3'),
+    bat:  lakeSensorState(allTels, 'battery'),
+  };
+  // Faqat PRESENT holatlardagi qiymatlar AI'ga beriladi — qolganlar null
+  const safeVal = (key, telKey) => sensorStates[key] === SENSOR_STATE.PRESENT
+    ? (now[telKey] ?? null) : null;
+
   const pts24 = firstId ? await historyService.getHistory(firstId, '24h').catch(() => []) : [];
   const doVals = pts24.map((p) => p.do).filter((v) => typeof v === 'number');
 
@@ -56,9 +72,19 @@ export async function buildContext({ lake, devs, telemetry, th, meta, uid, weath
   return {
     lake: { id: lake.id, name: lake.name, region: lake.region || null },
     thresholds: th,
-    now: { do: now.do ?? null, t: now.t ?? null, ph: now.ph ?? null, rssi: now.rssi ?? null,
-      battery: now.battery ?? null, aer: now.aer ?? null, manual: now.manual ?? null,
-      man_remain: now.man_remain ?? null, mode: now.mode ?? null, ts: now.ts ?? null },
+    sensorStates,   // AI va UI sensor holatini tekshiradi
+    now: {
+      do:        safeVal('do', 'do'),         // ABSENT/FAULTY bo'lsa null
+      t:         safeVal('t', 't'),
+      ph:        safeVal('ph', 'ph'),
+      rssi:      now.rssi ?? null,
+      battery:   safeVal('bat', 'battery'),
+      aer:       now.aer ?? null,
+      manual:    now.manual ?? null,
+      man_remain:now.man_remain ?? null,
+      mode:      now.mode ?? null,
+      ts:        now.ts ?? null,
+    },
     trend24h: {
       points: pts24.length,
       doMin: doVals.length ? Math.min(...doVals) : null,
