@@ -207,10 +207,8 @@ export function buildHistoryTab({ lakeId, uid, isUz, getDevs, getTh, lakeName = 
 
   function fmtXRange(ts) {
     const rDef = RANGES.find((r) => r.id === activeRange) || RANGES[1];
-    const pts = rangePoints();
-    const span = pts.length > 1 ? pts[pts.length-1].ts - pts[0].ts : rDef.ms;
-    if (span <= 24 * 3600e3) return fmtTime(ts);
-    if (span <= 7 * 24 * 3600e3)
+    if (rDef.ms <= 24 * 3600e3) return fmtTime(ts);
+    if (rDef.ms <= 7 * 24 * 3600e3)
       return `${p2(new Date(ts).getDate())}.${p2(new Date(ts).getMonth()+1)} ${fmtTime(ts)}`;
     return `${p2(new Date(ts).getDate())}.${p2(new Date(ts).getMonth()+1)}`;
   }
@@ -248,21 +246,25 @@ export function buildHistoryTab({ lakeId, uid, isUz, getDevs, getTh, lakeName = 
       ranges[key] = { min: mn - pad, max: mx + pad };
     });
 
-    const xMin = pts[0].ts, xMax = pts[pts.length - 1].ts;
-    const xRange = xMax - xMin || 1;
-    const toX = (ts) => PAD.l + ((ts - xMin) / xRange) * IW;
+    // X o'qi: tanlangan diapazonning BOSHIDAN OXIRIGACHA (now gacha)
+    // Shunda 1s tanlasang nuqtalar x o'qini to'liq egallaydi,
+    // 24s tanlasang 1s ma'lumot x o'qning faqat o'ng 1/24 qismida turadi
+    const rDef2 = RANGES.find((r) => r.id === activeRange) || RANGES[1];
+    const xMax = Date.now();
+    const xMin = xMax - rDef2.ms;
+    const xRange = rDef2.ms;
+    const toX = (ts) => PAD.l + Math.max(0, Math.min(1, (ts - xMin) / xRange)) * IW;
     const toY = (v, key) => {
       const r = ranges[key]; if (!r) return null;
       return PAD.t + IH - ((v - r.min) / (r.max - r.min)) * IH;
     };
 
-    // X o'qi yorliqlari
-    const xLabels = [];
-    const labelCount = Math.min(5, pts.length);
-    const step = Math.floor(pts.length / labelCount) || 1;
-    for (let i = 0; i < pts.length; i += step) {
-      xLabels.push({ x: toX(pts[i].ts), label: fmtXRange(pts[i].ts) });
-    }
+    // X o'qi yorliqlari — to'liq diapazon bo'yicha 5 ta bir xil oraliqda
+    const labelCount = 5;
+    const xLabels = Array.from({ length: labelCount + 1 }, (_, i) => {
+      const ts = xMin + (rDef2.ms / labelCount) * i;
+      return { x: toX(ts), label: fmtXRange(ts) };
+    });
 
     // Har seriya uchun path + circles
     const seriesSvg = series.map(({ key, color }) => {

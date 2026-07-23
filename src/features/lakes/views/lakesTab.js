@@ -36,7 +36,7 @@ import { computeFeedPlan } from '../../telemetry/domain/feedEngine.js';
 import { loadLakeMeta } from '../../telemetry/services/archiveService.js';
 import { renderLakeDetailPage } from './lakeDetailPage.js';
 import { renderLakeFormPage } from './lakeFormPage.js';
-import { openDeviceProvisionModal } from '../../devices/views/deviceClaimFlow.js';
+import { openFarmerClaimModal } from '../../devices/views/deviceClaimFlow.js';
 import { LAKE_STATUS } from '../../../core/collections.js';
 import {
   slLakeMonitorCard, slFeedSchedule, slField, slEmptyState, slButton,
@@ -210,7 +210,7 @@ export function renderLakesTab(nav) {
             variant: 'text', size: 'sm',
             onClick: (e) => {
               e.stopPropagation();
-              openDeviceProvisionModal({ lakeId: vm.lk.id, lakeName: vm.lk.name, nav });
+              openFarmerClaimModal({ lakeId: vm.lk.id, lakeName: vm.lk.name });
             },
           }),
         ]),

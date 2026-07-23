@@ -1,335 +1,352 @@
 // ============================================================
 //  features/devices/views/deviceClaimFlow.js — QURILMA ULASH
 //
-//  Admin tomoni (renderDeviceProvisionCard):
-//    Ko'l kartasida "⊕ Qurilma" tugmasi -> modal:
-//      - DeviceID (o'zgarmaydi, tartib raqam bilan)
-//      - ActivationKey (yangi generatsiya yoki mavjud)
-//      - QR kod (ID + Kod)
-//      - PDF yuklab olish (ID + Kod + QR)
+//  ADMIN (openAdminProvisionPage):
+//    - Hudud + DeviceID (admin o'zi kiritadi, AQ+8hex)
+//    - Tartib raqam tizim tomonidan avtomatik
+//    - "Kalit yaratish" → PDF (DeviceID + Kalit + QR)
+//    - PDF pastda yuklab olish tugmasi (qurilma holati bilan birga)
 //
-//  Fermer tomoni (renderDeviceClaimModal):
-//    - ID + Kod qo'lda kiritish
-//    - QR kod skanerlash (kamera)
-//    - ownershipService.requestClaim -> admin tasdiqlaydi
+//  FERMER (openFarmerClaimModal, Ko'l kartasida "⊕ Qurilma"):
+//    - DeviceID + Kalit qo'lda kiritish
+//    - YOKI "📷 QR kod" tugmasi → kamera scan
+//    - "Saqlash" → requestClaim → admin tasdiqlaydi
 // ============================================================
 
 import { el, mount } from '../../../shared/dom.js';
 import { toast } from '../../../shared/toast.js';
 import { t, detectLocale } from '../../../core/i18n/index.js';
 import { authStore } from '../../auth/index.js';
-import { openDialog } from '../../../shared/ui/index.js';
 import { ownershipService } from '../../ownership/index.js';
 import { deviceService, generateActivationKey } from '../index.js';
 import * as dataStore from '../../../farmer/dataStore.js';
 import {
-  slIcon, slCard, slButton, slField, slBadge, slEmptyState,
+  slIcon, slCard, slButton, slField, slBadge,
 } from '../../../design-system/index.js';
 
-const isUz = () => detectLocale() === 'uz';
+const L = (uz, ru) => detectLocale() === 'uz' ? uz : ru;
 
 /* ============================================================
-   QR KOD — tashqi kutubxonasiz, SVG QR (yengil, dynamic import)
+   DIALOG yordamchi
    ============================================================ */
-// QR rendering — qrcode lib yo'q, shuning uchun Google Charts API dan olamiz
-// (internet bo'lsa) yoki matn ko'rsatamiz
-function renderQrEl(text, size = 180) {
-  const url = `https://chart.googleapis.com/chart?chs=${size}x${size}&cht=qr&chl=${encodeURIComponent(text)}&choe=UTF-8`;
-  const img = el('img', { src: url, alt: 'QR', width: String(size), height: String(size),
-    style: `width:${size}px;height:${size}px;border-radius:8px;display:block;margin:0 auto` });
-  img.onerror = () => {
-    // Internet yo'q — matn
-    mount(img.parentElement || img, el('div', {
-      style: `width:${size}px;height:${size}px;display:flex;flex-direction:column;align-items:center;justify-content:center;`
-           + 'border:2px dashed var(--sl-border);border-radius:8px;font-size:10px;text-align:center;padding:8px;gap:4px',
-    }, [
-      el('div', { html: slIcon('info', 18), style: 'opacity:.4' }),
-      el('div', { text: text, style: 'font-family:monospace;word-break:break-all' }),
-    ]));
-  };
-  return img;
+function showModal(title, body, onClose) {
+  const scrim = el('div', { style: 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;display:flex;align-items:flex-end' });
+  const sheet = el('div', {
+    style: 'background:var(--md-surface,#fff);width:100%;max-width:480px;margin:0 auto;'
+         + 'border-radius:20px 20px 0 0;padding:24px 20px 32px;max-height:90vh;overflow-y:auto;'
+         + 'box-shadow:0 -4px 32px rgba(0,0,0,.18);animation:sl-pdrawer-in .22s ease both',
+  });
+  const handle = el('div', { style: 'width:40px;height:4px;border-radius:2px;background:var(--sl-border,#ddd);margin:0 auto 16px' });
+  const titleEl = el('div', { style: 'font-size:17px;font-weight:800;margin-bottom:16px', text: title });
+  const closeBtn = el('button', { type: 'button',
+    style: 'position:absolute;top:12px;right:16px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--sl-text-secondary)',
+    text: '×' });
+  sheet.style.position = 'relative';
+  sheet.append(handle, titleEl, closeBtn, body);
+  scrim.append(sheet);
+  document.body.append(scrim);
+
+  function close() { scrim.remove(); onClose && onClose(); }
+  closeBtn.addEventListener('click', close);
+  scrim.addEventListener('click', (e) => { if (e.target === scrim) close(); });
+  return { close };
 }
 
 /* ============================================================
-   PDF YUKLAB OLISH (jspdf — dynamic import)
+   TARTIB RAQAM — mavjud qurilmalar soniga qarab
    ============================================================ */
-async function downloadPdf({ deviceId, activationKey, lakeName, qrDataUrl }) {
+async function nextSerialNumber() {
+  try {
+    const st = dataStore.getState();
+    const count = st.devices.length + 1;
+    return `SL-${String(count).padStart(4, '0')}`;
+  } catch { return `SL-0001`; }
+}
+
+/* ============================================================
+   PDF YARATISH — jspdf (dynamic import)
+   ============================================================ */
+async function generatePdf({ deviceId, activationKey, serialNumber, region }) {
+  const qrUrl = `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(deviceId + '|' + activationKey)}&choe=UTF-8&chld=M|1`;
+
   try {
     const { jsPDF } = await import('jspdf');
-    const doc = new jsPDF({ format: [80, 110], unit: 'mm' });
+    const doc = new jsPDF({ format: [85, 120], unit: 'mm' });
 
+    // Header
     doc.setFillColor(14, 124, 107);
-    doc.rect(0, 0, 80, 18, 'F');
+    doc.rect(0, 0, 85, 20, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(12); doc.setFont('helvetica', 'bold');
-    doc.text('SmartLake', 6, 8);
+    doc.setFontSize(13); doc.setFont('helvetica', 'bold');
+    doc.text('SmartLake', 7, 9);
     doc.setFontSize(7); doc.setFont('helvetica', 'normal');
-    doc.text(isUz() ? "Qurilma faollashtirish" : 'Активация устройства', 6, 14);
+    doc.text(L('Qurilma faollashtirish kartasi', 'Карта активации устройства'), 7, 15);
 
-    doc.setTextColor(30, 30, 30);
-    doc.setFontSize(8); doc.setFont('helvetica', 'bold');
-    doc.text(isUz() ? "Ko'l:" : 'Озеро:', 6, 24);
-    doc.setFont('helvetica', 'normal');
-    doc.text(lakeName || '—', 22, 24);
+    // Ma'lumotlar
+    doc.setTextColor(20, 20, 20);
+    const rows = [
+      [L('Tartib raqam', 'Серийный №'), serialNumber],
+      ['Device ID', deviceId],
+      [L('Hudud', 'Регион'), region || '—'],
+      [L('Faollashtirish kodi', 'Код активации'), activationKey],
+    ];
+    let y = 28;
+    rows.forEach(([label, value]) => {
+      doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 100, 100);
+      doc.text(label + ':', 7, y);
+      doc.setFontSize(9); doc.setFont(label === 'Device ID' || label.includes('kod') ? 'courier' : 'helvetica', 'bold');
+      doc.setTextColor(14, 124, 107);
+      doc.text(value, 7, y + 5);
+      y += 12;
+    });
 
-    doc.setFont('helvetica', 'bold');
-    doc.text('Device ID:', 6, 31);
-    doc.setFont('courier', 'bold');
-    doc.setFontSize(10);
-    doc.text(deviceId, 6, 37);
+    // QR kod
+    try {
+      const resp = await fetch(qrUrl);
+      const blob = await resp.blob();
+      const b64 = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
+      doc.addImage(b64, 'PNG', 17, y + 2, 52, 52);
+      y += 58;
+    } catch { y += 4; }
 
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(8);
-    doc.text(isUz() ? 'Faollashtirish kodi:' : 'Код активации:', 6, 45);
-    doc.setFont('courier', 'bold');
-    doc.setFontSize(10);
-    doc.text(activationKey, 6, 51);
+    doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(140, 140, 140);
+    doc.text(L("Bu kartani saqlab qo'ying — qurilmani ulash uchun kerak.", 'Сохраните эту карту — нужна для подключения устройства.'), 7, y + 4, { maxWidth: 71 });
 
-    if (qrDataUrl) {
-      try {
-        const resp = await fetch(qrDataUrl);
-        const blob = await resp.blob();
-        const b64 = await new Promise((res) => {
-          const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob);
-        });
-        doc.addImage(b64, 'PNG', 15, 57, 50, 50);
-      } catch { /* QR rasm yuklanmasa — skip */ }
-    }
-
-    doc.setFontSize(6); doc.setFont('helvetica', 'normal');
-    doc.setTextColor(120, 120, 120);
-    doc.text(isUz() ? 'Bu kartani saqlab qo\'ying — faollashtirish uchun kerak.' : 'Сохраните эту карту — нужна для активации.', 6, 105);
-
-    doc.save(`smartlake-device-${deviceId}.pdf`);
+    const blob = doc.output('blob');
+    const url = URL.createObjectURL(blob);
+    return { url, filename: `smartlake-device-${deviceId}.pdf` };
   } catch (e) {
-    toast(`PDF: ${e && e.message}`, 'err');
+    throw new Error('PDF: ' + (e && e.message));
   }
 }
 
 /* ============================================================
-   ADMIN — "⊕ Qurilma" modal (Ko'l kartasida tugma)
+   ADMIN — Qurilmalar bo'limida yangi qurilma provisioning
+   @param {object} nav — navigatsiya ob'ekti
    ============================================================ */
-export function openDeviceProvisionModal({ lakeId, lakeName, nav }) {
+export function openAdminProvisionPage(nav) {
   const s = authStore.getState();
-  const isAdmin = s.role === 'super' || s.role === 'admin';
-  if (!isAdmin) {
-    // Fermer: claim sahifasiga o'tish
-    openDeviceClaimModal({ lakeId, lakeName, nav });
-    return;
-  }
 
-  // Admin: yangi qurilma provisioning yoki mavjud qayta ulash
+  const regionIn = slField({ label: L('Hudud', 'Регион'), type: 'text', placeholder: L('Navoiy, O\'zbekiston', 'Навои, Узбекистан') });
+  regionIn.querySelector('.sl-help').remove();
+
   const idIn = slField({ label: 'Device ID', type: 'text',
-    attrs: { style: 'text-transform:uppercase;font-family:var(--sl-font-mono,monospace)' },
+    attrs: { style: 'text-transform:uppercase;font-family:monospace;letter-spacing:1px' },
     placeholder: 'AQ12345678' });
   idIn.querySelector('.sl-help').remove();
-  const serialIn = slField({ label: isUz() ? 'Seriya raqam (ixtiyoriy)' : 'Серийный номер (необязательно)',
-    type: 'text', placeholder: 'SN-001' });
-  serialIn.querySelector('.sl-help').remove();
 
   const resultBox = el('div');
-  let currentKey = null;
-  let qrImg = null;
-  let qrDataUrl = null;
+  let pdfData = null;  // { url, filename }
 
-  async function generate() {
-    const rawId = idIn.input.value.trim().toUpperCase();
-    if (!rawId) { toast(isUz() ? 'Device ID kiriting' : 'Введите Device ID', 'err'); return; }
+  const genBtn = slButton({
+    label: L('Kalit yaratish', 'Создать ключ'), variant: 'primary',
+    onClick: async () => {
+      const rawId = idIn.input.value.trim().toUpperCase();
+      const region = regionIn.input.value.trim();
+      if (!rawId) { toast(L('Device ID kiriting', 'Введите Device ID'), 'err'); return; }
+      if (!/^AQ[0-9A-F]{8}$/.test(rawId)) { toast(L("Format: AQ + 8 hex belgi (masalan AQ1A2B3C4D)", "Формат: AQ + 8 hex символов"), 'err'); return; }
 
-    genBtn.disabled = true;
-    mount(resultBox, el('div', { class: 'sl-skeleton card', style: 'height:120px' }));
-    try {
-      // Mavjud qurilmani tekshirish — agar bor bo'lsa key regeneratsiya
-      let result;
+      genBtn.disabled = true;
+      mount(resultBox, el('div', { class: 'sl-skeleton card', style: 'height:100px' }));
+      pdfData = null;
+
       try {
-        result = await deviceService.regenerateKey(rawId, s.uid);
-      } catch {
-        // Yangi provision
-        result = await deviceService.provision({
-          deviceId: rawId,
-          serialNumber: serialIn.input.value.trim(),
-          firmwareVersion: '', hardwareRevision: '', region: '',
-        }, s.uid);
-      }
-      currentKey = result.activationKey;
-      const qrText = `${result.deviceId}|${currentKey}`;
+        const serial = await nextSerialNumber();
+        // Mavjud qurilma bo'lsa — kalit yangilanadi, bo'lmasa — yangi provision
+        let result;
+        try {
+          result = await deviceService.regenerateKey(rawId, s.uid);
+        } catch {
+          result = await deviceService.provision({ deviceId: rawId, serialNumber: serial, region, firmwareVersion: '', hardwareRevision: '' }, s.uid);
+        }
 
-      // QR hosil qilish (Google Charts API — kutubxonasiz)
-      qrDataUrl = `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(qrText)}&choe=UTF-8`;
-      qrImg = renderQrEl(qrText, 160);
+        // PDF yaratish
+        pdfData = await generatePdf({ deviceId: result.deviceId, activationKey: result.activationKey, serialNumber: serial, region });
+        await dataStore.refresh();
 
-      mount(resultBox, el('div', { class: 'sl-stack' }, [
-        slCard([
-          el('div', { style: 'display:flex;gap:var(--sl-sp-4);align-items:flex-start;flex-wrap:wrap' }, [
-            el('div', { class: 'sl-grow' }, [
-              el('div', { class: 'sl-caption', text: 'Device ID' }),
-              el('div', { style: 'font-family:monospace;font-size:18px;font-weight:800;color:var(--sl-primary);letter-spacing:1px', text: result.deviceId }),
-              el('div', { class: 'sl-caption', style: 'margin-top:var(--sl-sp-3)', text: isUz() ? 'Faollashtirish kodi' : 'Код активации' }),
-              el('div', { style: 'font-family:monospace;font-size:15px;font-weight:700;color:var(--sl-chart-feed);letter-spacing:2px', text: currentKey }),
-              el('div', { class: 'sl-caption', style: 'margin-top:4px;color:var(--sl-text-secondary)',
-                text: isUz() ? 'Bu kod bir martalik — qurilma ulanganidan keyin noto\'g\'ri bo\'ladi.' : 'Код одноразовый — после привязки устройства недействителен.' }),
+        mount(resultBox, slCard([
+          el('div', { class: 'sl-stack-sm' }, [
+            el('div', { style: 'display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap' }, [
+              el('div', { class: 'sl-grow' }, [
+                el('div', { class: 'sl-caption', text: L('Tartib raqam', 'Серийный №') }),
+                el('div', { style: 'font-weight:700;margin-bottom:8px', text: serial }),
+                el('div', { class: 'sl-caption', text: 'Device ID' }),
+                el('div', { style: 'font-family:monospace;font-size:17px;font-weight:800;color:var(--sl-primary);letter-spacing:1px;margin-bottom:8px', text: result.deviceId }),
+                el('div', { class: 'sl-caption', text: L('Faollashtirish kodi', 'Код активации') }),
+                el('div', { style: 'font-family:monospace;font-size:14px;font-weight:700;color:var(--sl-chart-feed);letter-spacing:2px', text: result.activationKey }),
+              ]),
+              el('img', {
+                src: `https://chart.googleapis.com/chart?chs=120x120&cht=qr&chl=${encodeURIComponent(result.deviceId + '|' + result.activationKey)}&choe=UTF-8&chld=M|1`,
+                alt: 'QR',
+                style: 'width:120px;height:120px;border-radius:8px;border:1px solid var(--sl-border)',
+              }),
             ]),
-            qrImg || el('span'),
+            el('div', { class: 'sl-caption', style: 'color:var(--sl-text-secondary)',
+              text: L("Bu kalit bir martalik. Qurilma biriktirilgach yangi kalit kerak bo'ladi.", "Ключ одноразовый. После привязки устройства потребуется новый ключ.") }),
+            slButton({
+              label: L('⬇ PDF yuklab olish', '⬇ Скачать PDF'),
+              variant: 'secondary', icon: 'download',
+              onClick: () => {
+                if (!pdfData) return;
+                const a = document.createElement('a');
+                a.href = pdfData.url; a.download = pdfData.filename; a.click();
+              },
+            }),
           ]),
-          el('div', { style: 'margin-top:var(--sl-sp-3)' }, [
-            slButton({ label: isUz() ? '⬇ PDF yuklab olish' : '⬇ Скачать PDF',
-              variant: 'primary', icon: 'download',
-              onClick: () => downloadPdf({ deviceId: result.deviceId, activationKey: currentKey, lakeName, qrDataUrl }) }),
+        ]));
+      } catch (e) {
+        mount(resultBox, el('div', { class: 'sl-banner warn', text: e && e.message }));
+      } finally { genBtn.disabled = false; }
+    },
+  });
+
+  // To'liq sahifa sifatida qaytarish
+  const node = el('div', {}, [
+    el('div', { class: 'md-appbar' }, [
+      el('button', { class: 'md-iconbtn', type: 'button', 'aria-label': L('Orqaga', 'Назад'),
+        html: slIcon('arrowLeft', 22), onClick: () => nav.back() }),
+      el('div', { class: 'grow', style: 'font-size:17px;font-weight:700', text: L('Yangi qurilma ulash', 'Подключить устройство') }),
+    ]),
+    el('div', { class: 'md-content no-nav' }, [
+      el('div', { class: 'sl-stack' }, [
+        slCard([
+          el('div', { class: 'sl-card-title', style: 'margin-bottom:12px', text: L("Qurilma ma'lumotlari", 'Данные устройства') }),
+          el('div', { class: 'sl-stack-sm' }, [
+            regionIn,
+            idIn,
+            el('div', { class: 'sl-caption', style: 'color:var(--sl-text-secondary)',
+              text: L('Format: AQ + 8 hex belgi. Misol: AQ1A2B3C4D. Tartib raqam avtomatik beriladi.', 'Формат: AQ + 8 hex символов. Пример: AQ1A2B3C4D. Серийный номер присваивается автоматически.') }),
+            genBtn,
           ]),
         ]),
-      ]));
-    } catch (e) {
-      mount(resultBox, el('div', { class: 'sl-banner warn', text: e && e.message }));
-    } finally { genBtn.disabled = false; }
-  }
-
-  const genBtn = slButton({ label: isUz() ? 'ID va kod yaratish' : 'Создать ID и код', variant: 'secondary', onClick: generate });
-
-  openDialog({
-    title: isUz() ? `⊕ Qurilma ulash — ${lakeName}` : `⊕ Добавить устройство — ${lakeName}`,
-    body: el('div', { class: 'sl-stack' }, [
-      el('div', { class: 'sl-row', style: 'gap:var(--sl-sp-2);align-items:flex-end;flex-wrap:wrap' }, [idIn, serialIn, genBtn]),
-      el('div', { class: 'sl-caption', style: 'color:var(--sl-text-secondary)',
-        text: isUz() ? 'Mavjud qurilma uchun: bir xil ID kiriting — kod yangilanadi, ID o\'zgarmaydi.' : 'Для повторного подключения: введите тот же ID — код обновится, ID не изменится.' }),
-      resultBox,
+        resultBox,
+      ]),
     ]),
-    actions: [{ label: isUz() ? 'Yopish' : 'Закрыть', variant: 'text' }],
-  });
-  const dlg = document.querySelector('.md-dialog');
-  if (dlg) dlg.classList.add('wide');
+  ]);
+  node.__cleanup = () => { if (pdfData) URL.revokeObjectURL(pdfData.url); };
+  return node;
 }
 
 /* ============================================================
-   FERMER — qurilmani ulash modali (ID + Kod qo'lda yoki QR)
+   FERMER — Ko'l kartasida "⊕ Qurilma ulash" → bottom sheet
    ============================================================ */
-export function openDeviceClaimModal({ lakeId, lakeName, nav }) {
+export function openFarmerClaimModal({ lakeId, lakeName }) {
   const s = authStore.getState();
+
   const idIn = slField({ label: 'Device ID', type: 'text',
-    attrs: { style: 'text-transform:uppercase;font-family:var(--sl-font-mono,monospace)' },
+    attrs: { style: 'text-transform:uppercase;font-family:monospace;letter-spacing:1px' },
     placeholder: 'AQ12345678' });
   idIn.querySelector('.sl-help').remove();
-  const keyIn = slField({ label: isUz() ? 'Faollashtirish kodi' : 'Код активации', type: 'text',
-    attrs: { style: 'text-transform:uppercase;font-family:var(--sl-font-mono,monospace)' },
+
+  const keyIn = slField({
+    label: L('Faollashtirish kodi', 'Код активации'), type: 'text',
+    attrs: { style: 'text-transform:uppercase;font-family:monospace;letter-spacing:2px' },
     placeholder: 'XXXX-XXXX-XXXX-XXXX' });
   keyIn.querySelector('.sl-help').remove();
 
-  const errEl = el('div', { class: 'sl-banner warn', style: 'display:none' });
+  const errEl = el('div', { style: 'display:none;color:var(--sl-critical);font-size:13px;padding:8px;background:color-mix(in srgb,var(--sl-critical) 10%,transparent);border-radius:8px' });
 
-  // QR scan tugmasi
-  const scanBtn = slButton({ label: isUz() ? '📷 QR skanerlash' : '📷 Сканировать QR', variant: 'outlined',
-    onClick: () => startQrScan(idIn, keyIn) });
-
-  const submitBtn = slButton({ label: isUz() ? 'Qurilmani ulash' : 'Привязать устройство', variant: 'primary',
+  const saveBtn = slButton({
+    label: L('Saqlash', 'Сохранить'), variant: 'primary',
     onClick: async () => {
       errEl.style.display = 'none';
       const deviceId = idIn.input.value.trim().toUpperCase();
       const activationKey = keyIn.input.value.trim().toUpperCase();
       if (!deviceId || !activationKey) {
-        errEl.textContent = isUz() ? 'Device ID va kodni kiriting' : 'Введите Device ID и код';
-        errEl.style.display = 'flex'; return;
+        errEl.textContent = L('Device ID va kodni kiriting', 'Введите Device ID и код');
+        errEl.style.display = 'block'; return;
       }
-      submitBtn.disabled = true;
+      saveBtn.disabled = true;
       try {
         await ownershipService.requestClaim({ deviceId, activationKey, lakeName, lakeId, farmerRegion: s.profile?.vil || '' }, s.uid);
-        toast(isUz() ? 'So\'rov yuborildi — admin tasdiqlagandan so\'ng qurilma biriktiriladi.' : 'Запрос отправлен — устройство подключится после одобрения.', 'ok');
+        modal.close();
+        toast(L("So'rov yuborildi — admin tasdiqlagach qurilma biriktiriladi.", "Запрос отправлен — устройство подключится после одобрения."), 'ok');
         await dataStore.refresh();
-        document.querySelectorAll('.md-dialog').forEach((d) => d.remove());
-        document.querySelectorAll('.md-scrim').forEach((d) => d.remove());
       } catch (e) {
-        const msg = String(e?.code || '').includes('permission-denied')
-          ? (isUz() ? 'ID yoki kod noto\'g\'ri, yoki qurilma allaqachon biriktirilgan.' : 'Неверный ID или код, или устройство уже привязано.')
-          : (e?.message || 'Xato');
-        errEl.textContent = msg; errEl.style.display = 'flex';
-        submitBtn.disabled = false;
+        errEl.textContent = String(e?.code || '').includes('permission-denied')
+          ? L("ID yoki kod noto'g'ri, yoki qurilma allaqachon band.", 'Неверный ID или код, или устройство уже занято.')
+          : (e?.message || L('Xato yuz berdi', 'Произошла ошибка'));
+        errEl.style.display = 'block';
+        saveBtn.disabled = false;
       }
     },
   });
 
-  openDialog({
-    title: isUz() ? `Qurilma ulash — ${lakeName}` : `Подключить устройство — ${lakeName}`,
-    body: el('div', { class: 'sl-stack' }, [
-      errEl,
-      el('div', { class: 'sl-banner info' }, [
-        el('span', { html: slIcon('info', 14), style: 'display:inline-flex;flex:none' }),
-        el('span', { text: isUz() ? 'Device ID va faollashtirish kodini qurilma qadoqidan yoki admin bergan PDF dan oling.' : 'Device ID и код активации возьмите из упаковки устройства или из PDF от администратора.' }),
-      ]),
-      idIn, keyIn,
-      el('div', { class: 'sl-row', style: 'gap:var(--sl-sp-2)' }, [submitBtn, scanBtn]),
-    ]),
-    actions: [{ label: isUz() ? 'Bekor qilish' : 'Отмена', variant: 'text' }],
+  // QR skanerlash
+  const scanBtn = slButton({
+    label: L('📷 QR kod orqali', '📷 Через QR-код'), variant: 'outlined',
+    onClick: () => startQrScan(idIn, keyIn),
   });
-  const dlg = document.querySelector('.md-dialog');
-  if (dlg) dlg.classList.add('wide');
+
+  const body = el('div', { class: 'sl-stack' }, [
+    el('div', { class: 'sl-banner info', style: 'font-size:12px' }, [
+      el('span', { html: slIcon('info', 14), style: 'display:inline-flex;flex:none' }),
+      el('span', { text: L("Device ID va faollashtirish kodini admin bergan PDF dan oling yoki QR kodni skaner qiling.", "Возьмите Device ID и код из PDF от администратора или отсканируйте QR-код.") }),
+    ]),
+    errEl,
+    idIn,
+    keyIn,
+    el('div', { class: 'sl-row', style: 'gap:8px' }, [saveBtn, scanBtn]),
+  ]);
+
+  const modal = showModal(L(`⊕ Qurilma ulash — ${lakeName}`, `⊕ Устройство — ${lakeName}`), body);
 }
 
-/* QR skanerlash (kamera API) */
+/* QR skanerlash */
 async function startQrScan(idIn, keyIn) {
-  const isUzL = isUz();
-  if (!navigator.mediaDevices) {
-    toast(isUzL ? 'Kamera mavjud emas' : 'Камера недоступна', 'err'); return;
+  if (!navigator.mediaDevices?.getUserMedia) {
+    toast(L('Kamera mavjud emas', 'Камера недоступна'), 'err'); return;
   }
   const video = el('video', { autoplay: 'true', playsinline: 'true',
-    style: 'width:100%;border-radius:8px;max-height:280px;object-fit:cover' });
-  const scanBox = el('div', { style: 'position:relative' }, [video]);
-  const stopBtn = slButton({ label: isUzL ? 'To\'xtatish' : 'Остановить', variant: 'text',
-    onClick: () => stop() });
-
-  // Scan dialogi ustiga chiqarish
-  const overlay = el('div', {
-    style: 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px',
-  }, [
-    el('div', { style: 'color:#fff;font-weight:700', text: isUzL ? 'QR kodni kameraga ko\'rsating' : 'Наведите камеру на QR-код' }),
-    scanBox,
-    stopBtn,
+    style: 'width:100%;border-radius:10px;max-height:260px;object-fit:cover' });
+  const stopBtn = slButton({ label: L("To'xtatish", 'Остановить'), variant: 'text' });
+  const scanBody = el('div', { class: 'sl-stack-sm' }, [
+    el('div', { style: 'font-size:13px;color:var(--sl-text-secondary);text-align:center',
+      text: L('QR kodni kameraga yaqinlashtiring', 'Наведите камеру на QR-код') }),
+    video, stopBtn,
   ]);
-  document.body.appendChild(overlay);
+  const m = showModal(L('QR skanerlash', 'Сканирование QR'), scanBody);
+  stopBtn.addEventListener('click', () => { stop(); m.close(); });
 
   let stream; let raf;
-  const canvas = document.createElement('canvas');
-
-  async function stop() {
+  function stop() {
     cancelAnimationFrame(raf);
-    stream?.getTracks().forEach((t) => t.stop());
-    overlay.remove();
+    stream?.getTracks().forEach((tr) => tr.stop());
   }
-
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
     video.srcObject = stream;
-    await new Promise((res) => { video.onloadedmetadata = res; });
     video.play();
-
-    // BarcodeDetector API (modern browsers)
-    const BarcodeDetector = window.BarcodeDetector;
-    if (!BarcodeDetector) {
-      stop();
-      toast(isUzL ? 'Brauzer QR skanerlashni qo\'llab-quvvatlamaydi' : 'Браузер не поддерживает сканирование QR', 'err');
+    if (!window.BarcodeDetector) {
+      stop(); m.close();
+      toast(L('Brauzer QR skanerlashni qo\'llab-quvvatlamaydi', 'Браузер не поддерживает QR'), 'err');
       return;
     }
-    const detector = new BarcodeDetector({ formats: ['qr_code'] });
-
+    const detector = new window.BarcodeDetector({ formats: ['qr_code'] });
+    const canvas = document.createElement('canvas');
     async function scan() {
       canvas.width = video.videoWidth; canvas.height = video.videoHeight;
       canvas.getContext('2d').drawImage(video, 0, 0);
       try {
-        const [result] = await detector.detect(canvas);
-        if (result) {
-          const [id, key] = result.rawValue.split('|');
+        const [res] = await detector.detect(canvas);
+        if (res) {
+          const [id, key] = res.rawValue.split('|');
           if (id && key) {
             idIn.input.value = id.toUpperCase();
             keyIn.input.value = key.toUpperCase();
-            toast(isUzL ? 'QR muvaffaqiyatli o\'qildi' : 'QR успешно считан', 'ok');
-            stop(); return;
+            stop(); m.close();
+            toast(L('QR muvaffaqiyatli o\'qildi', 'QR успешно считан'), 'ok');
+            return;
           }
         }
-      } catch { /* detector xato — davom etish */ }
+      } catch {}
       raf = requestAnimationFrame(scan);
     }
     scan();
-  } catch (e) {
-    stop();
-    toast(isUzL ? 'Kameraga ruxsat berilmadi' : 'Нет доступа к камере', 'err');
+  } catch {
+    stop(); m.close();
+    toast(L('Kameraga ruxsat berilmadi', 'Нет доступа к камере'), 'err');
   }
 }
 
-export default { openDeviceProvisionModal, openDeviceClaimModal };
+export default { openAdminProvisionPage, openFarmerClaimModal };

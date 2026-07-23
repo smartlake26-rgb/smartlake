@@ -4,19 +4,27 @@
 
 import { el, mount } from '../../../shared/dom.js';
 import { t } from '../../../core/i18n/index.js';
+import { authStore } from '../../auth/index.js';
 import { appBar, mdIconButton, mdCard, statusChip, listItem, skeletonCards, emptyState, mdFab } from '../../../shared/ui/index.js';
 import * as dataStore from '../../../farmer/dataStore.js';
 import { resolveThresholds } from '../../telemetry/domain/thresholds.js';
 import { deviceStatus } from '../../telemetry/domain/statusEngine.js';
 import { renderDeviceDetailPage } from '../../telemetry/views/deviceDetailPage.js';
 import { renderClaimPage } from './claimPage.js';
+import { openAdminProvisionPage } from './deviceClaimFlow.js';
 
 export function renderDevicesTab(nav) {
+  const s = authStore.getState ? authStore.getState() : {};
+  const isAdmin = s.role === 'super' || s.role === 'admin';
+  const addAction = isAdmin
+    ? () => nav.push((n) => openAdminProvisionPage(n))
+    : () => nav.push(renderClaimPage);
+
   const content = el('div', { class: 'md-content' });
   const node = el('div', {}, [
-    appBar({ title: t('nav.devices'), actions: [mdIconButton({ icon: 'plus', label: t('device.claimTitle'), onClick: () => nav.push(renderClaimPage) })] }),
+    appBar({ title: t('nav.devices'), actions: [mdIconButton({ icon: 'plus', label: t('device.claimTitle'), onClick: addAction })] }),
     content,
-    mdFab({ label: t('device.claimTitle'), icon: 'plus', onClick: () => nav.push(renderClaimPage) }),
+    mdFab({ label: t('device.claimTitle'), icon: 'plus', onClick: addAction }),
   ]);
 
   function row(d, st) {
