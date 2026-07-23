@@ -274,23 +274,27 @@ export function buildHistoryTab({ lakeId, uid, isUz, getDevs, getTh, lakeName = 
       const devs = getDevs();
       const ids = devs.map((d) => d.id);
       const [fromTs, toTs] = dateFilter.getRange();
-      // SAQLANGAN oqim: arxiv ∪ (davr bugunni qamrasa) qurilma 24h buferi
-      const arch = await fetchArchive(uid, ids, fromTs, toTs);
+      // 24h bufer — arxivsiz ham ishlaydi
       let rtdb = [];
-      if (toTs >= Date.now() - DAY && ids.length) {
+      if (ids.length) {
         const pts = await historyService.getHistory(ids[0], '24h').catch(() => []);
         rtdb = pts.filter((x) => x.ts >= fromTs && x.ts <= toTs);
       }
+      // Arxiv — xato bo'lsa jim o'tkaziladi, bufer yetarli bo'ladi
+      let arch = [];
+      try { arch = await fetchArchive(uid, ids, fromTs, toTs); } catch (_) {}
       const seen = new Set(arch.map((x) => Math.floor(x.ts / 300e3)));
       samples = arch.concat(rtdb.filter((x) => !seen.has(Math.floor(x.ts / 300e3))))
         .sort((a, b) => a.ts - b.ts);
       rows = aggregateLocal(samples, bucketFor(toTs - fromTs));
-      renderSummary(); renderCharts(); renderTable();
-      if (!firstLoad) toast(t('hist.refreshed'), 'ok');
-      firstLoad = false;
     } catch (e) {
-      renderError();
+      // Arxiv xatosi — 24h buferdan kelgan ma'lumotlar saqlanadi
+      samples = samples.length ? samples : [];
+      rows = aggregateLocal(samples, bucketFor(toTs - fromTs));
     } finally { loading = false; }
+    renderSummary(); renderCharts(); renderTable();
+    if (!firstLoad) toast(t('hist.refreshed'), 'ok');
+    firstLoad = false;
   }
 
   /* ---------- yig'ish + pull-to-refresh ---------- */
