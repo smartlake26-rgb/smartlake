@@ -1,0 +1,92 @@
+/* ============================================================
+   design-system/tokens/typography.css — SMARTLAKE DS 3.0 · SHRIFT
+   ------------------------------------------------------------
+   Qaror: webfont ATAYLAB yo'q — ferma sharoitida sekin internet,
+   PWA offline birinchi ochilishda ham shrift "sakramasligi" kerak.
+   Tizim imzosi shrift tanlovida emas, RAQAM MUOMALASIDA:
+   barcha sensor qiymatlari tabular-nums bilan tekis ustunda turadi
+   (7.6 → 10.2 ga o'zgarganda karta "titramaydi").
+
+   Og'irliklar FAQAT standart pog'onalarda (400/500/600/700/800) —
+   oraliq qiymatlar (550/650/750) eski WebView'larda yaxlitlanib
+   qurilmalar orasida farq berardi.
+   ============================================================ */
+
+:root {
+  /* Shrift oilalari */
+  --sl-font: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+             "Helvetica Neue", Arial, system-ui, sans-serif;
+  --sl-mono: ui-monospace, "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
+
+  /* Shkala: rol → o'lcham / og'irlik / qator / kerning */
+  --sl-fs-display:   clamp(28px, 7vw, 34px);
+  --sl-fw-display:   800;
+  --sl-lh-display:   1.15;
+  --sl-ls-display:   -0.6px;
+
+  --sl-fs-headline:  clamp(22px, 5.5vw, 26px);
+  --sl-fw-headline:  700;
+  --sl-lh-headline:  1.2;
+  --sl-ls-headline:  -0.35px;
+
+  --sl-fs-title:     18px;
+  --sl-fw-title:     700;
+  --sl-lh-title:     1.3;
+  --sl-ls-title:     -0.15px;
+
+  --sl-fs-subtitle:  15px;
+  --sl-fw-subtitle:  600;
+  --sl-lh-subtitle:  1.35;
+  --sl-ls-subtitle:  0;
+
+  --sl-fs-body:      15px;
+  --sl-fw-body:      400;
+  --sl-lh-body:      1.5;
+  --sl-ls-body:      0;
+
+  --sl-fs-body-sm:   13px;
+  --sl-fw-body-sm:   400;
+  --sl-lh-body-sm:   1.45;
+  --sl-ls-body-sm:   0;
+
+  --sl-fs-label:     12px;
+  --sl-fw-label:     600;
+  --sl-lh-label:     1.3;
+  --sl-ls-label:     0.05em;   /* uppercase bilan */
+
+  --sl-fs-caption:   11px;
+  --sl-fw-caption:   500;
+  --sl-lh-caption:   1.35;
+  --sl-ls-caption:   0.01em;
+
+  /* Sensor raqamlari (tizim imzosi) */
+  --sl-fs-num-lg:    34px;
+  --sl-fs-num-md:    26px;
+  --sl-fs-num-sm:    18px;
+}
+
+/* --- Utility klasslar (komponentlar shulardan quriladi) --- */
+.sl-display  { font-size: var(--sl-fs-display);  font-weight: var(--sl-fw-display);  line-height: var(--sl-lh-display);  letter-spacing: var(--sl-ls-display); }
+.sl-headline { font-size: var(--sl-fs-headline); font-weight: var(--sl-fw-headline); line-height: var(--sl-lh-headline); letter-spacing: var(--sl-ls-headline); }
+.sl-title    { font-size: var(--sl-fs-title);    font-weight: var(--sl-fw-title);    line-height: var(--sl-lh-title);    letter-spacing: var(--sl-ls-title); }
+.sl-subtitle { font-size: var(--sl-fs-subtitle); font-weight: var(--sl-fw-subtitle); line-height: var(--sl-lh-subtitle); letter-spacing: var(--sl-ls-subtitle); }
+.sl-body     { font-size: var(--sl-fs-body);     font-weight: var(--sl-fw-body);     line-height: var(--sl-lh-body);     letter-spacing: var(--sl-ls-body); }
+.sl-body-sm  { font-size: var(--sl-fs-body-sm);  font-weight: var(--sl-fw-body-sm);  line-height: var(--sl-lh-body-sm);  letter-spacing: var(--sl-ls-body-sm); }
+.sl-label    { font-size: var(--sl-fs-label);    font-weight: var(--sl-fw-label);    line-height: var(--sl-lh-label);    letter-spacing: var(--sl-ls-label); text-transform: uppercase; }
+.sl-caption  { font-size: var(--sl-fs-caption);  font-weight: var(--sl-fw-caption);  line-height: var(--sl-lh-caption);  letter-spacing: var(--sl-ls-caption); color: var(--sl-text-secondary); }
+
+/* Rang modifikatorlari */
+.sl-text-secondary { color: var(--sl-text-secondary); }
+.sl-text-disabled  { color: var(--sl-text-disabled); }
+
+/* Raqamlar — tabular (sensor qiymatlari, jadval ustunlari) */
+.sl-num, .sl-num-lg, .sl-num-md, .sl-num-sm {
+  font-variant-numeric: tabular-nums lining-nums;
+  font-feature-settings: "tnum";
+}
+.sl-num-lg { font-size: var(--sl-fs-num-lg); font-weight: 800; letter-spacing: -0.8px; line-height: 1; }
+.sl-num-md { font-size: var(--sl-fs-num-md); font-weight: 700; letter-spacing: -0.4px; line-height: 1.05; }
+.sl-num-sm { font-size: var(--sl-fs-num-sm); font-weight: 700; letter-spacing: -0.2px; line-height: 1.1; }
+
+/* Monospace (qurilma ID, texnik qiymatlar) */
+.sl-mono { font-family: var(--sl-mono); letter-spacing: 0.02em; }

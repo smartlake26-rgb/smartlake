@@ -1,0 +1,159 @@
+/* ============================================================
+   design-system/styles/cards.css — SMARTLAKE DS 3.0 · KARTALAR
+   ------------------------------------------------------------
+   Asos: .sl-card ("suvda suzuvchi" oq qatlam, teal soyali).
+   Modifikatorlar: .elevated · .interactive · .inset · .premium ·
+                   .critical (pulsli kritik holat)
+   Ixtisoslashgan kartalar (card.js fabrikalari shu asosdan quradi):
+   stat / lake / sensor / alert / ai / chart / action / weather /
+   summary / energy / feed / history
+   ============================================================ */
+
+.sl-card {
+  background: var(--sl-card);
+  border-radius: var(--sl-r-card);
+  padding: var(--sl-card-pad);
+  border: 1px solid color-mix(in srgb, var(--sl-primary) 7%, var(--sl-border));
+  box-shadow: var(--sl-shadow-1);
+  transition: transform var(--sl-motion) var(--sl-ease-out),
+              box-shadow var(--sl-motion) var(--sl-ease),
+              border-color var(--sl-motion) var(--sl-ease),
+              background var(--sl-motion) var(--sl-ease);
+}
+[data-theme="dark"] .sl-card {
+  border-color: color-mix(in srgb, var(--sl-primary) 10%, transparent);
+}
+
+.sl-card.elevated { box-shadow: var(--sl-shadow-3); border-color: transparent; }
+.sl-card.inset    { background: var(--sl-card-inset); border: none; box-shadow: none; }
+.sl-card.premium  { box-shadow: var(--sl-shadow-premium); }
+
+.sl-card.interactive { cursor: pointer; }
+.sl-card.interactive:hover {
+  transform: translateY(-2px); box-shadow: var(--sl-shadow-3);
+  border-color: color-mix(in srgb, var(--sl-primary) 30%, var(--sl-border));
+}
+.sl-card.interactive:active { transform: translateY(0) scale(.985); box-shadow: var(--sl-shadow-1); }
+
+.sl-card.critical {
+  border-color: var(--sl-critical);
+  animation: sl-pulse-critical 1.6s infinite var(--sl-ease);
+}
+
+/* --- Karta ichki qismlari --- */
+.sl-card-head { display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sl-inline-gap); margin-bottom: var(--sl-stack-gap); }
+.sl-card-title { font-size: var(--sl-fs-title); font-weight: var(--sl-fw-title);
+  letter-spacing: var(--sl-ls-title); color: var(--sl-text-primary); }
+.sl-card-sub { font-size: var(--sl-fs-body-sm); color: var(--sl-text-secondary); }
+
+/* --- STAT CARD (raqam + yorliq + ikonka) --- */
+.sl-stat { background: var(--sl-card); border-radius: var(--sl-r-lg);
+  padding: var(--sl-sp-4); border: 1px solid var(--sl-border); }
+.sl-stat .st-ic { width: 40px; height: 40px; border-radius: var(--sl-r-md);
+  display: inline-flex; align-items: center; justify-content: center; margin-bottom: var(--sl-sp-2); }
+.sl-stat .st-val { font-size: var(--sl-fs-num-md); font-weight: 800; line-height: 1;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.4px; color: var(--sl-text-primary); }
+.sl-stat .st-lab { font-size: var(--sl-fs-label); font-weight: var(--sl-fw-label);
+  color: var(--sl-text-secondary); margin-top: var(--sl-sp-1); }
+.sl-stat.interactive { cursor: pointer; transition: transform var(--sl-motion) var(--sl-ease-out),
+  box-shadow var(--sl-motion) var(--sl-ease); }
+.sl-stat.interactive:hover { transform: translateY(-2px); box-shadow: var(--sl-shadow-2); }
+
+/* --- SENSOR CARD (bitta o'lchov katakchasi, bento) --- */
+.sl-sensor {
+  --_c: var(--sl-primary);                     /* seriya rangi (JS beradi) */
+  background: color-mix(in srgb, var(--_c) 7%, var(--sl-card));
+  border: 1px solid color-mix(in srgb, var(--_c) 16%, var(--sl-border));
+  border-radius: var(--sl-r-lg); padding: var(--sl-sp-3) var(--sl-sp-4);
+  display: flex; flex-direction: column; justify-content: space-between;
+  min-height: 80px; position: relative;
+  transition: border-color var(--sl-motion) var(--sl-ease);
+}
+.sl-sensor .sn-lab { font-size: var(--sl-fs-caption); font-weight: 600;
+  letter-spacing: .04em; text-transform: uppercase; color: var(--sl-text-secondary);
+  display: flex; align-items: center; gap: var(--sl-sp-1); }
+.sl-sensor .sn-lab .sl-ic { color: var(--_c); }
+.sl-sensor .sn-val { font-size: var(--sl-fs-num-md); font-weight: 700;
+  font-variant-numeric: tabular-nums; letter-spacing: -0.4px; line-height: 1.05;
+  color: var(--_c); margin-top: var(--sl-sp-1);
+  display: flex; align-items: baseline; gap: 3px; }
+.sl-sensor .sn-unit { font-size: var(--sl-fs-caption); font-weight: 500;
+  color: var(--sl-text-secondary); letter-spacing: 0; }
+.sl-sensor.critical { border-color: var(--sl-critical);
+  animation: sl-pulse-critical 1.6s infinite var(--sl-ease); }
+.sl-sensor .sn-live { position: absolute; top: var(--sl-sp-3); right: var(--sl-sp-3);
+  width: 7px; height: 7px; border-radius: 50%; background: var(--sl-online);
+  box-shadow: 0 0 6px var(--sl-online); animation: sl-pulse 1.6s infinite var(--sl-ease); }
+
+/* --- ALERT CARD --- */
+.sl-alert-card { display: flex; gap: var(--sl-sp-3); align-items: flex-start;
+  border-left: 3px solid var(--_c, var(--sl-warning)); }
+.sl-alert-card .al-ic { width: 36px; height: 36px; border-radius: var(--sl-r-md); flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: color-mix(in srgb, var(--_c, var(--sl-warning)) 14%, transparent);
+  color: var(--_c, var(--sl-warning)); }
+
+/* --- AI CARD (iris urg'usi + oquvchi chiziq) --- */
+.sl-ai-card { position: relative; overflow: hidden;
+  border-color: color-mix(in srgb, var(--sl-ai) 35%, var(--sl-border));
+  background: linear-gradient(145deg, var(--sl-card), color-mix(in srgb, var(--sl-ai) 5%, var(--sl-card)));
+  box-shadow: var(--sl-shadow-premium); }
+.sl-ai-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+  background: linear-gradient(90deg, var(--sl-ai), var(--sl-aqua-50), var(--sl-ai));
+  background-size: 200% 100%; animation: sl-flowline 4s linear infinite; }
+@keyframes sl-flowline { to { background-position: -200% 0; } }
+.sl-ai-card .ai-tag { display: inline-flex; align-items: center; gap: var(--sl-sp-1);
+  font-size: var(--sl-fs-caption); font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; color: var(--sl-ai); }
+
+/* --- WEATHER CARD (ob-havo qatori) --- */
+.sl-weather { background: color-mix(in srgb, var(--sl-info) 7%, var(--sl-card));
+  border: 1px solid color-mix(in srgb, var(--sl-info) 16%, var(--sl-border));
+  border-radius: var(--sl-r-sm); padding: var(--sl-sp-2) var(--sl-sp-3);
+  display: flex; align-items: center; justify-content: space-between; gap: var(--sl-sp-2);
+  font-size: var(--sl-fs-body-sm); font-weight: 500; color: var(--sl-text-secondary); }
+.sl-weather .wx-main { display: flex; align-items: center; gap: var(--sl-sp-2); min-width: 0; }
+.sl-weather .wx-main .sl-ic { color: var(--sl-info); flex: none; }
+.sl-weather .wx-txt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sl-weather .wx-next { font-size: var(--sl-fs-caption); font-weight: 700; flex: none;
+  font-variant-numeric: tabular-nums; }
+
+/* --- ACTION CARD (harakatga chorlovchi) --- */
+.sl-action-card { display: flex; align-items: center; gap: var(--sl-sp-3); cursor: pointer; }
+.sl-action-card .ac-ic { width: 44px; height: 44px; border-radius: var(--sl-r-md); flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--sl-primary-container); color: var(--sl-on-primary-container); }
+.sl-action-card .ac-chev { color: var(--sl-border-strong); flex: none; }
+
+/* --- SUMMARY / ENERGY / FEED / HISTORY qatorlari --- */
+.sl-kv-row { display: flex; align-items: center; justify-content: space-between;
+  gap: var(--sl-sp-3); padding: var(--sl-sp-2) 0;
+  border-bottom: 1px solid var(--sl-divider); font-size: var(--sl-fs-body-sm); }
+.sl-kv-row:last-child { border-bottom: none; }
+.sl-kv-row .kv-key { color: var(--sl-text-secondary); display: flex;
+  align-items: center; gap: var(--sl-sp-2); }
+.sl-kv-row .kv-val { font-weight: 700; font-variant-numeric: tabular-nums;
+  color: var(--sl-text-primary); }
+
+/* --- Ro'yxat elementi --- */
+.sl-listitem { display: flex; align-items: center; gap: var(--sl-sp-3);
+  padding: var(--sl-sp-3) var(--sl-sp-1);
+  border-bottom: 1px solid var(--sl-divider);
+  transition: background var(--sl-motion-fast) var(--sl-ease); }
+.sl-listitem:last-child { border-bottom: none; }
+.sl-listitem.interactive { cursor: pointer; border-radius: var(--sl-r-sm); }
+.sl-listitem.interactive:hover { background: color-mix(in srgb, var(--sl-text-primary) 4%, transparent); }
+.sl-listitem .li-lead { width: 42px; height: 42px; border-radius: var(--sl-r-md); flex: none;
+  background: var(--sl-surface-3); color: var(--sl-text-secondary);
+  display: inline-flex; align-items: center; justify-content: center; }
+
+/* --- Bo'sh / xato holat --- */
+.sl-state { text-align: center; padding: var(--sl-sp-9) var(--sl-sp-5);
+  color: var(--sl-text-secondary); }
+.sl-state .st-ic { color: var(--sl-border-strong); margin-bottom: var(--sl-sp-3); }
+.sl-state .st-title { font-size: var(--sl-fs-subtitle); font-weight: 700;
+  color: var(--sl-text-primary); }
+.sl-state .st-desc { font-size: var(--sl-fs-body-sm); margin-top: var(--sl-sp-1);
+  max-width: 280px; margin-inline: auto; }
+.sl-state .st-action { margin-top: var(--sl-sp-4); display: flex; justify-content: center; }

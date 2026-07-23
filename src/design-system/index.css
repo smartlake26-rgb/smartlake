@@ -1,0 +1,26 @@
+/* ============================================================
+   design-system/index.css — SMARTLAKE DS 3.0 · YAGONA KIRISH
+   ------------------------------------------------------------
+   Migratsiya bosqichida entry-fayl faqat shuni import qiladi:
+     import '../design-system/index.css';
+   Tartib muhim: avval tokenlar, keyin komponent stillari.
+   MUHIM: bu fayl HALI hech qayerga import qilinmagan — mavjud
+   ekranlar o'zgarmaydi (barcha klasslar .sl- prefiksli).
+   ============================================================ */
+
+/* 1 · Tokenlar */
+@import './tokens/colors.css';
+@import './tokens/typography.css';
+@import './tokens/spacing.css';
+@import './tokens/radius.css';
+@import './tokens/shadow.css';
+@import './tokens/motion.css';
+@import './tokens/charts.css';
+
+/* 2 · Komponent stillari */
+@import './styles/base.css';
+@import './styles/buttons.css';
+@import './styles/cards.css';
+@import './styles/inputs.css';
+@import './styles/tables.css';
+@import './styles/feedback.css';

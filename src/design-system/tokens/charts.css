@@ -1,0 +1,107 @@
+/* ============================================================
+   design-system/tokens/charts.css — SMARTLAKE DS 3.0 · GRAFIK
+   ------------------------------------------------------------
+   Yagona grafik tili: bosh sahifa bento'si, gauge, sparkline va
+   tarix grafigi BIR XIL ranglarda gaplashadi:
+     DO = brend teal · Harorat = issiq apelsin · pH = binafsha
+   Inline hex TAQIQLANADI — SVG'lar faqat shu tokenlarni ishlatadi.
+   ============================================================ */
+
+:root {
+  /* Seriya ranglari (sensor semantikasi) */
+  --sl-chart-do:      var(--sl-lake-40);   /* kislorod — brend */
+  --sl-chart-temp:    #E07B39;             /* harorat */
+  --sl-chart-ph:      #7C5CBF;             /* pH */
+  --sl-chart-battery: #B36A00;             /* batareya */
+  --sl-chart-rssi:    var(--sl-aqua-40);   /* signal */
+  --sl-chart-energy:  #C9A227;             /* elektr (kWh) */
+  --sl-chart-feed:    #8A6D3B;             /* yem */
+
+  /* Umumiy seriyalar (sensor bo'lmagan grafiklar uchun 1..5) */
+  --sl-chart-1: var(--sl-lake-40);
+  --sl-chart-2: #E07B39;
+  --sl-chart-3: #7C5CBF;
+  --sl-chart-4: var(--sl-aqua-50);
+  --sl-chart-5: #C9A227;
+
+  /* Struktura elementlari */
+  --sl-chart-grid:      color-mix(in srgb, var(--sl-border) 55%, transparent);
+  --sl-chart-axis:      var(--sl-text-secondary);
+  --sl-chart-label:     var(--sl-slate-50);
+  --sl-chart-threshold: var(--sl-critical);
+  --sl-chart-cursor:    color-mix(in srgb, var(--sl-primary) 55%, transparent);
+  --sl-chart-dot-fill:  var(--sl-card);
+  --sl-chart-area-opacity: .12;
+
+  /* Gauge */
+  --sl-gauge-track: var(--sl-surface-3);
+
+  /* Tooltip (grafik ustidagi ma'lumot oynasi) */
+  --sl-chart-tooltip-bg:     color-mix(in srgb, var(--sl-lake-10) 94%, transparent);
+  --sl-chart-tooltip-text:   #F2FAF8;
+  --sl-chart-tooltip-border: color-mix(in srgb, var(--sl-lake-60) 30%, transparent);
+}
+
+[data-theme="dark"] {
+  --sl-chart-do:      #52DFC9;
+  --sl-chart-temp:    #F09C63;
+  --sl-chart-ph:      #B79CF0;
+  --sl-chart-battery: #FFB95C;
+  --sl-chart-rssi:    #7FDCEF;
+  --sl-chart-energy:  #E3C255;
+  --sl-chart-feed:    #C4A473;
+
+  --sl-chart-1: #52DFC9;
+  --sl-chart-2: #F09C63;
+  --sl-chart-3: #B79CF0;
+  --sl-chart-4: #7FDCEF;
+  --sl-chart-5: #E3C255;
+
+  --sl-chart-grid: color-mix(in srgb, var(--sl-border) 60%, transparent);
+  --sl-chart-tooltip-bg: color-mix(in srgb, #030D0B 92%, transparent);
+}
+
+/* --- SVG klasslari (chart.js dvigateli shularni qo'yadi) --- */
+.sl-chart-grid      { stroke: var(--sl-chart-grid); stroke-width: 1; }
+.sl-chart-axis      { stroke: var(--sl-chart-axis); stroke-width: 1; }
+.sl-chart-tick      { fill: var(--sl-chart-label); font-size: 10px; font-family: var(--sl-font); }
+.sl-chart-line      { fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; }
+.sl-chart-area      { opacity: var(--sl-chart-area-opacity); }
+.sl-chart-threshold { stroke: var(--sl-chart-threshold); stroke-width: 1.5; stroke-dasharray: 5 4; }
+.sl-chart-cursor    { stroke: var(--sl-chart-cursor); stroke-width: 1.5; stroke-dasharray: 3 3; }
+.sl-chart-dot       { fill: var(--sl-chart-dot-fill); stroke-width: 2.5; }
+.sl-chart-bar       { rx: 3; }
+
+/* Seriya rang bog'lamalari */
+.sl-series-do      { stroke: var(--sl-chart-do); }      .sl-fill-do      { fill: var(--sl-chart-do); }
+.sl-series-temp    { stroke: var(--sl-chart-temp); }    .sl-fill-temp    { fill: var(--sl-chart-temp); }
+.sl-series-ph      { stroke: var(--sl-chart-ph); }      .sl-fill-ph      { fill: var(--sl-chart-ph); }
+.sl-series-battery { stroke: var(--sl-chart-battery); } .sl-fill-battery { fill: var(--sl-chart-battery); }
+.sl-series-rssi    { stroke: var(--sl-chart-rssi); }    .sl-fill-rssi    { fill: var(--sl-chart-rssi); }
+.sl-series-energy  { stroke: var(--sl-chart-energy); }  .sl-fill-energy  { fill: var(--sl-chart-energy); }
+.sl-series-feed    { stroke: var(--sl-chart-feed); }    .sl-fill-feed    { fill: var(--sl-chart-feed); }
+
+/* Legend */
+.sl-chart-legend { display: flex; flex-wrap: wrap; gap: var(--sl-sp-4);
+  font-size: var(--sl-fs-label); color: var(--sl-text-secondary); font-weight: var(--sl-fw-label); }
+.sl-chart-legend .sl-swatch { width: 10px; height: 10px; border-radius: 3px;
+  display: inline-block; margin-right: 5px; vertical-align: -1px; }
+
+/* Tooltip */
+.sl-chart-tooltip { position: absolute; display: none; pointer-events: none;
+  z-index: var(--sl-z-tooltip); min-width: 150px;
+  background: var(--sl-chart-tooltip-bg); color: var(--sl-chart-tooltip-text);
+  border: 1px solid var(--sl-chart-tooltip-border); border-radius: var(--sl-r-md);
+  padding: var(--sl-sp-2) var(--sl-sp-3);
+  font-size: var(--sl-fs-caption); line-height: 1.5;
+  box-shadow: var(--sl-shadow-dialog);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.sl-chart-tooltip .tt-head { font-weight: 700; padding-bottom: 4px; margin-bottom: 6px;
+  border-bottom: 1px solid color-mix(in srgb, currentColor 18%, transparent); }
+.sl-chart-tooltip .tt-row { display: flex; justify-content: space-between; gap: var(--sl-sp-3); }
+.sl-chart-tooltip .tt-val { font-variant-numeric: tabular-nums; font-weight: 700; }
+
+/* Konteyner */
+.sl-chart-frame { position: relative; background: var(--sl-surface-1);
+  border: 1px solid var(--sl-border); border-radius: var(--sl-r-md);
+  padding: var(--sl-sp-3); overflow: hidden; }

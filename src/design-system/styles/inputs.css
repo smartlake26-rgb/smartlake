@@ -1,0 +1,80 @@
+/* ============================================================
+   design-system/styles/inputs.css — SMARTLAKE DS 3.0 · FORMALAR
+   ------------------------------------------------------------
+   Asos qoida: fokusda border-width O'ZGARMAYDI — halqa box-shadow
+   bilan chiziladi (layout-shift yo'q).
+   Holatlar: normal · hover · focus · error · success · disabled
+   Turlar: text / number / search / dropdown / date / time / password
+   ============================================================ */
+
+.sl-field { display: flex; flex-direction: column; gap: var(--sl-sp-1); }
+.sl-field > label { font-size: var(--sl-fs-label); font-weight: var(--sl-fw-label);
+  letter-spacing: .03em; color: var(--sl-text-secondary); }
+
+.sl-input, .sl-select {
+  width: 100%; padding: var(--sl-sp-3) var(--sl-sp-4);
+  border-radius: var(--sl-r-input);
+  border: 1.5px solid var(--sl-border);
+  background: var(--sl-card); color: var(--sl-text-primary);
+  font-size: var(--sl-fs-body); font-family: var(--sl-font); outline: none;
+  transition: border-color var(--sl-motion-fast) var(--sl-ease),
+              box-shadow var(--sl-motion-fast) var(--sl-ease),
+              background var(--sl-motion-fast) var(--sl-ease);
+}
+[data-theme="dark"] .sl-input, [data-theme="dark"] .sl-select { background: var(--sl-surface-1); }
+
+.sl-input::placeholder { color: var(--sl-text-disabled); }
+.sl-input:hover:not(:disabled), .sl-select:hover:not(:disabled) { border-color: var(--sl-border-strong); }
+.sl-input:focus, .sl-select:focus {
+  border-color: var(--sl-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sl-primary) 16%, transparent);
+}
+.sl-input:disabled, .sl-select:disabled { opacity: .55; background: var(--sl-surface-2); cursor: default; }
+
+/* Yordam matni */
+.sl-field .sl-help { font-size: var(--sl-fs-caption); color: var(--sl-text-secondary); }
+
+/* --- ERROR holati --- */
+.sl-field.error > label { color: var(--sl-error); }
+.sl-field.error .sl-input, .sl-field.error .sl-select { border-color: var(--sl-error); }
+.sl-field.error .sl-input:focus, .sl-field.error .sl-select:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sl-error) 16%, transparent);
+}
+.sl-field.error .sl-help { color: var(--sl-error); font-weight: 600; }
+
+/* --- SUCCESS holati --- */
+.sl-field.success .sl-input, .sl-field.success .sl-select { border-color: var(--sl-success); }
+.sl-field.success .sl-input:focus {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sl-success) 16%, transparent);
+}
+.sl-field.success .sl-help { color: var(--sl-success); font-weight: 600; }
+
+/* --- Ichki ikonli o'ram (search, password, date, time) --- */
+.sl-input-wrap { position: relative; display: flex; align-items: center; }
+.sl-input-wrap .sl-input { padding-right: 44px; }
+.sl-input-wrap.lead .sl-input { padding-left: 42px; padding-right: var(--sl-sp-4); }
+.sl-input-wrap .in-ic {
+  position: absolute; right: var(--sl-sp-3); color: var(--sl-text-disabled);
+  display: inline-flex; pointer-events: none;
+}
+.sl-input-wrap.lead .in-ic { right: auto; left: var(--sl-sp-3); }
+.sl-input-wrap .in-btn {
+  position: absolute; right: var(--sl-sp-1); width: 36px; height: 36px;
+  border: none; background: transparent; border-radius: var(--sl-r-full);
+  color: var(--sl-text-secondary); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background var(--sl-motion-fast) var(--sl-ease);
+}
+.sl-input-wrap .in-btn:hover { background: color-mix(in srgb, var(--sl-text-primary) 7%, transparent); }
+
+/* Number input — brauzer strelkalarini yumshatish */
+.sl-input[type="number"] { font-variant-numeric: tabular-nums; }
+
+/* Date/Time — ikonka rangi (WebKit) */
+.sl-input[type="date"]::-webkit-calendar-picker-indicator,
+.sl-input[type="time"]::-webkit-calendar-picker-indicator { opacity: .55; cursor: pointer; }
+
+/* Select — o'z strelkamiz */
+.sl-select { appearance: none; -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%235D6F6B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center; padding-right: 40px; }

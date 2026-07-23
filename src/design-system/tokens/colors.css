@@ -1,0 +1,158 @@
+/* ============================================================
+   design-system/tokens/colors.css — SMARTLAKE DS 3.0 · RANGLAR
+   ------------------------------------------------------------
+   Imzo: "Chuqurlik" — interfeys suv qatlamlari kabi quriladi:
+   fon = suv yuzasi, kartalar = sayoz qatlam, dialog = eng yuza.
+   Brend teal (#0E7C6B) o'zgarmagan. Barcha qiymatlar FAQAT shu
+   fayldan olinadi — komponent ichida hex yozish TAQIQLANADI.
+
+   Qatlamlar:
+     1) Primitivlar  (--sl-lake-*, --sl-iris-*, ...) — xom ramp'lar
+     2) Semantik     (--sl-primary, --sl-surface, ...) — komponentlar
+        FAQAT shu qatlamni ishlatadi.
+   Dark rejim: [data-theme="dark"] — mavjud theme.js mexanizmi.
+   ============================================================ */
+
+:root {
+  /* ----------------------------------------------------------
+     1 · PRIMITIVLAR
+     ---------------------------------------------------------- */
+  /* Suv (brend) tonal narvoni */
+  --sl-lake-05: #03110F;  --sl-lake-10: #06201B;  --sl-lake-20: #0A3B33;
+  --sl-lake-30: #0C5A4D;  --sl-lake-40: #0E7C6B;  /* ← brend yadro */
+  --sl-lake-50: #199C86;  --sl-lake-60: #37BCA4;  --sl-lake-70: #6BD7C2;
+  --sl-lake-80: #9FEBDB;  --sl-lake-90: #CEF5EE;  --sl-lake-95: #E6FAF6;
+  --sl-lake-98: #F3FCFA;  --sl-lake-99: #F8FDFC;
+
+  /* Aqua (info / ikkilamchi suv toni) */
+  --sl-aqua-30: #085F75;  --sl-aqua-40: #0E7F9C;  --sl-aqua-50: #15AEC2;
+  --sl-aqua-80: #A5E8F5;  --sl-aqua-90: #CFF3FA;
+
+  /* Iris (AI belgisi — suv palitrasidan ataylab ajralib turadi) */
+  --sl-iris-30: #4534A8;  --sl-iris-40: #5B48D0;  --sl-iris-50: #7462E8;
+  --sl-iris-80: #C9C0F8;  --sl-iris-90: #E4DFFC;
+
+  /* Neytral (slate — sovuq-yashil kul) */
+  --sl-slate-10: #0E1B19; --sl-slate-30: #33433F; --sl-slate-50: #5D6F6B;
+  --sl-slate-70: #93A5A1; --sl-slate-80: #B8C7C3; --sl-slate-90: #D9E3E0;
+  --sl-slate-95: #ECF2F0;
+
+  /* ----------------------------------------------------------
+     2 · SEMANTIK ROLLAR (LIGHT)
+     ---------------------------------------------------------- */
+  /* Brend */
+  --sl-primary:              var(--sl-lake-40);
+  --sl-on-primary:           #FFFFFF;
+  --sl-primary-container:    var(--sl-lake-90);
+  --sl-on-primary-container: var(--sl-lake-10);
+  --sl-primary-hover:        var(--sl-lake-30);
+
+  --sl-secondary:              #45605C;
+  --sl-on-secondary:           #FFFFFF;
+  --sl-secondary-container:    #D9EAE6;
+  --sl-on-secondary-container: #0B211E;
+
+  /* Sirtlar — suv qatlamlari (pastdan yuqoriga ochiladi) */
+  --sl-background:        var(--sl-lake-98);   /* ekran foni (suv yuzasi) */
+  --sl-surface:           #FFFFFF;             /* asosiy sirt */
+  --sl-surface-dim:       #D8E5E2;
+  --sl-card:              #FFFFFF;             /* karta foni */
+  --sl-card-inset:        #E9F2EF;             /* karta ichidagi panel */
+  --sl-surface-1:         #EFF7F5;             /* qatlam +1 */
+  --sl-surface-2:         #E7F1EE;             /* qatlam +2 */
+  --sl-surface-3:         #DCE9E6;             /* qatlam +3 (sticky/hover) */
+
+  /* Chegara va ajratgichlar */
+  --sl-border:        #C2D2CD;                 /* forma/karta chegarasi */
+  --sl-border-strong: #64756F;                 /* urg'uli chegara */
+  --sl-divider:       #E1EAE7;                 /* ro'yxat ajratgichi */
+
+  /* Matn */
+  --sl-text-primary:   #071A16;   /* quyoshda o'qilish uchun chuqur ton */
+  --sl-text-secondary: #33443F;
+  --sl-text-disabled:  #8AA09B;
+  --sl-text-inverse:   #F2FAF8;
+
+  /* Holatlar (sensor semantikasi, AA kontrast) */
+  --sl-success:  #0B8A5C;   /* muvaffaqiyat */
+  --sl-healthy:  #0B8A5C;   /* sog'lom ko'l (success bilan bir ramp) */
+  --sl-warning:  #B36A00;   /* ogohlantirish (och fonda AA) */
+  --sl-error:    #B3261E;   /* xato (forma/tizim) */
+  --sl-critical: #C6362B;   /* kritik sensor (DO) */
+  --sl-info:     var(--sl-aqua-40);
+  --sl-online:   #0B8A5C;   /* aloqada */
+  --sl-offline:  #6E7E80;   /* aloqa yo'q / noma'lum */
+  --sl-ai:       var(--sl-iris-40);  /* AI maslahatchi belgisi */
+
+  /* Yumshoq konteynerlar (chip/badge/banner fonlari) */
+  --sl-success-soft:  color-mix(in srgb, var(--sl-success) 14%, transparent);
+  --sl-healthy-soft:  var(--sl-success-soft);
+  --sl-warning-soft:  color-mix(in srgb, var(--sl-warning) 15%, transparent);
+  --sl-error-soft:    color-mix(in srgb, var(--sl-error) 13%, transparent);
+  --sl-critical-soft: color-mix(in srgb, var(--sl-critical) 13%, transparent);
+  --sl-info-soft:     color-mix(in srgb, var(--sl-info) 14%, transparent);
+  --sl-offline-soft:  color-mix(in srgb, var(--sl-offline) 15%, transparent);
+  --sl-ai-soft:       color-mix(in srgb, var(--sl-ai) 12%, transparent);
+
+  /* Scrim / overlay */
+  --sl-scrim: rgba(3, 17, 15, .38);
+
+  /* Fokus halqasi (butun tizim uchun yagona) */
+  --sl-focus-ring: 0 0 0 3px color-mix(in srgb, var(--sl-primary) 32%, transparent);
+}
+
+/* ============================================================
+   DARK — "chuqur suv": qora emas, to'q suv-yashil.
+   ============================================================ */
+[data-theme="dark"] {
+  --sl-primary:              #52DFC9;
+  --sl-on-primary:           #00332B;
+  --sl-primary-container:    #0C5A4D;
+  --sl-on-primary-container: #9FEBDB;
+  --sl-primary-hover:        #6BE7D4;
+
+  --sl-secondary:              #B2CCC7;
+  --sl-on-secondary:           #1D3532;
+  --sl-secondary-container:    #324C48;
+  --sl-on-secondary-container: #D9EAE6;
+
+  --sl-background:  #061412;
+  --sl-surface:     #0C1C19;
+  --sl-surface-dim: #04100E;
+  --sl-card:        #0F211D;
+  --sl-card-inset:  #142A25;
+  --sl-surface-1:   #10231F;
+  --sl-surface-2:   #182E2A;
+  --sl-surface-3:   #203935;
+
+  --sl-border:        #3B4B47;
+  --sl-border-strong: #82938E;
+  --sl-divider:       #263C37;
+
+  --sl-text-primary:   #E2ECE9;
+  --sl-text-secondary: #B6C6C1;
+  --sl-text-disabled:  #6F8480;
+  --sl-text-inverse:   #071A16;
+
+  --sl-success:  #59DFA4;
+  --sl-healthy:  #59DFA4;
+  --sl-warning:  #FFB95C;
+  --sl-error:    #FFB4AB;
+  --sl-critical: #FF897F;
+  --sl-info:     #7FDCEF;
+  --sl-online:   #59DFA4;
+  --sl-offline:  #93A3A5;
+  --sl-ai:       #A79BF2;
+
+  --sl-success-soft:  color-mix(in srgb, var(--sl-success) 16%, transparent);
+  --sl-healthy-soft:  var(--sl-success-soft);
+  --sl-warning-soft:  color-mix(in srgb, var(--sl-warning) 17%, transparent);
+  --sl-error-soft:    color-mix(in srgb, var(--sl-error) 15%, transparent);
+  --sl-critical-soft: color-mix(in srgb, var(--sl-critical) 15%, transparent);
+  --sl-info-soft:     color-mix(in srgb, var(--sl-info) 16%, transparent);
+  --sl-offline-soft:  color-mix(in srgb, var(--sl-offline) 17%, transparent);
+  --sl-ai-soft:       color-mix(in srgb, var(--sl-ai) 14%, transparent);
+
+  --sl-scrim: rgba(0, 0, 0, .55);
+  --sl-focus-ring: 0 0 0 3px color-mix(in srgb, var(--sl-primary) 40%, transparent);
+}

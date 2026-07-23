@@ -1,0 +1,115 @@
+/* ============================================================
+   design-system/styles/buttons.css — SMARTLAKE DS 3.0 · TUGMALAR
+   ------------------------------------------------------------
+   Variantlar: primary / secondary / outlined / text / danger /
+               success / warning
+   Qo'shimcha: .sl-iconbtn (dumaloq ikon tugma), .sl-fab (suzuvchi)
+   O'lchamlar: .sm 36px · standart 44px · .lg 52px
+   Holatlar: normal · hover · pressed(:active) · focus-visible ·
+             disabled · .is-loading
+   ============================================================ */
+
+.sl-btn {
+  --_btn-h: 44px;
+  border: none; border-radius: var(--sl-r-full);
+  min-height: var(--_btn-h); padding: 0 var(--sl-sp-6);
+  font-family: var(--sl-font); font-size: 14px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: var(--sl-sp-2); cursor: pointer; position: relative;
+  transition: box-shadow var(--sl-motion-fast) var(--sl-ease),
+              transform var(--sl-motion-fast) var(--sl-ease),
+              background var(--sl-motion-fast) var(--sl-ease),
+              border-color var(--sl-motion-fast) var(--sl-ease),
+              opacity var(--sl-motion-fast) var(--sl-ease);
+}
+.sl-btn.sm { --_btn-h: 36px; padding: 0 var(--sl-sp-4); font-size: 13px; }
+.sl-btn.lg { --_btn-h: 52px; padding: 0 var(--sl-sp-7); font-size: 15px; border-radius: var(--sl-r-lg); }
+.sl-btn.full { width: 100%; }
+.sl-btn:active:not(:disabled) { transform: scale(.97); }
+.sl-btn:disabled { opacity: .45; cursor: default; }
+
+/* --- Variantlar --- */
+.sl-btn.primary {
+  background: linear-gradient(135deg, var(--sl-lake-40) 0%, var(--sl-aqua-50) 100%);
+  color: #FFFFFF;
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--sl-primary) 28%, transparent);
+}
+.sl-btn.primary:hover:not(:disabled) {
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--sl-primary) 34%, transparent);
+  transform: translateY(-1px);
+}
+.sl-btn.primary:active:not(:disabled) { transform: translateY(0) scale(.97); }
+[data-theme="dark"] .sl-btn.primary {
+  background: linear-gradient(135deg, #14907C 0%, #1897AB 100%);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .4);
+}
+
+.sl-btn.secondary { background: var(--sl-secondary-container); color: var(--sl-on-secondary-container); }
+.sl-btn.secondary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sl-secondary-container) 88%, var(--sl-on-secondary-container));
+}
+
+.sl-btn.outlined {
+  background: transparent; color: var(--sl-primary);
+  border: 1.5px solid color-mix(in srgb, var(--sl-primary) 55%, var(--sl-border));
+}
+.sl-btn.outlined:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sl-primary) 7%, transparent);
+  border-color: var(--sl-primary);
+}
+
+.sl-btn.text { background: transparent; color: var(--sl-primary); padding: 0 var(--sl-sp-3); }
+.sl-btn.text:hover:not(:disabled) { background: color-mix(in srgb, var(--sl-primary) 8%, transparent); }
+
+.sl-btn.danger  { background: var(--sl-error);   color: #FFFFFF; }
+.sl-btn.success { background: var(--sl-success); color: #FFFFFF; }
+.sl-btn.warning { background: var(--sl-warning); color: #FFFFFF; }
+.sl-btn.danger:hover:not(:disabled)  { box-shadow: 0 6px 16px var(--sl-error-soft); }
+.sl-btn.success:hover:not(:disabled) { box-shadow: 0 6px 16px var(--sl-success-soft); }
+.sl-btn.warning:hover:not(:disabled) { box-shadow: 0 6px 16px var(--sl-warning-soft); }
+[data-theme="dark"] .sl-btn.danger  { color: var(--sl-text-inverse); }
+[data-theme="dark"] .sl-btn.success { color: var(--sl-text-inverse); }
+[data-theme="dark"] .sl-btn.warning { color: var(--sl-text-inverse); }
+
+/* --- Yuklanish holati: matn yashirinadi, ichki spinner --- */
+.sl-btn.is-loading { pointer-events: none; color: transparent !important; }
+.sl-btn.is-loading::after {
+  content: ''; position: absolute; width: 18px; height: 18px; border-radius: 50%;
+  border: 2.5px solid rgba(255, 255, 255, .35); border-top-color: #FFFFFF;
+  animation: sl-spin .8s linear infinite;
+}
+.sl-btn.secondary.is-loading::after,
+.sl-btn.outlined.is-loading::after,
+.sl-btn.text.is-loading::after {
+  border-color: color-mix(in srgb, var(--sl-primary) 30%, transparent);
+  border-top-color: var(--sl-primary);
+}
+
+/* --- Ikon tugma --- */
+.sl-iconbtn {
+  width: 42px; height: 42px; border-radius: var(--sl-r-full); border: none;
+  background: transparent; color: var(--sl-text-secondary);
+  display: inline-flex; align-items: center; justify-content: center; cursor: pointer;
+  transition: background var(--sl-motion-fast) var(--sl-ease),
+              transform var(--sl-motion-fast) var(--sl-ease);
+}
+.sl-iconbtn:hover  { background: color-mix(in srgb, var(--sl-text-primary) 7%, transparent); }
+.sl-iconbtn:active { background: color-mix(in srgb, var(--sl-text-primary) 13%, transparent); transform: scale(.94); }
+.sl-iconbtn.tonal  { background: var(--sl-surface-2); color: var(--sl-primary); }
+.sl-iconbtn:disabled { opacity: .45; cursor: default; }
+
+/* --- Suzuvchi tugma (FAB) --- */
+.sl-fab {
+  position: fixed; right: var(--sl-sp-4); bottom: 104px; z-index: var(--sl-z-fab);
+  border: none; cursor: pointer; height: 56px; min-width: 56px;
+  padding: 0 var(--sl-sp-5); border-radius: var(--sl-r-lg);
+  background: linear-gradient(135deg, var(--sl-lake-40) 0%, var(--sl-aqua-50) 100%);
+  color: #FFFFFF; box-shadow: var(--sl-shadow-floating);
+  display: inline-flex; align-items: center; gap: var(--sl-sp-2);
+  font-family: var(--sl-font); font-weight: 700; font-size: 14px;
+  transition: transform var(--sl-motion) var(--sl-ease-spring),
+              box-shadow var(--sl-motion) var(--sl-ease);
+}
+.sl-fab:hover  { transform: translateY(-3px); }
+.sl-fab:active { transform: translateY(0) scale(.96); }
+[data-theme="dark"] .sl-fab { background: linear-gradient(135deg, #14907C 0%, #1897AB 100%); }

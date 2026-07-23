@@ -1,0 +1,56 @@
+/* ============================================================
+   design-system/styles/base.css — SMARTLAKE DS 3.0 · POYDEVOR
+   ------------------------------------------------------------
+   MUHIM: bu fayl global `body`ni QAYTA STILLAMAYDI — mavjud
+   ekranlar buzilmasligi uchun barcha qoidalar `.sl-` prefiksli
+   klasslar orqali qo'llanadi. Ilova qobig'i migratsiya bosqichida
+   `.sl-app` klassini oladi.
+   ============================================================ */
+
+/* --- Ilova qobig'i (kelajakdagi ekranlar uchun) --- */
+.sl-app {
+  font-family: var(--sl-font);
+  color: var(--sl-text-primary);
+  background: linear-gradient(180deg, var(--sl-lake-98) 0%, var(--sl-surface) 55%);
+  min-height: 100vh;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+}
+[data-theme="dark"] .sl-app {
+  background: linear-gradient(180deg, #0A1917 0%, var(--sl-surface-dim) 55%);
+}
+.sl-app *, .sl-app *::before, .sl-app *::after { box-sizing: border-box; }
+.sl-app ::selection { background: color-mix(in srgb, var(--sl-primary) 24%, transparent); }
+
+/* --- Klaviatura fokusi — butun DS uchun yagona halqa --- */
+:where(.sl-btn, .sl-iconbtn, .sl-fab, .sl-input, .sl-select, .sl-tab,
+       .sl-card[tabindex], .sl-listitem[tabindex], .sl-badge[tabindex],
+       .sl-table th.sortable, .sl-pager button):focus-visible {
+  outline: none;
+  box-shadow: var(--sl-focus-ring);
+}
+
+/* --- Ajratgich --- */
+.sl-divider { border: 0; border-top: 1px solid var(--sl-divider); margin: var(--sl-sp-3) 0; }
+.sl-divider.dashed { border-top-style: dashed; border-top-color: var(--sl-border); }
+
+/* --- Scrollbar (ixchamlashtirish, faqat DS ichida) --- */
+.sl-scroll-x { overflow-x: auto; scrollbar-width: thin; }
+.sl-scroll-y { overflow-y: auto; scrollbar-width: thin; }
+
+/* --- ACCESSIBILITY: harakat kamaytirilgan rejim --- */
+@media (prefers-reduced-motion: reduce) {
+  [class*="sl-"], [class*="sl-"]::before, [class*="sl-"]::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --- Faqat ekran o'quvchilar uchun matn --- */
+.sl-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }

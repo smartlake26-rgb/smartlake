@@ -1,0 +1,39 @@
+/* ============================================================
+   design-system/tokens/spacing.css — SMARTLAKE DS 3.0 · BO'SHLIQ
+   ------------------------------------------------------------
+   4px asosli yagona shkala. Komponentlar FAQAT shu qiymatlardan
+   foydalanadi — ad-hoc padding/margin (9px, 13px, 18px...) yozish
+   taqiqlanadi.
+   ============================================================ */
+
+:root {
+  --sl-sp-1:  4px;
+  --sl-sp-2:  8px;
+  --sl-sp-3:  12px;
+  --sl-sp-4:  16px;
+  --sl-sp-5:  20px;
+  --sl-sp-6:  24px;
+  --sl-sp-7:  32px;
+  --sl-sp-8:  40px;
+  --sl-sp-9:  48px;
+  --sl-sp-10: 64px;
+  --sl-sp-11: 80px;
+  --sl-sp-12: 96px;
+
+  /* Semantik bo'shliqlar — bitta joydan boshqariladi */
+  --sl-page-pad:    var(--sl-sp-4);   /* ekran cheti */
+  --sl-card-pad:    var(--sl-sp-4);   /* karta ichki bo'shlig'i */
+  --sl-card-pad-lg: var(--sl-sp-5);   /* katta karta / dialog */
+  --sl-section-gap: var(--sl-sp-4);   /* kartalar / bo'limlar orasi */
+  --sl-stack-gap:   var(--sl-sp-3);   /* karta ichidagi elementlar orasi */
+  --sl-inline-gap:  var(--sl-sp-2);   /* qatordagi elementlar orasi */
+}
+
+/* Layout yordamchilari */
+.sl-stack     { display: flex; flex-direction: column; gap: var(--sl-section-gap); }
+.sl-stack-sm  { display: flex; flex-direction: column; gap: var(--sl-inline-gap); }
+.sl-row       { display: flex; align-items: center; gap: var(--sl-inline-gap); }
+.sl-row-between { display: flex; align-items: center; justify-content: space-between; gap: var(--sl-inline-gap); }
+.sl-grow      { flex: 1; min-width: 0; }
+.sl-grid-2    { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--sl-sp-3); }
+.sl-grid-3    { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--sl-sp-3); }

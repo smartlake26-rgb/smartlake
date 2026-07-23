@@ -1,0 +1,19 @@
+/* ============================================================
+   design-system/tokens/radius.css — SMARTLAKE DS 3.0 · BURCHAK
+   ------------------------------------------------------------
+   Yumshoq, "suv tomchisi" geometriyasi. Har rol uchun bitta manba.
+   ============================================================ */
+
+:root {
+  --sl-r-sm:   8px;    /* chip, kichik tugma, badge */
+  --sl-r-md:   12px;   /* input, ichki panel, tooltip */
+  --sl-r-lg:   16px;   /* tugma .lg, sensor katakcha */
+  --sl-r-xl:   20px;   /* karta (asosiy) */
+  --sl-r-xxl:  28px;   /* dialog, katta modal, app-ramka */
+  --sl-r-full: 999px;  /* pill tugma, avatar, badge-dot */
+
+  /* Rolga bog'langan taxalluslar */
+  --sl-r-card:   var(--sl-r-xl);
+  --sl-r-input:  var(--sl-r-md);
+  --sl-r-dialog: var(--sl-r-xxl);
+}

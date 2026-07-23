@@ -1,0 +1,103 @@
+/* ============================================================
+   design-system/styles/tables.css — SMARTLAKE DS 3.0 · JADVAL
+   ------------------------------------------------------------
+   Xususiyatlar: responsive (gorizontal scroll), sortable header,
+   sticky header, filtr paneli, pagination, hover qatori.
+   ============================================================ */
+
+.sl-table-panel { background: var(--sl-card); border: 1px solid var(--sl-border);
+  border-radius: var(--sl-r-md); overflow: hidden; }
+.sl-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+table.sl-table { width: 100%; border-collapse: collapse; font-size: 13.5px;
+  font-family: var(--sl-font); }
+
+table.sl-table th {
+  text-align: left; padding: var(--sl-sp-3) var(--sl-sp-4);
+  color: var(--sl-text-secondary); font-weight: 600;
+  font-size: var(--sl-fs-caption); text-transform: uppercase; letter-spacing: .5px;
+  border-bottom: 1px solid var(--sl-border);
+  white-space: nowrap; user-select: none;
+  background: var(--sl-card);
+}
+.sl-table-panel.sticky table.sl-table th {
+  position: sticky; top: 0; z-index: 2;
+  box-shadow: 0 1px 0 var(--sl-border);
+}
+table.sl-table th.sortable { cursor: pointer; }
+table.sl-table th.sortable:hover { color: var(--sl-primary); }
+table.sl-table th .sort-ic { display: inline-block; margin-left: 4px; opacity: .7;
+  font-size: 10px; }
+
+table.sl-table td { padding: var(--sl-sp-3) var(--sl-sp-4);
+  border-bottom: 1px solid var(--sl-divider); vertical-align: middle;
+  color: var(--sl-text-primary); }
+table.sl-table td.num { font-variant-numeric: tabular-nums; font-weight: 600; }
+table.sl-table tr:last-child td { border-bottom: none; }
+table.sl-table tbody tr { transition: background var(--sl-motion-fast) var(--sl-ease); }
+table.sl-table tbody tr:hover td { background: var(--sl-surface-1); }
+table.sl-table tbody tr.clickable { cursor: pointer; }
+
+.sl-table-empty { padding: var(--sl-sp-8); text-align: center;
+  color: var(--sl-text-secondary); font-size: var(--sl-fs-body-sm); }
+
+/* --- Filtr paneli --- */
+.sl-table-toolbar { display: flex; align-items: center; gap: var(--sl-sp-2);
+  padding: var(--sl-sp-3) var(--sl-sp-4); flex-wrap: wrap;
+  border-bottom: 1px solid var(--sl-border); }
+.sl-table-toolbar .sl-input, .sl-table-toolbar .sl-select {
+  width: auto; min-width: 140px; padding: var(--sl-sp-2) var(--sl-sp-3); font-size: 13px; }
+.sl-table-toolbar .sl-input-wrap { width: auto; }
+.sl-table-toolbar .tb-count { margin-left: auto; font-size: var(--sl-fs-caption);
+  color: var(--sl-text-secondary); font-variant-numeric: tabular-nums; }
+
+/* --- Pagination --- */
+.sl-pager { display: flex; align-items: center; justify-content: flex-end;
+  gap: var(--sl-sp-2); padding: var(--sl-sp-3) var(--sl-sp-4);
+  font-size: 13px; color: var(--sl-text-secondary); }
+.sl-pager .pg-info { font-variant-numeric: tabular-nums; }
+.sl-pager button { border: 1px solid var(--sl-border); background: var(--sl-card);
+  color: var(--sl-text-primary); border-radius: var(--sl-r-sm);
+  padding: var(--sl-sp-1) var(--sl-sp-3); cursor: pointer; font-family: var(--sl-font);
+  font-size: 13px; transition: background var(--sl-motion-fast) var(--sl-ease),
+  border-color var(--sl-motion-fast) var(--sl-ease); }
+.sl-pager button:hover:not(:disabled) { border-color: var(--sl-primary); color: var(--sl-primary); }
+.sl-pager button:disabled { opacity: .4; cursor: default; }
+
+/* ============================================================
+   BADGE — status belgilar
+   Turlar: online / offline / healthy / warning / critical / ai /
+           success / danger / info / neutral
+   ============================================================ */
+
+.sl-badge {
+  --_c: var(--sl-offline);
+  display: inline-flex; align-items: center; gap: 6px;
+  border-radius: var(--sl-r-full); padding: var(--sl-sp-1) var(--sl-sp-3);
+  font-size: var(--sl-fs-label); font-weight: 700; letter-spacing: .02em;
+  white-space: nowrap; border: 1px solid transparent;
+  background: color-mix(in srgb, var(--_c) 14%, transparent);
+  color: var(--_c);
+}
+.sl-badge .bd-dot { width: 7px; height: 7px; border-radius: 50%;
+  background: currentColor; flex: none; }
+
+.sl-badge.online   { --_c: var(--sl-online); }
+.sl-badge.offline  { --_c: var(--sl-offline); }
+.sl-badge.healthy  { --_c: var(--sl-healthy); }
+.sl-badge.warning  { --_c: var(--sl-warning); }
+.sl-badge.critical { --_c: var(--sl-critical); }
+.sl-badge.ai       { --_c: var(--sl-ai); }
+.sl-badge.success  { --_c: var(--sl-success); }
+.sl-badge.danger   { --_c: var(--sl-error); }
+.sl-badge.info     { --_c: var(--sl-info); }
+.sl-badge.neutral  { --_c: var(--sl-offline); }
+
+/* Jonli holatlar pulsi */
+.sl-badge.online .bd-dot, .sl-badge.healthy .bd-dot {
+  animation: sl-pulse 1.8s infinite var(--sl-ease); }
+.sl-badge.critical .bd-dot { animation: sl-pulse 1s infinite var(--sl-ease); }
+
+/* Kichik nuqta-badge (nav belgisi) */
+.sl-dot-badge { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--sl-critical); box-shadow: 0 0 0 2px var(--sl-card); }

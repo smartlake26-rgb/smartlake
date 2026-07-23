@@ -1,0 +1,41 @@
+/* ============================================================
+   design-system/tokens/shadow.css — SMARTLAKE DS 3.0 · CHUQURLIK
+   ------------------------------------------------------------
+   Imzo: soyalar neytral-qora emas, TEAL-tusli (rgba(10,59,51,…)) —
+   element "suvga qancha chuqur botgani"ni bildiradi. Soya ham
+   brendning bir qismi.
+   Pog'onalar: level-1..3 (kartalar) → floating (FAB) →
+   dialog → modal → premium (maxsus AI/hero kartalar).
+   ============================================================ */
+
+:root {
+  --sl-shadow-0: none;
+
+  /* Karta pog'onalari */
+  --sl-shadow-1: 0 1px 2px rgba(10, 59, 51, .05), 0 1px 3px rgba(10, 59, 51, .07);
+  --sl-shadow-2: 0 2px 6px rgba(10, 59, 51, .07), 0 1px 2px rgba(10, 59, 51, .06);
+  --sl-shadow-3: 0 6px 16px rgba(10, 59, 51, .09), 0 2px 4px rgba(10, 59, 51, .06);
+
+  /* Suzuvchi elementlar (FAB, sticky panel) */
+  --sl-shadow-floating: 0 10px 26px rgba(10, 59, 51, .14), 0 3px 8px rgba(10, 59, 51, .08);
+
+  /* Dialog / Modal */
+  --sl-shadow-dialog: 0 12px 28px rgba(10, 59, 51, .14), 0 4px 8px rgba(10, 59, 51, .07);
+  --sl-shadow-modal:  0 20px 44px rgba(10, 59, 51, .18), 0 6px 12px rgba(10, 59, 51, .08);
+
+  /* Premium karta — brend nur bilan (AI, hero, tanlangan holat) */
+  --sl-shadow-premium: 0 8px 24px rgba(14, 124, 107, .16),
+                       0 2px 6px rgba(10, 59, 51, .08),
+                       0 0 0 1px color-mix(in srgb, var(--sl-primary) 14%, transparent);
+}
+
+[data-theme="dark"] {
+  --sl-shadow-1: 0 1px 3px rgba(0, 0, 0, .42);
+  --sl-shadow-2: 0 2px 6px rgba(0, 0, 0, .46);
+  --sl-shadow-3: 0 6px 14px rgba(0, 0, 0, .5);
+  --sl-shadow-floating: 0 10px 24px rgba(0, 0, 0, .55);
+  --sl-shadow-dialog:   0 12px 26px rgba(0, 0, 0, .55);
+  --sl-shadow-modal:    0 20px 40px rgba(0, 0, 0, .6);
+  --sl-shadow-premium:  0 8px 24px rgba(0, 0, 0, .5),
+                        0 0 0 1px color-mix(in srgb, var(--sl-primary) 22%, transparent);
+}
