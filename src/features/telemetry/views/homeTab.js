@@ -39,10 +39,10 @@ import { getLakeWeather, getWeatherIcon } from '../services/weatherService.js';
 import { renderLakeDetailPage } from '../../lakes/views/lakeDetailPage.js';
 import { fetchAnnouncements } from '../../announcements/announcementsService.js';
 import { announcementCard } from '../../announcements/views/announcementsTab.js';
-import {
-  slIcon, ICONS, slIconButton, slCard, slStatCard, slLakeMonitorCard,
+import { slIcon, ICONS, slIconButton, slCard, slStatCard, slLakeMonitorCard,
   slWeatherCard, slEmptyState, slBadge, slButton, slCountUp, slFeedSchedule,
 } from '../../../design-system/index.js';
+import { createProfileDrawer } from '../../../farmer/profileDrawer.js';
 
 /* ---------- modul keshlari ---------- */
 const WEATHER_TTL = 15 * 60 * 1000;
@@ -82,6 +82,8 @@ export function renderHomeTab(nav) {
   let annPreview;   // e'lon preview (lazy, bir marta)
 
   /* --------- HEADER (o'zgarmagan) --------- */
+  const avatarBtn = createProfileDrawer(nav);   // profil drawer tugmasi
+
   const clockEl = el('div', { class: 'sl-caption', style: 'margin-top:2px' });
   const greetEl = el('div', { class: 'sl-title' });
   const bellDot = el('span', { class: 'sl-dot-badge', style: 'position:absolute;top:8px;right:9px;display:none' });
@@ -98,7 +100,12 @@ export function renderHomeTab(nav) {
   }
   tickClock();
   timers.push(setInterval(tickClock, 30_000));
-  const header = el('div', { class: 'md-appbar' }, [el('div', { class: 'grow' }, [greetEl, clockEl]), bellBtn, themeBtn]);
+  // Header: [Avatar] [Salom+vaqt -----> ] [Qo'ng'iroq] [Tema]
+  const header = el('div', { class: 'md-appbar', style: 'gap:var(--sl-sp-2)' }, [
+    avatarBtn,
+    el('div', { class: 'grow' }, [greetEl, clockEl]),
+    bellBtn, themeBtn,
+  ]);
   const node = el('div', {}, [header, content]);
 
   /* --------- SNAPSHOT (domen modullari) --------- */
