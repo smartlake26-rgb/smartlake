@@ -158,3 +158,16 @@
 .sl-pdrawer-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .sl-pdrawer-body  { flex: 1; padding: var(--sl-sp-2) var(--sl-sp-2); }
 .sl-pdrawer-foot  { padding: var(--sl-sp-2) var(--sl-sp-2) var(--sl-sp-6); border-top: 1px solid var(--sl-divider); }
+
+/* ============================================================
+   HERO SLIDER (bosh sahifa yuqori — salomlashuv/ob-havo/salomatlik)
+   ============================================================ */
+.sl-hero-slider { position: relative; overflow: hidden; border-radius: var(--sl-r-xl);
+  touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.sl-hero-track { display: flex; transition: transform var(--sl-motion-slow) var(--sl-ease-out); will-change: transform; }
+.sl-hero-slide { flex: 0 0 100%; min-width: 0; }
+.sl-hero-dots  { display: flex; justify-content: center; gap: 5px; padding: var(--sl-sp-2) 0 0; }
+.sl-hero-dot   { width: 6px; height: 6px; border-radius: 3px; border: none; padding: 0;
+  background: var(--sl-border); cursor: pointer;
+  transition: background var(--sl-motion) var(--sl-ease), width var(--sl-motion) var(--sl-ease); }
+.sl-hero-dot.active { background: var(--sl-primary); width: 18px; }

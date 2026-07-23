@@ -17,11 +17,10 @@
 
 import { el, mount } from '../shared/dom.js';
 import { t } from '../core/i18n/index.js';
-import { slIcon, slIconButton, ICONS } from '../design-system/index.js';
+import { slIcon, ICONS } from '../design-system/index.js';
 import { createProfileDrawer } from './profileDrawer.js';
 import { renderOnboarding } from './onboarding.js';
 import { authStore } from '../features/auth/index.js';
-import { getTheme, toggleTheme } from '../shared/ui/theme.js';
 
 import { renderHomeTab }            from '../features/telemetry/views/homeTab.js';
 import { renderNotificationsTab }   from '../features/telemetry/views/notificationsTab.js';
@@ -64,20 +63,32 @@ export function createShell(root, ctx = {}) {
      BARQAROR QOBIQ ELEMENTLARI (bir marta quriladi)
      ============================================================ */
 
-  /* --- TopBar: avatar | sarlavha | qo'ng'iroq --- */
-  const titleEl    = el('div', { class: 'ab-title' });
-  const bellDotEl  = el('span', { class: 'ni-dot', style: 'display:none;position:absolute;top:6px;right:8px' });
-  const bellBtn    = el('button', { class: 'md-iconbtn', type: 'button',
-    'aria-label': t('dash.alerts'), style: 'position:relative' },
+  /* --- TopBar: avatar+ism | bell (barqaror, o'zgarmaydi) --- */
+  const sUser = authStore.getState();
+  const uName = sUser.profile
+    ? (sUser.profile.ism + (sUser.profile.fam ? ' ' + sUser.profile.fam : ''))
+    : (sUser.email || '');
+  const uRole = t('role.' + (sUser.role || 'farmer'));
+
+  const bellDotEl = el('span', { class: 'ni-dot',
+    style: 'display:none;position:absolute;top:4px;right:4px;width:8px;height:8px' });
+  const bellBtn   = el('button', { class: 'md-iconbtn', type: 'button',
+    'aria-label': t('dash.alerts'), style: 'position:relative;flex:none' },
     [el('span', { html: slIcon(ICONS.alert.bell, 22) }), bellDotEl]);
   bellBtn.addEventListener('click', () => nav.switchTab('alerts'));
 
-  // Avatar (birinchi qurilganda, keyin o'zgarmaydi)
-  let avatarBtn = null;   // profileDrawer qaytaradi, topbar tayyor bo'lgandan keyin qo'shiladi
+  // Foydalanuvchi info bloki (topbar o'rta qism)
+  const userBlock = el('div', { class: 'grow', style: 'min-width:0' }, [
+    el('div', { style: 'font-size:15px;font-weight:700;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap',
+      text: uName }),
+    el('div', { style: 'font-size:11px;opacity:.65;margin-top:1px', text: uRole }),
+  ]);
+
+  let avatarBtn = null;   // profileDrawer qaytaradi
 
   const topbar = el('div', { class: 'md-appbar', style: 'gap:var(--sl-sp-2)' }, [
-    el('span', { id: 'shell-avatar-slot' }),   // avatar shu yerga qo'yiladi
-    el('div', { class: 'grow' }, [titleEl]),
+    el('span', { id: 'shell-avatar-slot' }),
+    userBlock,
     bellBtn,
   ]);
 
@@ -112,7 +123,7 @@ export function createShell(root, ctx = {}) {
     push(renderFn) { subPage = { render: renderFn }; renderMain(); },
     back()         { subPage = null; renderMain(); },
     reTab()        { renderMain(); },
-    setTitle(txt)  { titleEl.textContent = txt || ''; },
+    setTitle()     { /* topbar barqaror — sarlavha shart emas */ },
     setBell(on)    { bellDotEl.style.display = on ? '' : 'none'; },
     logout: ctx.onLogout,
   };

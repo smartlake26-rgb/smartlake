@@ -81,15 +81,72 @@ export function renderHomeTab(nav) {
   /* --------- HEADER (o'zgarmagan) --------- */
   // Shell topbar'iga sarlavha va qo'ng'iroq badge yuborish
   // (avatar, qo'ng'iroq va tema — topbar'da barqaror)
+  /* ============================================================
+     HERO SLIDER — 3 slayd (avtomat 6 sek, swipe bilan ham)
+     Slayd 1: Salomlashuv + sana/vaqt (jonli, 30 sek yangilanadi)
+     Slayd 2: Ob-havo (birinchi ko'l keshidan; keyinchalik kelar)
+     Slayd 3: Umumiy salomatlik % (dataStore'dan; real vaqt)
+     ============================================================ */
+
+  // --- Slayd mazmuni elementlari (faqat ma'lumot o'zgaradi) ---
+  const greetTextEl = el('div', { style: 'font-size:22px;font-weight:800;line-height:1.2;color:#fff' });
+  const dateTextEl  = el('div', { style: 'font-size:13px;opacity:.85;margin-top:4px;color:#fff' });
+  const weatherSlideEl  = el('div', { style: 'height:100%' });
+  const healthSlideEl   = el('div', { style: 'height:100%' });
+
+  function slideCard(colorA, colorB, children) {
+    return el('div', { style:
+      `background:linear-gradient(135deg,${colorA} 0%,${colorB} 100%);`
+      + 'border-radius:var(--sl-r-xl);padding:var(--sl-sp-5);min-height:130px;'
+      + 'display:flex;flex-direction:column;justify-content:center;' }, children);
+  }
+
+  const slide1 = slideCard('var(--sl-lake-30)', 'var(--sl-aqua-40)', [greetTextEl, dateTextEl]);
+  const slide2 = el('div', {}, [weatherSlideEl]);
+  const slide3 = el('div', {}, [healthSlideEl]);
+
+  const track = el('div', { class: 'sl-hero-track' }, [
+    el('div', { class: 'sl-hero-slide' }, [slide1]),
+    el('div', { class: 'sl-hero-slide' }, [slide2]),
+    el('div', { class: 'sl-hero-slide' }, [slide3]),
+  ]);
+  const dots = [0, 1, 2].map((i) => {
+    const d = el('button', { class: 'sl-hero-dot' + (i === 0 ? ' active' : ''), type: 'button', 'aria-label': String(i + 1) });
+    d.addEventListener('click', () => goSlide(i));
+    return d;
+  });
+  const dotsRow = el('div', { class: 'sl-hero-dots' }, dots);
+  const slider = el('div', { class: 'sl-hero-slider' }, [track]);
+
+  let curSlide = 0;
+  function goSlide(idx) {
+    curSlide = idx;
+    track.style.transform = `translateX(-${idx * 100}%)`;
+    dots.forEach((d, i) => d.classList.toggle('active', i === idx));
+  }
+  // Avtomat almashinuv
+  let sliderTimer = setInterval(() => goSlide((curSlide + 1) % 3), 6000);
+  timers.push(sliderTimer);
+  // Swipe
+  let swX = null;
+  slider.addEventListener('touchstart', (e) => { swX = e.touches[0].clientX; clearInterval(sliderTimer); }, { passive: true });
+  slider.addEventListener('touchend', (e) => {
+    if (swX == null) return;
+    const dx = e.changedTouches[0].clientX - swX; swX = null;
+    if (Math.abs(dx) > 40) goSlide(dx < 0 ? Math.min(2, curSlide + 1) : Math.max(0, curSlide - 1));
+  }, { passive: true });
+
+  // Slayd 1: jonli soat
   function tickClock() {
     const now = new Date();
-    const greeting = `${t(greetKey(now.getHours()))}, ${s.profile ? s.profile.ism : ''}`;
-    const dateStr  = `${fmtDate(now, isUz)} · ${fmtClock(now)}`;
-    nav.setTitle && nav.setTitle(greeting + '\n' + dateStr);
+    greetTextEl.textContent = `${t(greetKey(now.getHours()))}, ${s.profile ? s.profile.ism : ''}`;
+    dateTextEl.textContent  = `${fmtDate(now, isUz)} · ${fmtClock(now)}`;
   }
   tickClock();
   timers.push(setInterval(tickClock, 30_000));
-  const node = el('div', { class: 'md-content' }, []);
+
+  const heroBlock = el('div', {}, [slider, dotsRow]);
+  const node = el('div', { class: 'md-content' }, [heroBlock]);
 
   /* --------- SNAPSHOT (domen modullari) --------- */
   function computeSnapshot(st) {
@@ -355,10 +412,49 @@ export function renderHomeTab(nav) {
     if (sig === lastSig && !firstRender) return;
     lastSig = sig;
 
+    // Slayd 2: ob-havo (birinchi ko'ldan)
+    const wFirst = snap.perLake.find((x) => {
+      const w = weatherCache.get(x.lake.id); return w && w.data;
+    });
+    const wData = wFirst ? weatherCache.get(wFirst.lake.id).data : null;
+    mount(weatherSlideEl, (() => {
+      const card = slideCard('var(--sl-aqua-30)', 'var(--sl-lake-40)', [
+        el('div', { style: 'display:flex;align-items:center;gap:8px;color:#fff' }, [
+          el('span', { style: 'font-size:28px', html: slIcon(wData ? getWeatherIcon(wData.code) : 'sun', 28) }),
+          el('div', {}, [
+            el('div', { style: 'font-size:20px;font-weight:800', text: wData ? `${wData.temp}°C` : '—°C' }),
+            el('div', { style: 'font-size:12px;opacity:.85', text: wData ? `${wData.district}: ${wData.label}` : (isUz ? "Ob-havo ma'lumoti kelmayapti" : 'Нет данных о погоде') }),
+          ]),
+        ]),
+        wData ? el('div', { style: 'font-size:12px;opacity:.75;margin-top:6px;color:#fff',
+          text: (isUz ? 'Ertaga' : 'Завтра') + `: ${wData.tomorrowTempMax}°C` }) : null,
+      ].filter(Boolean));
+      return card;
+    })());
+
+    // Slayd 3: umumiy salomatlik
+    const g = gradeOf(snap.overall ?? 0);
+    const healthPct = snap.overall != null ? `${snap.overall}%` : '—';
+    mount(healthSlideEl, slideCard('var(--sl-lake-20)', 'var(--sl-lake-40)', [
+      el('div', { style: 'display:flex;align-items:center;justify-content:space-between;color:#fff' }, [
+        el('div', {}, [
+          el('div', { style: 'font-size:12px;opacity:.8', text: isUz ? 'Tizim salomatligi' : 'Здоровье системы' }),
+          el('div', { style: 'font-size:36px;font-weight:800;line-height:1;margin-top:4px', text: healthPct }),
+          el('div', { style: `font-size:13px;font-weight:700;margin-top:4px;color:color-mix(in srgb,white 85%,var(${g.colorVar}))`,
+            text: snap.overall != null ? t(g.key) : '—' }),
+        ]),
+        el('div', { style: 'text-align:right;opacity:.8' }, [
+          el('div', { style: 'font-size:12px', text: `${snap.online.length}/${snap.perLake.length} ${isUz ? 'onlayn' : 'онлайн'}` }),
+          el('div', { style: 'font-size:12px;margin-top:2px', text: `${snap.onlineDevs} ${isUz ? 'qurilma' : 'устр.'}` }),
+        ]),
+      ]),
+    ]));
+
     updateBell(snap);
     loadAnnPreview();
 
     mount(node, el('div', { class: 'sl-stack' }, [
+      heroBlock,
       statsRow(snap),
       lakeSection(snap),
       recentAlertsSection(snap),
