@@ -362,3 +362,7 @@ button { font-family: inherit; }
 .md-tab:active { transform: scale(.96); }
 .md-tab.active { background: var(--md-primary); color: var(--md-on-primary);
   box-shadow: 0 3px 10px color-mix(in srgb, var(--md-primary) 30%, transparent); }
+
+/* Shell kontent zone */
+.shell-main { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(72px + env(safe-area-inset-bottom)); }

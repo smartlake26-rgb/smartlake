@@ -26,7 +26,6 @@
 import { el, mount } from '../../../shared/dom.js';
 import { t, detectLocale } from '../../../core/i18n/index.js';
 import { openDialog } from '../../../shared/ui/index.js';
-import { toggleTheme, getTheme } from '../../../shared/ui/theme.js';
 import { authStore } from '../../auth/index.js';
 import * as dataStore from '../../../farmer/dataStore.js';
 import { resolveThresholds } from '../domain/thresholds.js';
@@ -39,10 +38,9 @@ import { getLakeWeather, getWeatherIcon } from '../services/weatherService.js';
 import { renderLakeDetailPage } from '../../lakes/views/lakeDetailPage.js';
 import { fetchAnnouncements } from '../../announcements/announcementsService.js';
 import { announcementCard } from '../../announcements/views/announcementsTab.js';
-import { slIcon, ICONS, slIconButton, slCard, slStatCard, slLakeMonitorCard,
+import { slIcon, ICONS, slCard, slStatCard, slLakeMonitorCard,
   slWeatherCard, slEmptyState, slBadge, slButton, slCountUp, slFeedSchedule,
 } from '../../../design-system/index.js';
-import { createProfileDrawer } from '../../../farmer/profileDrawer.js';
 
 /* ---------- modul keshlari ---------- */
 const WEATHER_TTL = 15 * 60 * 1000;
@@ -75,38 +73,23 @@ const SEV = { critical: 0, warning: 1, offline: 2, unknown: 3, good: 4, healthy:
 export function renderHomeTab(nav) {
   const s = authStore.getState();
   const isUz = detectLocale() === 'uz';
-  const content = el('div', { class: 'md-content' });
   let firstRender = true;
   let lastSig = '';
   const timers = [];
   let annPreview;   // e'lon preview (lazy, bir marta)
 
   /* --------- HEADER (o'zgarmagan) --------- */
-  const avatarBtn = createProfileDrawer(nav);   // profil drawer tugmasi
-
-  const clockEl = el('div', { class: 'sl-caption', style: 'margin-top:2px' });
-  const greetEl = el('div', { class: 'sl-title' });
-  const bellDot = el('span', { class: 'sl-dot-badge', style: 'position:absolute;top:8px;right:9px;display:none' });
-  const bellBtn = slIconButton({ icon: ICONS.alert.bell, label: t('dash.alerts'),
-    onClick: () => nav.switchTab('alerts') });
-  bellBtn.style.position = 'relative';
-  bellBtn.appendChild(bellDot);
-  const themeBtn = slIconButton({ icon: getTheme() === 'dark' ? 'sun' : 'moon', label: t('menu.theme'),
-    onClick: () => { const next = toggleTheme(); themeBtn.innerHTML = slIcon(next === 'dark' ? 'sun' : 'moon', 22); } });
+  // Shell topbar'iga sarlavha va qo'ng'iroq badge yuborish
+  // (avatar, qo'ng'iroq va tema — topbar'da barqaror)
   function tickClock() {
     const now = new Date();
-    greetEl.textContent = `${t(greetKey(now.getHours()))}, ${s.profile ? s.profile.ism : ''}`;
-    clockEl.textContent = `${fmtDate(now, isUz)} · ${fmtClock(now)}`;
+    const greeting = `${t(greetKey(now.getHours()))}, ${s.profile ? s.profile.ism : ''}`;
+    const dateStr  = `${fmtDate(now, isUz)} · ${fmtClock(now)}`;
+    nav.setTitle && nav.setTitle(greeting + '\n' + dateStr);
   }
   tickClock();
   timers.push(setInterval(tickClock, 30_000));
-  // Header: [Avatar] [Salom+vaqt -----> ] [Qo'ng'iroq] [Tema]
-  const header = el('div', { class: 'md-appbar', style: 'gap:var(--sl-sp-2)' }, [
-    avatarBtn,
-    el('div', { class: 'grow' }, [greetEl, clockEl]),
-    bellBtn, themeBtn,
-  ]);
-  const node = el('div', {}, [header, content]);
+  const node = el('div', { class: 'md-content' }, []);
 
   /* --------- SNAPSHOT (domen modullari) --------- */
   function computeSnapshot(st) {
@@ -354,23 +337,28 @@ export function renderHomeTab(nav) {
       el('div', { class: 'sl-skeleton card', style: 'height:200px' }),
     ]);
   }
+  // Bell badge yangilash
+  function updateBell(snap) {
+    nav.setBell && nav.setBell(snap.alerts.length > 0);
+  }
+
   function renderContent() {
     const st = dataStore.getState();
-    if (st.loading) { mount(content, skeleton()); lastSig = ''; return; }
+    if (st.loading) { mount(node, skeleton()); lastSig = ''; return; }
     if (!st.lakes.length) {
-      mount(content, slEmptyState({ icon: 'droplet', title: t('lake.empty'), desc: t('home.emptyHint') }));
+      mount(node, slEmptyState({ icon: 'droplet', title: t('lake.empty'), desc: t('home.emptyHint') }));
       lastSig = '';
       return;
     }
     const snap = computeSnapshot(st);
     const sig = signatureOf(st, snap);
-    if (sig === lastSig && !firstRender) return;   // PERF: o'zgarish yo'q
+    if (sig === lastSig && !firstRender) return;
     lastSig = sig;
 
-    bellDot.style.display = snap.alerts.length ? '' : 'none';
+    updateBell(snap);
     loadAnnPreview();
 
-    mount(content, el('div', { class: 'sl-stack' }, [
+    mount(node, el('div', { class: 'sl-stack' }, [
       statsRow(snap),
       lakeSection(snap),
       recentAlertsSection(snap),
