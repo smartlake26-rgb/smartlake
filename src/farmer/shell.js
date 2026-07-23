@@ -1,18 +1,8 @@
 // ============================================================
-//  farmer/shell.js — Farmer ilova qobig'i v2 (PERSISTENT LAYOUT)
-//  Muammo: avval har tab render bo'lganda header+bottomNav qayta
-//  qurilib "sakrardi". Endi: bitta barqaror qobiq, faqat kontent
-//  (<main>) almashtiriladi — header va bottomNav UMUMAN o'zgarmaydi.
-//
-//  Tuzilish:
-//    [md-app]
-//      [topbar] — avatar | tab-sarlavha | qo'ng'iroq  (barqaror)
-//      [main]   — FAQAT shu qism almashadi (scroll ham shu yerda)
-//      [bottomnav] — 4 tab (barqaror)
-//
-//  Tab'lar `appBar()` chaqirmaydi — sarlavhani nav.setTitle() orqali
-//  topbar'ga uzatadi. Eski appBar() chaqiruvlari ishlashda davom
-//  etadi — ular DOM'ga qo'shilmaydi (render funksiyasida filtrlanadi).
+//  farmer/shell.js — Farmer ilova qobig'i (oddiy, ishonchli)
+//  Har tab o'z to'liq sahifasini qaytaradi.
+//  Topbar: shell tomonidan bir marta quriladi, tab'lar content'ini
+//  mainZone'ga qo'yadi. bottomNav barqaror qoladi.
 // ============================================================
 
 import { el, mount } from '../shared/dom.js';
@@ -22,14 +12,14 @@ import { createProfileDrawer } from './profileDrawer.js';
 import { renderOnboarding } from './onboarding.js';
 import { authStore } from '../features/auth/index.js';
 
-import { renderHomeTab }            from '../features/telemetry/views/homeTab.js';
-import { renderNotificationsTab }   from '../features/telemetry/views/notificationsTab.js';
-import { renderLakesTab }           from '../features/lakes/views/lakesTab.js';
-import { renderDevicesTab }         from '../features/devices/views/devicesTab.js';
-import { renderProfileTab }         from '../features/auth/views/profileTab.js';
-import { renderAiHomeTab }          from '../features/ai/views/aiHomeTab.js';
-import { renderReportsTab }         from '../features/telemetry/views/reportsTab.js';
-import { renderAnnouncementsTab }   from '../features/announcements/views/announcementsTab.js';
+import { renderHomeTab }          from '../features/telemetry/views/homeTab.js';
+import { renderNotificationsTab } from '../features/telemetry/views/notificationsTab.js';
+import { renderLakesTab }         from '../features/lakes/views/lakesTab.js';
+import { renderDevicesTab }       from '../features/devices/views/devicesTab.js';
+import { renderProfileTab }       from '../features/auth/views/profileTab.js';
+import { renderAiHomeTab }        from '../features/ai/views/aiHomeTab.js';
+import { renderReportsTab }       from '../features/telemetry/views/reportsTab.js';
+import { renderAnnouncementsTab } from '../features/announcements/views/announcementsTab.js';
 
 const TABS = {
   home:    renderHomeTab,
@@ -43,177 +33,170 @@ const TABS = {
 };
 
 const NAV = [
-  { id: 'home',    icon: 'home',     labelKey: 'nav.home' },
-  { id: 'lakes',   icon: 'droplet',  labelKey: 'nav.lakes' },
-  { id: 'elonlar', icon: 'bell',     labelKey: 'nav.announcements' },
-  { id: 'reports', icon: 'trendUp',  labelKey: 'nav.reports' },
+  { id: 'home',    icon: 'home',    labelKey: 'nav.home' },
+  { id: 'lakes',   icon: 'droplet', labelKey: 'nav.lakes' },
+  { id: 'elonlar', icon: 'bell',    labelKey: 'nav.announcements' },
+  { id: 'reports', icon: 'trendUp', labelKey: 'nav.reports' },
 ];
 const NAV_IDS = NAV.map((x) => x.id);
 
 export function createShell(root, ctx = {}) {
-  let activeTab  = 'home';
-  let subPage    = null;
-  let tabCleanup = null;
+  let activeTab = 'home';
+  let subPage   = null;
+  let cleanup   = null;
   let onboardingActive = false;
 
   const uid = authStore.getState().uid;
   try { onboardingActive = localStorage.getItem('sl_onboarded_' + uid) !== 'true'; } catch (_) {}
 
-  /* ============================================================
-     BARQAROR QOBIQ ELEMENTLARI (bir marta quriladi)
-     ============================================================ */
-
-  /* --- TopBar: avatar+ism | bell (barqaror, o'zgarmaydi) --- */
-  const sUser = authStore.getState();
-  const uName = sUser.profile
-    ? (sUser.profile.ism + (sUser.profile.fam ? ' ' + sUser.profile.fam : ''))
+  /* ----------------------------------------------------------
+     TOPBAR — bir marta quriladi, o'zgarmaydi
+     ---------------------------------------------------------- */
+  const sUser    = authStore.getState();
+  const uName    = sUser.profile
+    ? (sUser.profile.ism + (sUser.profile.fam ? ' ' + sUser.profile.fam : '')).trim()
     : (sUser.email || '');
-  const uRole = t('role.' + (sUser.role || 'farmer'));
 
   const bellDotEl = el('span', { class: 'ni-dot',
-    style: 'display:none;position:absolute;top:4px;right:4px;width:8px;height:8px' });
-  const bellBtn   = el('button', { class: 'md-iconbtn', type: 'button',
-    'aria-label': t('dash.alerts'), style: 'position:relative;flex:none' },
-    [el('span', { html: slIcon(ICONS.alert.bell, 22) }), bellDotEl]);
+    style: 'display:none;position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:var(--md-critical)' });
+  const bellBtn = el('button', { class: 'md-iconbtn', type: 'button',
+    'aria-label': t('dash.alerts'), style: 'position:relative;flex:none' });
+  bellBtn.innerHTML = slIcon(ICONS.alert.bell, 22);
+  bellBtn.appendChild(bellDotEl);
   bellBtn.addEventListener('click', () => nav.switchTab('alerts'));
 
-  // Foydalanuvchi info bloki (topbar o'rta qism)
-  const userBlock = el('div', { class: 'grow', style: 'min-width:0' }, [
-    el('div', { style: 'font-size:15px;font-weight:700;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap',
-      text: uName }),
-    el('div', { style: 'font-size:11px;opacity:.65;margin-top:1px', text: uRole }),
-  ]);
-
-  let avatarBtn = null;   // profileDrawer qaytaradi
-
-  const topbar = el('div', { class: 'md-appbar', style: 'gap:var(--sl-sp-2)' }, [
-    el('span', { id: 'shell-avatar-slot' }),
-    userBlock,
+  const topbar = el('div', { class: 'md-appbar', style: 'gap:8px' }, [
+    el('span', { id: 'tb-avatar' }),   // avatar shu yerga
+    el('div', { class: 'grow', style: 'min-width:0;overflow:hidden' }, [
+      el('div', {
+        style: 'font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis',
+        text: uName,
+      }),
+    ]),
     bellBtn,
   ]);
 
-  /* --- BottomNav (bir marta quriladi, active sinf yangilanadi) --- */
-  const navItems = NAV.map((n) => {
-    const btn = el('button', { class: 'md-navitem', type: 'button',
-      'aria-label': t(n.labelKey) }, [
+  /* ----------------------------------------------------------
+     BOTTOMNAV — bir marta quriladi, active sinf yangilanadi
+     ---------------------------------------------------------- */
+  const navBtns = NAV.map((n) => {
+    const btn = el('button', { class: 'md-navitem', type: 'button' }, [
       el('span', { class: 'ni-ic', html: slIcon(n.icon, 22) }),
       el('span', { class: 'ni-label', text: t(n.labelKey) }),
     ]);
     btn.addEventListener('click', () => nav.switchTab(n.id));
     return { id: n.id, btn };
   });
-  const bottomnav = el('nav', { class: 'md-bottomnav', role: 'navigation' },
-    navItems.map((x) => x.btn));
+  const bottomnav = el('nav', { class: 'md-bottomnav' }, navBtns.map((x) => x.btn));
 
-  /* --- Kontent zone (faqat shu almashadi) --- */
-  const mainZone = el('div', { class: 'shell-main' });
+  /* ----------------------------------------------------------
+     KONTENT ZONE — faqat shu almashinadi
+     ---------------------------------------------------------- */
+  const mainZone = el('div', { style: 'flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;min-height:0' });
 
-  /* --- Yig'ish --- */
-  const appEl = el('div', { class: 'md-app' }, [topbar, mainZone, bottomnav]);
+  const appEl = el('div', { class: 'md-app', style: 'display:flex;flex-direction:column' },
+    [topbar, mainZone, bottomnav]);
 
-  /* ============================================================
-     NAV OB'EKTI
-     ============================================================ */
+  /* ----------------------------------------------------------
+     NAV
+     ---------------------------------------------------------- */
   const nav = {
     switchTab(id) {
       if (id === activeTab && !subPage) return;
       activeTab = id; subPage = null;
-      renderMain();
+      render();
     },
-    push(renderFn) { subPage = { render: renderFn }; renderMain(); },
-    back()         { subPage = null; renderMain(); },
-    reTab()        { renderMain(); },
-    setTitle()     { /* topbar barqaror — sarlavha shart emas */ },
-    setBell(on)    { bellDotEl.style.display = on ? '' : 'none'; },
+    push(renderFn)  { subPage = { render: renderFn }; render(); },
+    back()          { subPage = null; render(); },
+    reTab()         { render(); },
+    setBell(on)     { bellDotEl.style.display = on ? '' : 'none'; },
+    setTitle()      { /* topbar barqaror */ },
     logout: ctx.onLogout,
   };
 
-  /* ============================================================
-     BOTTOMNAV ACTIVE BELGILASH
-     ============================================================ */
   function updateNav() {
     const active = NAV_IDS.includes(activeTab) ? activeTab : NAV_IDS[0];
-    navItems.forEach(({ id, btn }) => btn.classList.toggle('active', id === active));
+    navBtns.forEach(({ id, btn }) => btn.classList.toggle('active', id === active));
   }
 
-  /* ============================================================
-     KONTENT RENDER (faqat mainZone ichini almashtiradi)
-     ============================================================ */
-  function renderMain() {
-    /* cleanup */
-    if (typeof tabCleanup === 'function') { try { tabCleanup(); } catch (_) {} }
-    tabCleanup = null;
+  function doCleanup() {
+    if (typeof cleanup === 'function') { try { cleanup(); } catch (_) {} }
+    cleanup = null;
+  }
+
+  /* ----------------------------------------------------------
+     RENDER — topbar va bottomnav UMUMAN O'ZGARMAYDI
+     ---------------------------------------------------------- */
+  function render() {
+    doCleanup();
     window.scrollTo(0, 0);
 
-    updateNav();
-
     if (subPage) {
-      const node = subPage.render(nav);
-      // Sub-sahifada bottomnav va topbar ko'rinmasin
+      /* Sub-sahifa: topbar/bottomnav yashiriladi */
+      topbar.style.display    = 'none';
       bottomnav.style.display = 'none';
-      topbar.style.display = 'none';
-      tabCleanup = () => { bottomnav.style.display = ''; topbar.style.display = ''; };
+      mainZone.style.overflow = 'visible';
+      const node = subPage.render(nav);
+      cleanup = () => {
+        topbar.style.display    = '';
+        bottomnav.style.display = '';
+        mainZone.style.overflow = '';
+        if (node.__cleanup) node.__cleanup();
+      };
       mount(mainZone, node);
-      if (node.__cleanup) {
-        const prev = tabCleanup;
-        tabCleanup = () => { prev(); node.__cleanup(); };
-      }
       return;
     }
 
+    /* Asosiy tab */
+    topbar.style.display    = '';
     bottomnav.style.display = '';
-    topbar.style.display = '';
+    mainZone.style.overflow = '';
+    updateNav();
 
     const renderer = TABS[activeTab];
     if (!renderer) return;
 
-    const raw = renderer(nav);
-    tabCleanup = raw && raw.__cleanup ? raw.__cleanup : null;
+    const node = renderer(nav);
 
-    // Tablar ikkita tuzilishda kelishi mumkin:
-    // 1) Yangi tablar: to'g'ridan-to'g'ri md-content qaytaradi
-    // 2) Eski tablar: [md-appbar + md-content] tuzilishi
-    // Ikkalasida ham md-appbar olib tashlanadi (topbar'da bor)
-    if (raw && raw.querySelector) {
-      const inlineBar = raw.querySelector(':scope > .md-appbar');
-      if (inlineBar) inlineBar.remove();
+    /* Eski tablar [md-appbar + md-content] qaytaradi —
+       md-appbar olib tashlanadi (topbar'da bor) */
+    if (node && node.querySelector) {
+      const bar = node.querySelector(':scope > .md-appbar');
+      if (bar) bar.remove();
     }
 
-    mount(mainZone, raw);
+    cleanup = node && node.__cleanup ? node.__cleanup : null;
+    mount(mainZone, node);
   }
 
-  /* ============================================================
+  /* ----------------------------------------------------------
      ONBOARDING
-     ============================================================ */
+     ---------------------------------------------------------- */
   function renderOnboard() {
-    topbar.style.display = 'none';
+    topbar.style.display    = 'none';
     bottomnav.style.display = 'none';
     const node = renderOnboarding(uid, () => {
       onboardingActive = false;
-      topbar.style.display = '';
+      topbar.style.display    = '';
       bottomnav.style.display = '';
-      renderMain();
+      render();
     });
     mount(mainZone, node);
   }
 
-  /* ============================================================
-     ISHGA TUSHIRISH
-     ============================================================ */
+  /* ----------------------------------------------------------
+     START
+     ---------------------------------------------------------- */
   root.replaceChildren(appEl);
 
-  // Avatar tugmasini topbar'ga qo'shish
-  avatarBtn = createProfileDrawer(nav);
-  const slot = topbar.querySelector('#shell-avatar-slot');
-  slot.replaceWith(avatarBtn);
-
-  // Bosh sahifa sarlavhasi
-  nav.setTitle(t('nav.home'));
+  // Avatar tugmasi
+  const avatarBtn = createProfileDrawer(nav);
+  topbar.querySelector('#tb-avatar').replaceWith(avatarBtn);
 
   if (onboardingActive) renderOnboard();
-  else renderMain();
+  else render();
 
-  return { destroy: () => { if (typeof tabCleanup === 'function') tabCleanup(); } };
+  return { destroy: doCleanup };
 }
 
 export default createShell;
