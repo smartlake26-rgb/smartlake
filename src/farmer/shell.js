@@ -167,25 +167,16 @@ export function createShell(root, ctx = {}) {
     const renderer = TABS[activeTab];
     if (!renderer) return;
 
-    /* Tab renderini chaqiramiz. Tab o'z ichida nav.setTitle() chaqiradi.
-       Eski appBar() qaytaruvchi tablar ichida birinchi .md-appbar'ni
-       topbar'ga olib tashlaymiz (ikki marta chiqmasligi uchun). */
     const raw = renderer(nav);
     tabCleanup = raw && raw.__cleanup ? raw.__cleanup : null;
 
-    // Eski tablar: <div> [md-appbar, md-content] tuzilishi
-    // md-appbar'dan sarlavha olinadi, kontent qismi mainZone'ga qo'yiladi
+    // Tablar ikkita tuzilishda kelishi mumkin:
+    // 1) Yangi tablar: to'g'ridan-to'g'ri md-content qaytaradi
+    // 2) Eski tablar: [md-appbar + md-content] tuzilishi
+    // Ikkalasida ham md-appbar olib tashlanadi (topbar'da bor)
     if (raw && raw.querySelector) {
-      const inlineBar = raw.querySelector('.md-appbar');
-      if (inlineBar) {
-        // Sarlavha matnini olish
-        const titleNode = inlineBar.querySelector('.ab-title');
-        if (titleNode) nav.setTitle(titleNode.textContent);
-        inlineBar.remove();   // inline appbar'ni olib tashlaymiz
-      } else {
-        // homeTab: o'z headerini quradi — u allaqachon nav.setTitle ishlatmaydi
-        // sarlavha bo'sh qoladi (homeTab avatarni o'zi header'ga qo'shgan edi — bu endi topbar vazifasi)
-      }
+      const inlineBar = raw.querySelector(':scope > .md-appbar');
+      if (inlineBar) inlineBar.remove();
     }
 
     mount(mainZone, raw);
