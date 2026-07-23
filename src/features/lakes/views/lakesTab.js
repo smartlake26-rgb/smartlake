@@ -203,16 +203,23 @@ export function renderLakesTab(nav) {
       updatedText: `${t('lakespg.updated')}: ${fmtAge(vm.a.lastUpdate)}`,
       signalText: vm.bestRssi != null ? `${t('dash.signal')}: ${t('dash.signal_' + q)}` : '',
       extra: [feedBox,
-        // ⊕ Qurilma tugmasi — kartaning pastida
+        // ⊕ Qurilma ulash — kartaning pastida, ajralib turadi
         el('div', { style: 'margin-top:var(--sl-sp-3);padding-top:var(--sl-sp-2);border-top:1px solid var(--sl-divider)' }, [
-          slButton({
-            label: detectLocale() === 'uz' ? '⊕ Qurilma ulash' : '⊕ Подключить устройство',
-            variant: 'text', size: 'sm',
+          el('button', {
+            type: 'button',
+            style: 'display:inline-flex;align-items:center;gap:8px;padding:8px 16px;'
+                 + 'border-radius:var(--sl-r-full);border:1.5px dashed var(--sl-primary);'
+                 + 'background:color-mix(in srgb,var(--sl-primary) 6%,transparent);'
+                 + 'color:var(--sl-primary);font-size:13px;font-weight:700;cursor:pointer;'
+                 + 'transition:background var(--sl-motion) var(--sl-ease);width:100%;justify-content:center',
             onClick: (e) => {
               e.stopPropagation();
               openFarmerClaimModal({ lakeId: vm.lk.id, lakeName: vm.lk.name });
             },
-          }),
+          }, [
+            el('span', { html: slIcon('plus', 16) }),
+            el('span', { text: detectLocale() === 'uz' ? 'Qurilma ulash' : 'Подключить устройство' }),
+          ]),
         ]),
       ],
       dim: vm.kind === 'archived' || vm.kind === 'inactive',

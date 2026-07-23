@@ -64,6 +64,19 @@ export const deviceService = {
     return { deviceId, activationKey };
   },
 
+  /** Tartib raqam: barcha qurilmalar soniga +1 (qayta ulanganda ham o'sha) */
+  async getSerialNumber(deviceId) {
+    try {
+      // Avval shu qurilma mavjudmi — agar bor bo'lsa uning serialNumber ini qaytaramiz
+      const existing = await this.getDevice(deviceId);
+      if (existing && existing.serialNumber) return existing.serialNumber;
+      // Yangi: barcha qurilmalar soniga qarab keyingisini beramiz
+      const snap = await getDocs(collection(db, COLLECTIONS.DEVICES));
+      const count = snap.size + 1;
+      return `SL-${String(count).padStart(4, '0')}`;
+    } catch { return `SL-0001`; }
+  },
+
   /** Qurilmaning activationKey ni yangilash (qayta ulash uchun).
    *  deviceId O'ZGARMAYDI — faqat yangi maxfiy kalit hosil bo'ladi.
    *  FAQAT Super Admin (rules). */
