@@ -47,6 +47,16 @@ function nfmt(v, d = 1) { return v == null ? '—' : Number(v).toFixed(d); }
 const avgArr = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : null);
 
 /* Displey-bucket agregatsiya (faqat jadval/grafik uchun; eksport XOM). */
+/* Arxivdagi sample'dagi 0 qiymatlarni sensor holati bilan filtrlash:
+   DO/pH/TDS/NH3 uchun 0 = sensor mavjud emas (xom arxiv buzilgan
+   o'lchov emas, qurilmaning "yo'q" belgisi). Firmware/arxiv
+   O'ZGARTIRILMAGAN — faqat displey qatlamida filtrlanadi. */
+const ZERO_ABSENT_KEYS = new Set(['do', 'ph', 'tds', 'nh3']);
+function cleanSampleVal(key, val) {
+  if (val == null || typeof val !== 'number' || !Number.isFinite(val)) return null;
+  if (val === 0 && ZERO_ABSENT_KEYS.has(key)) return null;   // 0 = sensor yo'q
+  return val;
+}
 function aggregateLocal(samples, bucketMs) {
   const buckets = new Map();
   for (const sm of samples) {
@@ -54,10 +64,14 @@ function aggregateLocal(samples, bucketMs) {
     let b = buckets.get(key);
     if (!b) { b = { ts: key, n: 0, sdo: 0, ndo: 0, st: 0, nt: 0, sph: 0, nph: 0, stds: 0, ntds: 0 }; buckets.set(key, b); }
     b.n += 1;
-    if (typeof sm.do === 'number') { b.sdo += sm.do; b.ndo += 1; }
-    if (typeof sm.t === 'number') { b.st += sm.t; b.nt += 1; }
-    if (typeof sm.ph === 'number') { b.sph += sm.ph; b.nph += 1; }
-    if (typeof sm.tds === 'number') { b.stds += sm.tds; b.ntds += 1; }
+    const doV  = cleanSampleVal('do',  sm.do);
+    const tV   = cleanSampleVal('t',   sm.t);
+    const phV  = cleanSampleVal('ph',  sm.ph);
+    const tdsV = cleanSampleVal('tds', sm.tds);
+    if (doV  != null) { b.sdo  += doV;  b.ndo  += 1; }
+    if (tV   != null) { b.st   += tV;   b.nt   += 1; }
+    if (phV  != null) { b.sph  += phV;  b.nph  += 1; }
+    if (tdsV != null) { b.stds += tdsV; b.ntds += 1; }
   }
   return [...buckets.values()].map((b) => ({
     ts: b.ts, n: b.n,
@@ -124,11 +138,11 @@ export function buildHistoryTab({ lakeId, uid, isUz, getDevs, getTh, lakeName = 
       rows: samples.map((sm) => ({
         [t('hist.colDate')]: fmtDate(sm.ts),
         [t('hist.colTime')]: fmtTime(sm.ts),
-        'DO (mg/L)': typeof sm.do === 'number' ? +sm.do.toFixed(2) : '',
-        [`${t('tm.temp')} (°C)`]: typeof sm.t === 'number' ? +sm.t.toFixed(1) : '',
-        pH: typeof sm.ph === 'number' ? +sm.ph.toFixed(2) : '',
-        'TDS (ppm)': typeof sm.tds === 'number' ? Math.round(sm.tds) : '',
-        [t('hist.colStatus')]: statusOf(sm.do).label,
+        'DO (mg/L)':             cleanSampleVal('do',  sm.do)  != null ? +cleanSampleVal('do',  sm.do).toFixed(2)  : '',
+        [`${t('tm.temp')} (°C)`]: cleanSampleVal('t', sm.t) != null ? +cleanSampleVal('t', sm.t).toFixed(1) : '',
+        pH:                      cleanSampleVal('ph',  sm.ph)  != null ? +cleanSampleVal('ph',  sm.ph).toFixed(2)  : '',
+        'TDS (ppm)':             cleanSampleVal('tds', sm.tds) != null ? Math.round(cleanSampleVal('tds', sm.tds))  : '',
+        [t('hist.colStatus')]:   statusOf(cleanSampleVal('do', sm.do)).label,
       })),
     }],
   });

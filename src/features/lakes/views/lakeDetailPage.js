@@ -46,7 +46,7 @@ import { renderLakeFormPage } from './lakeFormPage.js';
 import { renderDeviceDetailPage } from '../../telemetry/views/deviceDetailPage.js';
 import { getLakeWeather, getWeatherIcon } from '../../telemetry/services/weatherService.js';
 import { historyService } from '../../telemetry/services/historyService.js';
-import { sensorState, SENSOR_STATE } from '../../telemetry/domain/sensorState.js';
+import { sensorState, lakeSensorState, SENSOR_STATE } from '../../telemetry/domain/sensorState.js';
 import { buildHistoryTab } from '../../telemetry/views/historyTab.js';
 import { buildLakeSettingsTab } from './lakeSettingsTab.js';
 import { buildAiTab } from '../../ai/views/aiTab.js';
@@ -483,46 +483,76 @@ export function renderLakeDetailPage(nav, lakeId) {
     const anyTel = devs.map((d) => st.telemetry.get(d.id)).filter(Boolean);
     const avgOf = (k) => { const v = anyTel.map((x) => x[k]).filter((n) => typeof n === 'number');
       return v.length ? Math.round((v.reduce((p, q) => p + q, 0) / v.length) * 10) / 10 : null; };
-    // LAKEDET-V5: 0 = nosozlik EMAS — sensor mavjudlik holati (sensorState)
-    const STATE_TEXT = {
-      [SENSOR_STATE.ABSENT]: t('lakedet.sensorAbsent'),
-      [SENSOR_STATE.DISABLED]: t('lakedet.sensorDisabled'),
-      [SENSOR_STATE.CALIBRATION]: t('lakedet.sensorCalib'),
-    };
+
+    // Barcha sensorlar uchun holat — lakeSensorState QAYTA ISHLATILADI (sensorState.js)
     function lakeState(key) {
-      let best = SENSOR_STATE.ABSENT;
-      for (const tel of anyTel) {
-        const st0 = sensorState(tel, key);
-        if (st0 === SENSOR_STATE.PRESENT) return SENSOR_STATE.PRESENT;
-        if (st0 !== SENSOR_STATE.ABSENT) best = st0;
-      }
-      return best;
+      return lakeSensorState(anyTel, key);
     }
-    const tdsState = lakeState('tds');
-    const nh3State = lakeState('nh3');
+    // Faqat PRESENT bo'lsa qiymat, aks holda null -> sensorParamCard status ko'rsatadi
+    function safeAvg(key, aggVal) {
+      return lakeState(key) === SENSOR_STATE.PRESENT ? aggVal : null;
+    }
+    // Sensor holati matni (UI'da qiymat o'rniga)
+    const sensorStateText = (state) => {
+      const KEY_MAP = {
+        [SENSOR_STATE.ABSENT]:       'sensor.absent',
+        [SENSOR_STATE.DISCONNECTED]: 'sensor.disconnected',
+        [SENSOR_STATE.DISABLED]:     'sensor.disabled',
+        [SENSOR_STATE.FAULTY]:       'sensor.faulty',
+        [SENSOR_STATE.CALIBRATION]:  'sensor.calibration',
+      };
+      return t(KEY_MAP[state] || 'sensor.absent');
+    };
+    function sensorNorm(key, defaultNorm) {
+      const st = lakeState(key);
+      return st === SENSOR_STATE.PRESENT ? defaultNorm : sensorStateText(st);
+    }
+    function sensorStKey(key, presentKey) {
+      return lakeState(key) === SENSOR_STATE.PRESENT ? presentKey : 'unknown';
+    }
+
+    const doState   = lakeState('do');
+    const tempState = lakeState('t');
+    const phState   = lakeState('ph');
+    const tdsState  = lakeState('tds');
+    const nh3State  = lakeState('nh3');
     const hasNh3 = nh3State === SENSOR_STATE.PRESENT;
     const sensorCards = [
-      sensorParamCard({ key: 'do', label: 'DO', ic: 'waves', value: a.avgDo, unit: 'mg/L',
-        norm: `≥${th.do.warn}`, stKey: evalDo(a.avgDo), tr: calcTrend(trendPts, 'do'), lastTs: a.lastUpdate }),
-      sensorParamCard({ key: 'temp', label: t('tm.temp'), ic: 'thermometer', value: a.avgTemp, unit: '°C',
-        norm: `${th.temp.warnMin}–${th.temp.warnMax}`, stKey: evalTemp(a.avgTemp), tr: calcTrend(trendPts, 't'), lastTs: a.lastUpdate }),
-      sensorParamCard({ key: 'ph', label: 'pH', ic: 'activity', value: a.avgPh, unit: '',
-        norm: `${th.ph.warnMin}–${th.ph.warnMax}`, stKey: evalPh(a.avgPh), tr: calcTrend(trendPts, 'ph'), lastTs: a.lastUpdate }),
+      sensorParamCard({ key: 'do', label: 'DO', ic: 'waves',
+        value: safeAvg('do', a.avgDo), unit: 'mg/L',
+        norm: sensorNorm('do', `≥${th.do.warn}`),
+        stKey: sensorStKey('do', evalDo(a.avgDo)),
+        tr: doState === SENSOR_STATE.PRESENT ? calcTrend(trendPts, 'do') : null,
+        lastTs: a.lastUpdate }),
+      sensorParamCard({ key: 'temp', label: t('tm.temp'), ic: 'thermometer',
+        value: safeAvg('t', a.avgTemp), unit: '°C',
+        norm: sensorNorm('t', `${th.temp.warnMin}–${th.temp.warnMax}`),
+        stKey: sensorStKey('t', evalTemp(a.avgTemp)),
+        tr: tempState === SENSOR_STATE.PRESENT ? calcTrend(trendPts, 't') : null,
+        lastTs: a.lastUpdate }),
+      sensorParamCard({ key: 'ph', label: 'pH', ic: 'activity',
+        value: safeAvg('ph', a.avgPh), unit: '',
+        norm: sensorNorm('ph', `${th.ph.warnMin}–${th.ph.warnMax}`),
+        stKey: sensorStKey('ph', evalPh(a.avgPh)),
+        tr: phState === SENSOR_STATE.PRESENT ? calcTrend(trendPts, 'ph') : null,
+        lastTs: a.lastUpdate }),
       sensorParamCard({ key: 'tds', label: 'TDS', ic: 'layers',
-        value: tdsState === SENSOR_STATE.PRESENT ? avgOf('tds') : null, unit: 'ppm',
-        norm: tdsState === SENSOR_STATE.PRESENT ? '—' : STATE_TEXT[tdsState],
-        stKey: tdsState === SENSOR_STATE.PRESENT ? 'healthy' : 'unknown',
+        value: safeAvg('tds', avgOf('tds')), unit: 'ppm',
+        norm: sensorNorm('tds', '—'),
+        stKey: sensorStKey('tds', 'healthy'),
         tr: null, lastTs: a.lastUpdate }),
     ];
     if (nh3State !== SENSOR_STATE.ABSENT) {
       sensorCards.push(sensorParamCard({ key: 'nh3', label: isUz ? 'Ammiak' : 'Аммиак', ic: 'droplet',
-        value: hasNh3 ? avgOf('nh3') : null, unit: 'mg/L',
-        norm: hasNh3 ? '—' : STATE_TEXT[nh3State],
-        stKey: hasNh3 ? 'healthy' : 'unknown', tr: null, lastTs: a.lastUpdate }));
+        value: safeAvg('nh3', avgOf('nh3')), unit: 'mg/L',
+        norm: sensorNorm('nh3', '—'),
+        stKey: sensorStKey('nh3', 'healthy'), tr: null, lastTs: a.lastUpdate }));
     }
+    const batState = lakeState('battery');
     sensorCards.push(sensorParamCard({ key: 'battery', label: t('lakedet.battery'), ic: 'battery',
-      value: avgOf('battery'), unit: '%', norm: `≥${th.battery.warn}%`,
-      stKey: avgOf('battery') != null && avgOf('battery') < th.battery.warn ? 'warning' : (avgOf('battery') != null ? 'healthy' : 'unknown'),
+      value: safeAvg('battery', avgOf('battery')), unit: '%', norm: `≥${th.battery.warn}%`,
+      stKey: sensorStKey('battery',
+        avgOf('battery') != null && avgOf('battery') < th.battery.warn ? 'warning' : 'healthy'),
       tr: null, lastTs: a.lastUpdate }));
     const sensors = el('div', { class: 'sl-grid-2' }, sensorCards);
 
