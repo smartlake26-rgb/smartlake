@@ -218,8 +218,10 @@ export function renderLakeDetailPage(nav, lakeId) {
   let settingsTabNode = null;
   function getSettingsTabNode() {
     if (!settingsTabNode) {
+      // devicesCard Sozlamalar ichiga ko'chirildi (topshiriq: qurilmalar eng yuqorida)
       settingsTabNode = buildLakeSettingsTab({
         lakeId, uid: s.uid, isUz,
+        devicesCard,           // biriktirilgan qurilmalar kartasi — eng yuqori bo'lim
         onSaved: (m) => { lakeMeta = m; render(); },
       });
     }
@@ -775,7 +777,8 @@ export function renderLakeDetailPage(nav, lakeId) {
         components = [devTabs, historyForDevice(historyDevId)].filter(Boolean);
       }
     } else if (activeTab === 'ai') components = [getAiTabNode()];
-    else if (activeTab === 'sozlama') components = [devicesCard, getSettingsTabNode(), ...actions];   // qurilmalar ENG YUQORIDA
+    // Sozlamalar: devicesCard SettingsTab ichida (birinchi blok) — bu yerda takrorlanmaydi
+    else if (activeTab === 'sozlama') components = [getSettingsTabNode(), ...actions];
     else {
       components = [healthHero, sensors, ...deviceChartCards];
       components.push(aeratorCard);

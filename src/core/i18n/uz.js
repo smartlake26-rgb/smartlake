@@ -388,6 +388,8 @@ uz.lset = {
   fromCatalog: 'Protein {p}% · FCR {f} — katalogdan',
   aerTitle: 'Aeratorlar', aerCount: 'Soni', aerKw: 'Bittasining quvvati (kW)',
   aerTariff: "Elektr narxi (so'm/kWh)",
+  tariffTitle: "Elektr narxi",
+  tariffNote: "Bu qiymat Hisobot bo'limida elektr xarajatini hisoblash uchun ishlatiladi. Faqat shu yerda o'zgartiriladi.",
   aerNote: "Saqlanganda Hisobotdagi umumiy quvvat (soni × kW) avtomatik yangilanadi.",
   fishSaved: "Baliq ma'lumotlari saqlandi",
   metaNote: "Bu ma'lumotlar faqat Firebase'da saqlanadi — qurilmaga yuborilmaydi. Yem va elektr hisoblari shu yerdan oziqlanadi.",
