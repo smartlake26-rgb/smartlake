@@ -269,11 +269,65 @@ uz.lakespg = {
   updated: 'Yangilandi',
 };
 
+// --- LAKEDET-V4: Ko'l sahifasi (boshqaruv markazi) ---
+uz.lakedet = {
+  tab_now: 'Joriy holat', tab_history: 'Tarix', tab_ai: 'AI tavsiya', tab_settings: 'Sozlamalar',
+  health: "Ko'l salomatligi",
+  aiReady: 'Baho AI hisobiga tayyor arxitekturada',
+  norm: "Me'yor", trendStable: 'barqaror',
+  min: 'Min', avg: "O'rtacha", max: 'Maks',
+  detailChart: 'oxirgi 24 soat', do24: 'Kislorod — oxirgi 24 soat',
+  rangeStats: 'Tanlangan davr statistikasi',
+  battery: 'Batareya',
+  aerator: 'Aerator boshqaruvi', working: 'Ishlayapti', stopped: "To'xtagan",
+  forceOn: 'Majburiy YOQISH', forceOff: "Majburiy O'CHIRISH",
+  offNote: "Majburiy O'CHIRISH qurilma firmware'sida yo'q — AUTO tugmasi qurilmani avtomatik rejimga qaytaradi (xavfsizlik uchun shunday loyihalangan).",
+  mode: 'Rejim', manual: "Qo'lda (majburiy)", autoDo: 'AUTO — kislorod bo\'yicha', autoTime: 'AUTO — vaqt jadvali',
+  lastCmd: 'Oxirgi buyruq', lastOn: 'Oxirgi yoqilgan',
+  runToday: 'Bugun ishladi', runWeek: 'Haftada ishladi',
+  kwhToday: 'Bugungi elektr', kwhMonth: 'Oylik elektr',
+  energyNeedKw: "kW kiritilmagan (Sozlamalar → Aeratorlar)",
+  feed: 'Yem tavsiyasi', feedMealOnce: 'Ovqatlanish vaqtlari va bir martalik miqdor',
+  biomass: 'Biomassa', rate: 'Kunlik stavka', feedTotal: 'Bugungi jami yem', feedCost: 'Taxminiy narxi',
+  feedAiNote: "Hisob: baliq soni × o'rtacha vazn × suv harorati × yem jadvali. Kelajakda AI aniqlashtiradi.",
+  feedEmpty: "Yem rejasi uchun baliq ma'lumotlarini kiriting.",
+  toSettings: 'Sozlamalarga o\'tish',
+  conn: 'Aloqa holati',
+  weatherRegion: 'Hudud ob-havosi', weatherToday: 'Bugun', weatherTomorrow: 'Ertaga',
+  loadingWeather: "Ob-havo yuklanmoqda...",
+};
+
 uz.reports = {
   title: 'Hisobot',
   pickLake: "Ko'lni tanlang",
   empty: "Hisobot uchun avval ko'l qo'shing",
   hint: "Davr bo'yicha o'lchovlar, yem va elektr hisobi, XLSX/CSV/PDF eksport",
+};
+
+// --- LAKEDET-V4: ko'l boshqaruv markazi ---
+uz.lakedet = {
+  tab_now: 'Joriy holat', tab_history: 'Tarix', tab_ai: 'AI tavsiya', tab_settings: 'Sozlamalar',
+  health: 'Ko\u02bbl salomatligi', aiReady: 'Kelajakda AI hisoblaydi',
+  norm: "Me'yor", trendStable: 'barqaror',
+  detailChart: '24 soatlik grafik', min: 'Eng past', avg: "O'rtacha", max: 'Eng yuqori',
+  do24: 'Kislorod — 24 soat',
+  aerator: 'Aerator boshqaruvi', working: 'ISHLAMOQDA', stopped: "TO'XTATILGAN",
+  forceOn: 'Majburiy YOQISH', forceOff: "Majburiy O'CHIRISH",
+  offNote: "Majburiy o'chirish qurilmada yo'q — AUTO rejimda kislorod yetarli bo'lsa qurilma o'zi o'chiradi (baliq himoyasi).",
+  mode: 'Hozirgi rejim', manual: "QO'LDA", autoDo: 'AVTO (kislorod)', autoTime: 'AVTO (vaqt)',
+  lastCmd: 'Oxirgi buyruq', lastOn: 'Oxirgi yoqilgan',
+  runToday: 'Bugun ishlagan', runWeek: 'Hafta ishlagan',
+  kwhToday: 'Bugungi elektr', kwhMonth: 'Oylik elektr',
+  energyNeedKw: "kW/tarif — Sozlamalar > Aeratorlar",
+  feed: 'Yem tavsiyasi', feedMealOnce: 'Bir martalik', feedTotal: 'Bugun jami',
+  feedCost: 'Taxminiy narxi', biomass: 'Biomassa', rate: 'Stavka',
+  feedAiNote: "Hisob: baliq soni × vazni × harorat × yem turi. Kelajakda AI aniqlashtiradi.",
+  feedEmpty: "Aniq hisob uchun Sozlamalar tabida baliq turi, soni va vaznini kiriting.",
+  toSettings: "Sozlamalarga o'tish",
+  conn: 'Aloqa holati', battery: 'Batareya',
+  weatherToday: 'Bugun', weatherTomorrow: 'Ertaga (bashorat)', weatherRegion: 'Hududiy ob-havo',
+  loadingWeather: 'Ob-havo yuklanmoqda...',
+  rangeStats: 'Tanlangan davr statistikasi',
 };
 
 export default uz;
