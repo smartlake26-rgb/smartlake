@@ -728,6 +728,11 @@ export function renderLakeDetailPage(nav, lakeId) {
       el('div', {}, deviceRows),
       ...assignRow,
     ]);
+    // devicesCard har render'da yangilanadi — settingsTabNode ni yangilash kerak
+    if (settingsTabNode) {
+      const slot = settingsTabNode.querySelector('.sl-devices-slot');
+      if (slot) slot.replaceWith(devicesCard);
+    }
 
     const archived = lake.status === LAKE_STATUS.ARCHIVED;
     const actions = [];

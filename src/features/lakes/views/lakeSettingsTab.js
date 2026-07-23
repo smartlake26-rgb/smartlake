@@ -328,7 +328,7 @@ export function buildLakeSettingsTab({ lakeId, uid, isUz, devicesCard, onSaved }
      Aerator → Elektr narxi → Izoh
      ============================================================ */
   const node = el('div', { class: 'sl-stack' }, [
-    devicesCard || null,   // tashqaridan uzatilgan qurilmalar kartasi
+    el('div', { class: 'sl-devices-slot' }, [devicesCard || null].filter(Boolean)),
     passportCard,
     fishCard,
     feedCard,

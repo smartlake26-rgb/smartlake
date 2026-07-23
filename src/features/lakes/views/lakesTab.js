@@ -39,7 +39,7 @@ import { renderLakeFormPage } from './lakeFormPage.js';
 import { openFarmerClaimModal } from '../../devices/views/deviceClaimFlow.js';
 import { LAKE_STATUS } from '../../../core/collections.js';
 import {
-  slLakeMonitorCard, slFeedSchedule, slField, slEmptyState, slButton,
+  slIcon, slLakeMonitorCard, slFeedSchedule, slField, slEmptyState, slButton,
 } from '../../../design-system/index.js';
 
 const SLOW_LOAD_MS = 12_000;

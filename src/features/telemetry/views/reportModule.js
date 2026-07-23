@@ -73,13 +73,19 @@ export function buildReportTab({ lakeId, uid, isUz, getDevs, lakeName = '' }) {
     return aeratorRuntimeMs(aerSamples().filter((x) => x.ts >= cutoff));
   }
   const saveEnergyBtn = slButton({ label: t('common.save'), variant: 'secondary', onClick: async () => {
-    const kw = parseFloat(kwIn.input.value) || 0; const tariff = parseFloat(tarifIn.input.value) || 0;
+    const kw = parseFloat(kwIn.input.value) || 0;
+    const tariff = parseFloat(tarifIn.input.value) || 0;
+    if (!uid) { toast('Foydalanuvchi topilmadi — qayta kiring', 'err'); return; }
+    if (!lakeId) { toast('Ko\'l ID topilmadi', 'err'); return; }
     try {
-      await saveLakeMeta(lakeId, uid, { energy: { kw, tariff } });   // SAQLANGAN yozuv yo'li
+      await saveLakeMeta(lakeId, uid, { energy: { kw, tariff } });
       meta = { ...(meta || {}), energy: { kw, tariff } };
       toast(t('common.saved'), 'ok');
       renderAll();
-    } catch (e) { toast((e && e.message) || 'Xato', 'err'); }
+    } catch (e) {
+      const msg = e && e.message || 'Xato';
+      toast(msg.includes('permission') ? 'Ruxsat yo\'q — sozlamalar Sozlamalar tabida saqlanadi' : msg, 'err');
+    }
   } });
 
   /* ---------- yem yordamchilari ---------- */
