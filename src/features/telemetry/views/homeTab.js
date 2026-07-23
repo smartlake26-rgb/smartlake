@@ -146,7 +146,8 @@ export function renderHomeTab(nav) {
   timers.push(setInterval(tickClock, 30_000));
 
   const heroBlock = el('div', {}, [slider, dotsRow]);
-  const node = el('div', { class: 'md-content' }, [heroBlock]);
+  const contentBox = el('div', { class: 'sl-stack' });
+  const node = el('div', { class: 'md-content' }, [heroBlock, contentBox]);
 
   /* --------- SNAPSHOT (domen modullari) --------- */
   function computeSnapshot(st) {
@@ -401,9 +402,9 @@ export function renderHomeTab(nav) {
 
   function renderContent() {
     const st = dataStore.getState();
-    if (st.loading) { mount(node, skeleton()); lastSig = ''; return; }
+    if (st.loading) { mount(contentBox, skeleton()); lastSig = ''; return; }
     if (!st.lakes.length) {
-      mount(node, slEmptyState({ icon: 'droplet', title: t('lake.empty'), desc: t('home.emptyHint') }));
+      mount(contentBox, slEmptyState({ icon: 'droplet', title: t('lake.empty'), desc: t('home.emptyHint') }));
       lastSig = '';
       return;
     }
@@ -453,8 +454,7 @@ export function renderHomeTab(nav) {
     updateBell(snap);
     loadAnnPreview();
 
-    mount(node, el('div', { class: 'sl-stack' }, [
-      heroBlock,
+    mount(contentBox, el('div', { class: 'sl-stack' }, [
       statsRow(snap),
       lakeSection(snap),
       recentAlertsSection(snap),
