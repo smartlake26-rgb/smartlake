@@ -347,6 +347,12 @@ ru.ann = {
   seeAll: 'Показать все',
 };
 
+// --- LAKES-V4: упрощённый каталог ---
+Object.assign(ru.lakespg, {
+  flt_healthy: 'Здоровые', flt_normal: 'Норма', flt_problem: 'Проблемные',
+  feedPending: 'Пока не рассчитано',
+});
+
 ru.reports = {
   title: 'Отчёт',
   pickLake: 'Выберите озеро',

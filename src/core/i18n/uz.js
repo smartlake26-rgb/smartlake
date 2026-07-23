@@ -355,6 +355,12 @@ uz.ann = {
   seeAll: "Barchasini ko'rish",
 };
 
+// --- LAKES-V4: soddalashtirilgan katalog ---
+Object.assign(uz.lakespg, {
+  flt_healthy: "Sog'lom", flt_normal: 'Normal', flt_problem: 'Muammoli',
+  feedPending: 'Hozircha hisoblanmagan',
+});
+
 uz.reports = {
   title: 'Hisobot',
   pickLake: "Ko'lni tanlang",

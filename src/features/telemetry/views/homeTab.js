@@ -41,7 +41,7 @@ import { fetchAnnouncements } from '../../announcements/announcementsService.js'
 import { announcementCard } from '../../announcements/views/announcementsTab.js';
 import {
   slIcon, ICONS, slIconButton, slCard, slStatCard, slLakeMonitorCard,
-  slWeatherCard, slEmptyState, slBadge, slButton, slCountUp,
+  slWeatherCard, slEmptyState, slBadge, slButton, slCountUp, slFeedSchedule,
 } from '../../../design-system/index.js';
 
 /* ---------- modul keshlari ---------- */
@@ -223,27 +223,19 @@ export function renderHomeTab(nav) {
       .catch(() => { metaCache.set(lakeId, null); });
   }
 
-  /** Bugungi yem rejasi qatori: "08:00 — 18 kg" chiplar (ishchilar uchun ko'rsatma). */
+  /** Bugungi yem rejasi (reusable slFeedSchedule orqali). */
   function feedExtra(x) {
     const m = metaCache.get(x.lake.id);
     if (m === undefined) return null;   // hali yuklanmoqda — jim
     const w = weatherCache.get(x.lake.id);
     const plan = m ? computeFeedPlan({ fish: m.fish || [], feed: m.feed || {},
       tempC: x.a.avgTemp, weather: w ? w.data : null }) : null;
-    if (!plan) {
-      return el('div', { class: 'sl-caption', style: 'margin-top:var(--sl-sp-3)', text: t('dash.feedNoData') });
-    }
-    return el('div', { style: 'margin-top:var(--sl-sp-3)' }, [
-      el('div', { class: 'sl-label', style: 'color:var(--sl-chart-feed);margin-bottom:var(--sl-sp-1);display:flex;align-items:center;gap:5px' }, [
-        el('span', { style: 'display:inline-flex', html: slIcon('feed', 13) }),
-        el('span', { text: `${t('dash.todayFeed')} · ${plan.dailyKg.toFixed(1)} kg` }),
-      ]),
-      el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' },
-        plan.meals.map((meal) => el('span', {
-          class: 'sl-badge neutral', style: 'font-variant-numeric:tabular-nums',
-          text: `${meal.time} — ${meal.kg.toFixed(1)} kg`,
-        }))),
-    ]);
+    return slFeedSchedule({
+      title: t('dash.todayFeed'),
+      totalKg: plan ? plan.dailyKg : null,
+      meals: plan ? plan.meals : [],
+      emptyText: t('dash.feedNoData'),
+    });
   }
   function weatherExtra(x) {
     const w = weatherCache.get(x.lake.id);
