@@ -594,20 +594,6 @@ export function buildHistoryTab({ lakeId, uid, isUz, getDevs, getTh }) {
       docPdf.save(`smartlake-hisobot-${filter}.pdf`);
     } catch (e) { toast('PDF: ' + (e && e.message), 'err'); }
   }
-  const exportCard = slCard([
-    el('div', { class: 'sl-card-head' }, [
-      el('div', { class: 'sl-card-title', style: 'display:flex;align-items:center;gap:6px' }, [
-        el('span', { style: 'color:var(--sl-primary);display:inline-flex', html: slIcon('download', 18) }),
-        el('span', { text: t('hist.exportTitle') }),
-      ]),
-    ]),
-    el('div', { class: 'sl-caption', style: 'margin-bottom:var(--sl-sp-2)', text: t('hist.exportHint') }),
-    el('div', { class: 'sl-row', style: 'gap:var(--sl-sp-2);flex-wrap:wrap' }, [
-      slButton({ label: 'Excel (.xlsx)', icon: 'download', variant: 'primary', onClick: exportXLSX }),
-      slButton({ label: 'CSV', variant: 'outlined', onClick: exportCSV }),
-      slButton({ label: 'PDF', variant: 'outlined', onClick: exportPDF }),
-    ]),
-  ]);
 
   /* ============================================================
      MA'LUMOT YUKLASH (SAQLANGAN oqim) + xatolik holati
@@ -662,16 +648,25 @@ export function buildHistoryTab({ lakeId, uid, isUz, getDevs, getTh }) {
   /* ============================================================
      YIG'ISH + PULL-TO-REFRESH
      ============================================================ */
+  const exportRow = el('div', { class: 'sl-row', style: 'gap:var(--sl-sp-2);flex-wrap:wrap;margin-top:var(--sl-sp-2)' }, [
+    slButton({ label: 'Excel (.xlsx)', icon: 'download', variant: 'primary', size: 'sm', onClick: exportXLSX }),
+    slButton({ label: 'CSV', variant: 'outlined', size: 'sm', onClick: exportCSV }),
+    slButton({ label: 'PDF', variant: 'outlined', size: 'sm', onClick: exportPDF }),
+  ]);
+
   const node = el('div', { class: 'sl-stack' }, [
     pullHint,
     slCard([
       el('div', { class: 'sl-card-head' }, [
         el('div', { class: 'sl-card-title', text: t('hist.title') }),
-        el('span', { style: 'color:var(--sl-primary);display:inline-flex', html: slIcon('trendUp', 18) }),
+        el('span', { style: 'color:var(--sl-primary);display:inline-flex', html: slIcon('download', 18) }),
       ]),
       filterRow, customRow,
+      // LAKEDET-V5: eksport tugmalari YUQORIDA — pastga tushish shart emas
+      exportRow,
+      el('div', { class: 'sl-caption', style: 'margin-top:var(--sl-sp-1)', text: t('hist.exportHint') }),
     ]),
-    summaryBox, chartsBox, tableBox, energyBox, feedStatBox, exportCard,
+    summaryBox, chartsBox, tableBox, energyBox, feedStatBox,
   ]);
 
   // Pull-to-refresh (yengil: sahifa tepasida turib pastga tortilsa)

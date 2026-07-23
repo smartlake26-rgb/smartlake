@@ -1,206 +1,298 @@
 // ============================================================
-//  features/lakes/views/lakeSettingsTab.js — SOZLAMALAR tabi (C-bosqich)
-//  Ko'l pasporti: maydon/chuqurlik · 4 tagacha baliq turi (qo'shish,
-//  o'lim kiritish, vazn yangilash) · yem (turi/protein/narx) ·
-//  aeratorlar (soni/model/kW). Hammasi FAQAT Firebase'da (lakeMeta) —
-//  qurilmaga YUBORILMAYDI (topshiriq qoidasi). Saqlangach yem/elektr
-//  hisoblari avtomatik yangilanadi (onSaved callback).
+//  features/lakes/views/lakeSettingsTab.js — SOZLAMALAR v2
+//  (LAKEDET-V5, Design System 3.0 + SuperAdmin kataloglari)
+//
+//  YANGI: baliq va yem NOMI YOZILMAYDI — katalogdan TANLANADI
+//  (catalogService; kolleksiya hali yo'q bo'lsa zaxira katalog).
+//  Biomassa-o'sish KATALOG PARAMETRI bo'yicha: feedBasedGrowth=true
+//  bo'lsa FCR asosida taxminiy joriy vazn hisoblanadi (growth.js);
+//  false bo'lsa hisob qo'llanmaydi. Aeratorda model olib tashlandi
+//  (soni + kW yetarli); eski meta.model qiymati saqlanib qoladi.
+//
+//  SAQLANGAN: buildLakeSettingsTab imzosi, saveLakeMeta yozuv yo'li,
+//  pasport, 4 tagacha baliq, o'lim kiritish, vazn yangilash,
+//  biomassa, tarif. Eski erkin-matn yozuvlar "(eski yozuv)" opsiyasi
+//  sifatida ko'rinadi — ma'lumot yo'qolmaydi.
 // ============================================================
 
 import { el, mount } from '../../../shared/dom.js';
-import { icon } from '../../../shared/icons.js';
 import { toast } from '../../../shared/toast.js';
-import { mdCard, mdButton, input } from '../../../shared/ui/index.js';
+import { t, detectLocale } from '../../../core/i18n/index.js';
 import { loadLakeMeta, saveLakeMeta } from '../../telemetry/services/archiveService.js';
 import { biomassKg } from '../../telemetry/domain/feedEngine.js';
+import { estimateAvgWeightG } from '../../telemetry/domain/growth.js';
+import { loadCatalogs, catalogName } from '../../catalog/catalogService.js';
+import {
+  slIcon, slCard, slButton, slField, slSelect, slBadge,
+} from '../../../design-system/index.js';
 
 const MAX_FISH = 4;
-
-function num(v) { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; }
-function numOrNull(v) { const n = parseFloat(v); return Number.isFinite(n) ? n : null; }
+const num = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : 0; };
+const numOrNull = (v) => { const n = parseFloat(v); return Number.isFinite(n) ? n : null; };
+const fmt = (key, vars = {}) => Object.entries(vars).reduce((s, [k, v]) => s.replaceAll(`{${k}}`, v), t(key));
 
 export function buildLakeSettingsTab({ lakeId, uid, isUz, onSaved }) {
   let meta = null;
-  let fish = [];   // [{type, count, startWeight, avgWeight}]
+  let fish = [];             // [{typeId, type, count, startWeight, avgWeight, stockedAt}]
+  let catalogs = { fish: [], feed: [] };
 
-  const L = (uz, ru) => (isUz ? uz : ru);
-
-  // ---------- umumiy yordamchilar ----------
-  const secTitle = (ic, txt, color = 'var(--md-primary)') =>
-    el('div', { class: 't-title-sm', style: 'display:flex;align-items:center;gap:6px;margin-bottom:10px' }, [
-      el('span', { html: icon(ic, 16), style: `color:${color};display:inline-flex` }),
+  const secTitle = (ic, txt, colorVar = '--sl-primary') =>
+    el('div', { class: 'sl-card-title', style: 'display:flex;align-items:center;gap:6px;margin-bottom:var(--sl-sp-3)' }, [
+      el('span', { html: slIcon(ic, 17), style: `color:var(${colorVar});display:inline-flex` }),
       el('span', { text: txt }),
     ]);
-  const fRow = (label, inputEl) => el('div', { class: 'md-field', style: 'flex:1;min-width:120px' }, [
-    el('label', { text: label }), inputEl,
-  ]);
+  function field(label, opts = {}) {
+    const f = slField({ label, type: opts.type || 'number', attrs: opts.attrs || { min: '0', step: opts.step || '1' }, placeholder: opts.ph });
+    f.querySelector('.sl-help').remove();
+    f.style.flex = '1'; f.style.minWidth = opts.minW || '120px';
+    return f;
+  }
   async function save(patch, okMsg) {
     try {
-      await saveLakeMeta(lakeId, uid, patch);
+      await saveLakeMeta(lakeId, uid, patch);                     // SAQLANGAN yozuv yo'li
       meta = { ...(meta || {}), ...patch };
-      toast(okMsg || L('Saqlandi', 'Сохранено'), 'ok');
+      toast(okMsg || t('common.saved'), 'ok');
       if (onSaved) onSaved(meta);
     } catch (e) { toast((e && e.message) || 'Xato', 'err'); }
   }
 
-  // ---------- 1. KO'L PASPORTI ----------
-  const areaIn = input({ type: 'number', min: '0', step: '0.01', placeholder: '1.5' });
-  const avgDepthIn = input({ type: 'number', min: '0', step: '0.1', placeholder: '1.8' });
-  const maxDepthIn = input({ type: 'number', min: '0', step: '0.1', placeholder: '3.0' });
-  const passportCard = mdCard([
-    secTitle('droplet', L("Ko'l pasporti", 'Паспорт озера')),
-    el('div', { style: 'display:flex;gap:10px;flex-wrap:wrap' }, [
-      fRow(L('Suv maydoni (ga)', 'Площадь (га)'), areaIn),
-      fRow(L("O'rtacha chuqurlik (m)", 'Средняя глубина (м)'), avgDepthIn),
-      fRow(L('Maks chuqurlik (m)', 'Макс. глубина (м)'), maxDepthIn),
-    ]),
-    el('div', { style: 'margin-top:12px' }, [
-      mdButton({ label: L('Saqlash', 'Сохранить'), variant: 'tonal', onClick: () =>
-        save({ passport: { area: numOrNull(areaIn.value), avgDepth: numOrNull(avgDepthIn.value), maxDepth: numOrNull(maxDepthIn.value) } }) }),
+  /* ---------- 1 · KO'L PASPORTI ---------- */
+  const areaIn = field(t('lset.area'), { step: '0.01', ph: '1.5' });
+  const avgDepthIn = field(t('lset.avgDepth'), { step: '0.1', ph: '1.8' });
+  const maxDepthIn = field(t('lset.maxDepth'), { step: '0.1', ph: '3.0' });
+  const passportCard = slCard([
+    secTitle('droplet', t('lset.passport')),
+    el('div', { class: 'sl-row', style: 'gap:var(--sl-sp-2);flex-wrap:wrap;align-items:flex-end' },
+      [areaIn, avgDepthIn, maxDepthIn]),
+    el('div', { style: 'margin-top:var(--sl-sp-3)' }, [
+      slButton({ label: t('common.save'), variant: 'secondary', onClick: () =>
+        save({ passport: { area: numOrNull(areaIn.input.value),
+          avgDepth: numOrNull(avgDepthIn.input.value), maxDepth: numOrNull(maxDepthIn.input.value) } }) }),
     ]),
   ]);
 
-  // ---------- 2. BALIQ TURLARI ----------
-  const fishList = el('div', {});
-  const biomassEl = el('div', { class: 't-body-sm', style: 'font-weight:800;color:var(--md-primary);font-variant-numeric:tabular-nums' });
+  /* ---------- 2 · BALIQ TURLARI (katalogdan) ---------- */
+  const fishList = el('div');
+  const biomassEl = el('div', { class: 'sl-body-sm',
+    style: 'font-weight:800;color:var(--sl-primary);font-variant-numeric:tabular-nums;margin-top:var(--sl-sp-2)' });
   function refreshBiomass() {
     const bm = biomassKg(fish);
-    biomassEl.textContent = `${L('Umumiy biomassa', 'Общая биомасса')}: ${bm > 0 ? bm.toFixed(1) + ' kg' : '—'}`;
+    biomassEl.textContent = `${t('lset.biomass')}: ${bm > 0 ? bm.toFixed(1) + ' kg' : '—'}`;
   }
+  function fishCatItem(f) {
+    return catalogs.fish.find((c) => c.id === f.typeId) || null;
+  }
+
   function fishRow(f, idx) {
-    const typeIn = input({ type: 'text', placeholder: L('Karp', 'Карп') }); typeIn.value = f.type || '';
-    const countIn = input({ type: 'number', min: '0', step: '1' }); countIn.value = f.count ?? '';
-    const swIn = input({ type: 'number', min: '0', step: '1', placeholder: 'g' }); swIn.value = f.startWeight ?? '';
-    const awIn = input({ type: 'number', min: '0', step: '1', placeholder: 'g' }); awIn.value = f.avgWeight ?? '';
-    const deadIn = input({ type: 'number', min: '0', step: '1', placeholder: '0', style: 'max-width:80px;text-align:center' });
-    [typeIn, countIn, swIn, awIn].forEach((inp, i) => inp.addEventListener('input', () => {
-      const keys = ['type', 'count', 'startWeight', 'avgWeight'];
-      f[keys[i]] = i === 0 ? inp.value : numOrNull(inp.value);
-      refreshBiomass();
+    // --- tur: KATALOG dropdown (nom yozilmaydi) ---
+    const options = [{ value: '', label: t('lset.pickType') },
+      ...catalogs.fish.map((c) => ({ value: c.id, label: catalogName(c, isUz) }))];
+    // eski erkin-matn yozuv — ma'lumot yo'qolmasin
+    if (!f.typeId && f.type) options.push({ value: '_legacy', label: `${f.type} ${t('lset.legacy')}` });
+    const typeSel = slSelect(options, f.typeId || (f.type ? '_legacy' : ''));
+
+    const countIn = field(t('lset.count')); countIn.input.value = f.count ?? '';
+    const swIn = field(t('lset.startW'), { ph: 'g' }); swIn.input.value = f.startWeight ?? '';
+    const awIn = field(t('lset.avgW'), { ph: 'g' }); awIn.input.value = f.avgWeight ?? '';
+    const stockIn = field(t('lset.stockedAt'), { type: 'date', attrs: {} });
+    if (f.stockedAt) stockIn.input.value = new Date(f.stockedAt).toISOString().slice(0, 10);
+
+    // --- o'sish bahosi (KATALOG parametri bo'yicha, nom bo'yicha emas) ---
+    const estBox = el('div', { class: 'sl-caption', style: 'margin-top:var(--sl-sp-1)' });
+    function refreshEst() {
+      const cat = fishCatItem(f);
+      if (!cat) { estBox.replaceChildren(); return; }
+      if (cat.feedBasedGrowth === false) {
+        estBox.textContent = t('lset.noGrowth');
+        return;
+      }
+      const est = estimateAvgWeightG({
+        startWeightG: num(swIn.input.value),
+        stockedAtTs: stockIn.input.value ? new Date(stockIn.input.value + 'T00:00:00').getTime() : null,
+        fcr: cat.fcr,
+      });
+      if (est == null) { estBox.textContent = t('lset.estHint'); return; }
+      mount(estBox,
+        el('span', { text: `${t('lset.estW')}: ~${est} g ` }),
+        slButton({ label: t('lset.apply'), variant: 'text', size: 'sm', onClick: () => {
+          awIn.input.value = est; f.avgWeight = est; refreshBiomass();
+        } }));
+    }
+
+    typeSel.addEventListener('change', () => {
+      f.typeId = typeSel.value === '_legacy' ? null : (typeSel.value || null);
+      if (f.typeId) f.type = catalogName(fishCatItem(f), isUz);   // eski hisoblar uchun nom saqlanadi
+      refreshEst();
+    });
+    [countIn, swIn, awIn].forEach((fld, i) => fld.input.addEventListener('input', () => {
+      const keys = ['count', 'startWeight', 'avgWeight'];
+      f[keys[i]] = numOrNull(fld.input.value);
+      refreshBiomass(); if (i !== 2) refreshEst();
     }));
-    const deadBtn = mdButton({ label: L("O'lim kiritish", 'Внести падёж'), variant: 'outlined', onClick: () => {
-      const d = num(deadIn.value);
-      if (d <= 0) return toast(L("Sonni kiriting", 'Введите число'), 'err');
-      f.count = Math.max(0, (num(f.count)) - d);
-      countIn.value = f.count; deadIn.value = '';
+    stockIn.input.addEventListener('change', () => {
+      f.stockedAt = stockIn.input.value ? new Date(stockIn.input.value + 'T00:00:00').getTime() : null;
+      refreshEst();
+    });
+
+    // --- korreksiya: o'lim kiritish ---
+    const deadIn = field(t('lset.dead'), { ph: '0', minW: '90px' });
+    deadIn.style.maxWidth = '120px';
+    const deadBtn = slButton({ label: t('lset.deadBtn'), variant: 'outlined', size: 'sm', onClick: () => {
+      const d = num(deadIn.input.value);
+      if (d <= 0) return toast(t('lset.enterNum'), 'err');
+      f.count = Math.max(0, num(f.count) - d);
+      countIn.input.value = f.count; deadIn.input.value = '';
       refreshBiomass();
-      toast(L(`${d} ta ayirildi — Saqlashni unutmang`, `Вычтено ${d} — не забудьте Сохранить`), 'ok');
+      toast(fmt('lset.deadDone', { n: d }), 'ok');
     } });
-    deadBtn.classList.add('sm');
-    const rmBtn = mdButton({ label: '✕', variant: 'text', onClick: () => { fish.splice(idx, 1); renderFish(); } });
-    rmBtn.classList.add('sm');
-    return el('div', { style: 'padding:12px;border-radius:var(--shape-md);border:1px solid var(--md-outline-variant);background:var(--md-surface-container-low);margin-bottom:10px' }, [
-      el('div', { class: 'row-between', style: 'margin-bottom:6px' }, [
-        el('span', { class: 't-label', style: 'color:var(--md-primary)', text: `${L('Baliq', 'Рыба')} #${idx + 1}` }),
+    const rmBtn = slButton({ label: '✕', variant: 'text', size: 'sm',
+      onClick: () => { fish.splice(idx, 1); renderFish(); } });
+
+    refreshEst();
+    return el('div', { class: 'sl-card inset', style: 'margin-bottom:var(--sl-sp-2);box-shadow:none' }, [
+      el('div', { class: 'sl-row-between', style: 'margin-bottom:var(--sl-sp-1)' }, [
+        el('span', { class: 'sl-label', style: 'color:var(--sl-primary)', text: `${t('lset.fishN')} #${idx + 1}` }),
         rmBtn,
       ]),
-      el('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' }, [
-        fRow(L('Turi', 'Вид'), typeIn),
-        fRow(L('Soni (dona)', 'Кол-во (шт)'), countIn),
-        fRow(L("Boshl. vazni (g)", 'Нач. вес (г)'), swIn),
-        fRow(L('Joriy vazni (g)', 'Тек. вес (г)'), awIn),
+      el('div', { class: 'sl-stack-sm' }, [
+        el('div', {}, [el('label', { class: 'sl-caption', text: t('lset.type') }), typeSel]),
+        el('div', { class: 'sl-row', style: 'gap:var(--sl-sp-2);flex-wrap:wrap;align-items:flex-end' },
+          [countIn, swIn, awIn, stockIn]),
+        estBox,
+        el('div', { class: 'sl-row', style: 'gap:var(--sl-sp-2);align-items:flex-end;flex-wrap:wrap' },
+          [deadIn, deadBtn]),
       ]),
-      el('div', { style: 'display:flex;gap:8px;align-items:flex-end;margin-top:8px;flex-wrap:wrap' }, [deadIn, deadBtn]),
     ]);
   }
   function renderFish() {
     mount(fishList, ...(fish.length ? fish.map((f, i) => fishRow(f, i))
-      : [el('div', { class: 't-body-sm muted', style: 'padding:8px 0', text: L("Hali baliq kiritilmagan", 'Рыба ещё не добавлена') })]));
+      : [el('div', { class: 'sl-body-sm sl-text-secondary', style: 'padding:8px 0', text: t('lset.noFish') })]));
     addFishBtn.disabled = fish.length >= MAX_FISH;
     refreshBiomass();
   }
-  const addFishBtn = mdButton({ label: L('+ Baliq qo\u02bbshish', '+ Добавить рыбу'), variant: 'outlined', onClick: () => {
+  const addFishBtn = slButton({ label: t('lset.addFish'), variant: 'outlined', onClick: () => {
     if (fish.length >= MAX_FISH) return;
-    fish.push({ type: '', count: null, startWeight: null, avgWeight: null });
+    fish.push({ typeId: null, type: '', count: null, startWeight: null, avgWeight: null, stockedAt: null });
     renderFish();
   } });
-  const fishCard = mdCard([
-    secTitle('activity', L(`Baliq turlari (maks ${MAX_FISH} ta)`, `Виды рыбы (макс ${MAX_FISH})`), 'var(--chart-ph)'),
+  const fishCard = slCard([
+    secTitle('fish', fmt('lset.fishTitle', { n: MAX_FISH }), '--sl-chart-ph'),
     fishList, biomassEl,
-    el('div', { style: 'display:flex;gap:8px;margin-top:12px;flex-wrap:wrap' }, [
+    el('div', { class: 'sl-row', style: 'gap:var(--sl-sp-2);margin-top:var(--sl-sp-3);flex-wrap:wrap' }, [
       addFishBtn,
-      mdButton({ label: L('Saqlash', 'Сохранить'), variant: 'tonal', onClick: () => {
-        const clean = fish.filter((f) => (f.type || '').trim() || num(f.count) > 0).slice(0, MAX_FISH);
-        save({ fish: clean, fishUpdatedAt: Date.now() }, L('Baliq ma\u02bblumotlari saqlandi', 'Данные рыбы сохранены'));
+      slButton({ label: t('common.save'), variant: 'secondary', onClick: () => {
+        const clean = fish.filter((f) => f.typeId || (f.type || '').trim() || num(f.count) > 0).slice(0, MAX_FISH);
+        save({ fish: clean, fishUpdatedAt: Date.now() }, t('lset.fishSaved'));
       } }),
     ]),
   ]);
 
-  // ---------- 3. YEM ----------
-  const feedTypeIn = input({ type: 'text', placeholder: L('Granula', 'Гранулы') });
-  const proteinIn = input({ type: 'number', min: '0', max: '100', step: '1', placeholder: '32' });
-  const feedPriceIn = input({ type: 'number', min: '0', step: '100', placeholder: '12000' });
-  const feedCard = mdCard([
-    secTitle('droplet', L('Yem', 'Корм'), 'var(--md-tertiary)'),
-    el('div', { style: 'display:flex;gap:10px;flex-wrap:wrap' }, [
-      fRow(L('Yem turi', 'Тип корма'), feedTypeIn),
-      fRow(L('Protein (%)', 'Протеин (%)'), proteinIn),
-      fRow(L("Narxi (so'm/kg)", 'Цена (сум/кг)'), feedPriceIn),
+  /* ---------- 3 · YEM (katalogdan; fermer faqat tur + narx) ---------- */
+  const feedSelWrap = el('div');
+  let feedSel = null;
+  const feedPriceIn = field(t('lset.price'), { step: '100', ph: '12000' });
+  const feedCatInfo = el('div', { class: 'sl-caption', style: 'margin-top:var(--sl-sp-1)' });
+  function feedCatItem(id) { return catalogs.feed.find((c) => c.id === id) || null; }
+  function refreshFeedInfo() {
+    const c = feedSel ? feedCatItem(feedSel.value) : null;
+    feedCatInfo.textContent = c
+      ? fmt('lset.fromCatalog', { p: c.protein ?? '—', f: c.fcr ?? '—' }) : '';
+  }
+  function buildFeedSelect() {
+    const legacy = meta && meta.feed && !meta.feed.typeId && meta.feed.type;
+    const options = [{ value: '', label: t('lset.pickType') },
+      ...catalogs.feed.map((c) => ({ value: c.id, label: catalogName(c, isUz) }))];
+    if (legacy) options.push({ value: '_legacy', label: `${meta.feed.type} ${t('lset.legacy')}` });
+    feedSel = slSelect(options,
+      (meta && meta.feed && meta.feed.typeId) || (legacy ? '_legacy' : ''));
+    feedSel.addEventListener('change', refreshFeedInfo);
+    mount(feedSelWrap,
+      el('label', { class: 'sl-caption', text: t('lset.feedType') }), feedSel);
+    refreshFeedInfo();
+  }
+  const feedCard = slCard([
+    secTitle('feed', t('lset.feedTitle'), '--sl-chart-feed'),
+    el('div', { class: 'sl-stack-sm' }, [
+      feedSelWrap,
+      el('div', { class: 'sl-row', style: 'gap:var(--sl-sp-2);align-items:flex-end;flex-wrap:wrap' }, [feedPriceIn]),
+      feedCatInfo,
     ]),
-    el('div', { style: 'margin-top:12px' }, [
-      mdButton({ label: L('Saqlash', 'Сохранить'), variant: 'tonal', onClick: () =>
-        save({ feed: { type: feedTypeIn.value.trim(), protein: numOrNull(proteinIn.value), price: numOrNull(feedPriceIn.value) } }) }),
+    el('div', { style: 'margin-top:var(--sl-sp-3)' }, [
+      slButton({ label: t('common.save'), variant: 'secondary', onClick: () => {
+        const c = feedSel ? feedCatItem(feedSel.value) : null;
+        const legacyType = (meta && meta.feed && meta.feed.type) || '';
+        save({ feed: {
+          typeId: c ? c.id : null,
+          type: c ? catalogName(c, isUz) : legacyType,       // eski hisoblar mosligi
+          protein: c ? (c.protein ?? null) : ((meta && meta.feed && meta.feed.protein) ?? null),
+          fcr: c ? (c.fcr ?? null) : ((meta && meta.feed && meta.feed.fcr) ?? null),
+          price: numOrNull(feedPriceIn.input.value),
+        } });
+      } }),
     ]),
   ]);
 
-  // ---------- 4. AERATORLAR ----------
-  const aerCountIn = input({ type: 'number', min: '0', step: '1', placeholder: '2' });
-  const aerModelIn = input({ type: 'text', placeholder: 'YL-1.5' });
-  const aerKwIn = input({ type: 'number', min: '0', step: '0.1', placeholder: '1.5' });
-  const aeratorCard = mdCard([
-    secTitle('power', L('Aeratorlar', 'Аэраторы'), 'var(--chart-temp)'),
-    el('div', { style: 'display:flex;gap:10px;flex-wrap:wrap' }, [
-      fRow(L('Soni', 'Кол-во'), aerCountIn),
-      fRow(L('Modeli', 'Модель'), aerModelIn),
-      fRow(L('Bittasining quvvati (kW)', 'Мощность одного (кВт)'), aerKwIn),
-    ]),
-    el('div', { class: 't-caption', style: 'margin-top:6px', text: L(
-      "Saqlanganda Tarix > Elektr hisobidagi umumiy quvvat (soni × kW) avtomatik yangilanadi.",
-      'При сохранении общая мощность в Истории (кол-во × кВт) обновится автоматически.') }),
-    el('div', { style: 'margin-top:12px' }, [
-      mdButton({ label: L('Saqlash', 'Сохранить'), variant: 'tonal', onClick: () => {
-        const count = num(aerCountIn.value), kwEach = num(aerKwIn.value);
+  /* ---------- 4 · AERATORLAR (model YO'Q — soni + kW) ---------- */
+  const aerCountIn = field(t('lset.aerCount'), { ph: '2' });
+  const aerKwIn = field(t('lset.aerKw'), { step: '0.1', ph: '1.5' });
+  const aerTariffIn = field(t('lset.aerTariff'), { step: '10', ph: '1000' });
+  const aeratorCard = slCard([
+    secTitle('power', t('lset.aerTitle'), '--sl-chart-energy'),
+    el('div', { class: 'sl-row', style: 'gap:var(--sl-sp-2);flex-wrap:wrap;align-items:flex-end' },
+      [aerCountIn, aerKwIn, aerTariffIn]),
+    el('div', { class: 'sl-caption', style: 'margin-top:var(--sl-sp-1)', text: t('lset.aerNote') }),
+    el('div', { style: 'margin-top:var(--sl-sp-3)' }, [
+      slButton({ label: t('common.save'), variant: 'secondary', onClick: () => {
+        const count = num(aerCountIn.input.value); const kwEach = num(aerKwIn.input.value);
         const totalKw = count > 0 && kwEach > 0 ? +(count * kwEach).toFixed(2) : (kwEach || null);
+        const tariff = numOrNull(aerTariffIn.input.value);
         save({
-          aerators: { count: count || null, model: aerModelIn.value.trim(), kw: kwEach || null },
-          energy: { ...((meta && meta.energy) || {}), kw: totalKw ?? ((meta && meta.energy && meta.energy.kw) || null) },
+          aerators: {
+            count: count || null,
+            model: (meta && meta.aerators && meta.aerators.model) || '',   // eski qiymat SAQLANADI
+            kw: kwEach || null,
+          },
+          energy: {
+            ...((meta && meta.energy) || {}),
+            kw: totalKw ?? ((meta && meta.energy && meta.energy.kw) || null),
+            ...(tariff != null ? { tariff } : {}),
+          },
         });
       } }),
     ]),
   ]);
 
-  const note = el('div', { class: 'md-banner info' }, [
-    el('span', { html: icon('info', 15), style: 'display:inline-flex;flex:none' }),
-    el('span', { text: L(
-      "Bu ma'lumotlar faqat Firebase'da saqlanadi — qurilmaga yuborilmaydi. Yem va elektr hisoblari shu yerdan oziqlanadi.",
-      'Эти данные хранятся только в Firebase — на устройство не отправляются.') }),
+  const note = el('div', { class: 'sl-banner info' }, [
+    el('span', { html: slIcon('info', 15), style: 'display:inline-flex;flex:none' }),
+    el('span', { text: t('lset.metaNote') }),
   ]);
 
-  const node = el('div', { class: 'stack' }, [note, passportCard, fishCard, feedCard, aeratorCard]);
+  const node = el('div', { class: 'sl-stack' }, [note, passportCard, fishCard, feedCard, aeratorCard]);
 
-  // ---------- meta yuklash ----------
-  loadLakeMeta(lakeId).then((m) => {
+  /* ---------- yuklash: katalog + meta parallel ---------- */
+  Promise.all([
+    loadCatalogs().catch(() => ({ fish: [], feed: [] })),
+    loadLakeMeta(lakeId).catch(() => null),
+  ]).then(([cats, m]) => {
+    catalogs = cats;
     meta = m || null;
     if (m) {
       if (m.passport) {
-        if (m.passport.area != null) areaIn.value = m.passport.area;
-        if (m.passport.avgDepth != null) avgDepthIn.value = m.passport.avgDepth;
-        if (m.passport.maxDepth != null) maxDepthIn.value = m.passport.maxDepth;
+        if (m.passport.area != null) areaIn.input.value = m.passport.area;
+        if (m.passport.avgDepth != null) avgDepthIn.input.value = m.passport.avgDepth;
+        if (m.passport.maxDepth != null) maxDepthIn.input.value = m.passport.maxDepth;
       }
       fish = Array.isArray(m.fish) ? m.fish.map((f) => ({ ...f })) : [];
-      if (m.feed) {
-        feedTypeIn.value = m.feed.type || '';
-        if (m.feed.protein != null) proteinIn.value = m.feed.protein;
-        if (m.feed.price != null) feedPriceIn.value = m.feed.price;
-      }
+      if (m.feed && m.feed.price != null) feedPriceIn.input.value = m.feed.price;
       if (m.aerators) {
-        if (m.aerators.count != null) aerCountIn.value = m.aerators.count;
-        aerModelIn.value = m.aerators.model || '';
-        if (m.aerators.kw != null) aerKwIn.value = m.aerators.kw;
+        if (m.aerators.count != null) aerCountIn.input.value = m.aerators.count;
+        if (m.aerators.kw != null) aerKwIn.input.value = m.aerators.kw;
       }
+      if (m.energy && m.energy.tariff != null) aerTariffIn.input.value = m.energy.tariff;
     }
+    buildFeedSelect();
     renderFish();
-  }).catch(() => renderFish());
+  });
   renderFish();
 
   return node;

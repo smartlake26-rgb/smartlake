@@ -45,7 +45,8 @@ import { rssiQuality as rssiQ } from '../../telemetry/domain/signalQuality.js';
 import { renderLakeFormPage } from './lakeFormPage.js';
 import { renderDeviceDetailPage } from '../../telemetry/views/deviceDetailPage.js';
 import { getLakeWeather, getWeatherIcon } from '../../telemetry/services/weatherService.js';
-import { historyService, RANGES } from '../../telemetry/services/historyService.js';
+import { historyService } from '../../telemetry/services/historyService.js';
+import { sensorState, SENSOR_STATE } from '../../telemetry/domain/sensorState.js';
 import { buildHistoryTab } from '../../telemetry/views/historyTab.js';
 import { buildLakeSettingsTab } from './lakeSettingsTab.js';
 import { buildAiTab } from '../../ai/views/aiTab.js';
@@ -57,8 +58,8 @@ import { commandService } from '../../commands/services/commandService.js';
 import { createAckTracker } from '../../commands/domain/ackTracker.js';
 import {
   slIcon, ICONS, slCard, slButton, slBadge, slStatusBadge, slListItem,
-  slSelect, slEmptyState, slKvRow, slLineChart, slChartLegend,
-  slGaugeChart, slCountUp,
+  slSelect, slEmptyState, slKvRow, slLineChart,
+  slCountUp,
 } from '../../../design-system/index.js';
 
 const DAY = 24 * 3600e3;
@@ -193,23 +194,7 @@ export function renderLakeDetailPage(nav, lakeId) {
     finally { aerBusy = false; }
   }
 
-  /* ---------- lazy tab keshlari (SAQLANGAN) ---------- */
-  let historyTabNode = null;
-  function getHistoryTabNode() {
-    if (!historyTabNode) {
-      historyTabNode = buildHistoryTab({
-        lakeId, uid: s.uid, isUz,
-        getDevs: () => dataStore.getState().devices.filter((d) => d.lakeId === lakeId),
-        getTh: () => {
-          const st2 = dataStore.getState();
-          const lk = st2.lakes.find((l) => l.id === lakeId) || st2.archivedLakes.find((l) => l.id === lakeId);
-          return resolveThresholds(lk);
-        },
-      });
-    }
-    return historyTabNode;
-  }
-
+  /* ---------- lazy tab keshlari ---------- */
   let lakeMeta = null;
   loadLakeMeta(lakeId).then((m) => { lakeMeta = m; render(); }).catch(() => {});
 
@@ -241,20 +226,33 @@ export function renderLakeDetailPage(nav, lakeId) {
     return settingsTabNode;
   }
 
-  /* ---------- 24h trend keshi (SAQLANGAN) ---------- */
-  let trendPts = [];
-  let trendKey = '';
-  function loadTrend(devs) {
-    const firstId = devs.length ? devs[0].id : null;
-    const key = firstId || 'none';
-    if (key === trendKey) return;
-    trendKey = key;
-    trendPts = [];
-    if (!firstId) return;
-    historyService.getHistory(firstId, '24h')
-      .then((pts) => { trendPts = pts || []; render(); })
-      .catch(() => {});
+  /* ---------- 48h PER-QURILMA trend keshi (LAKEDET-V5) ----------
+     Har qurilma alohida: qurilma 24h buferi ∪ arxivdan oldingi 24h
+     (5-daq dedupe, arxiv ustuvor) — servislar O'ZGARTIRILMAGAN. */
+  const deviceTrends = new Map();   // devId -> { pts, loading }
+  function loadTrend48(devId) {
+    const c = deviceTrends.get(devId);
+    if (c && (c.loading || c.pts)) return;
+    deviceTrends.set(devId, { loading: true, pts: null });
+    const now = Date.now();
+    Promise.all([
+      historyService.getHistory(devId, '24h').catch(() => []),
+      fetchArchive(s.uid, [devId], now - 2 * DAY, now).catch(() => []),
+    ]).then(([buf, arch]) => {
+      const seen = new Set(arch.map((x) => Math.floor(x.ts / 300e3)));
+      const pts = arch.concat((buf || []).filter((x) => !seen.has(Math.floor(x.ts / 300e3))))
+        .sort((a, b) => a.ts - b.ts);
+      deviceTrends.set(devId, { loading: false, pts });
+      render();
+    });
   }
+  /* Sensor kartalari trendi uchun: birinchi qurilma nuqtalari. */
+  function firstDevPts(devs) {
+    const first = devs.length ? deviceTrends.get(devs[0].id) : null;
+    return (first && first.pts) || [];
+  }
+  function loadTrend(devs) { devs.forEach((d) => loadTrend48(d.id)); }
+  let trendPts = [];   // render'da firstDevPts bilan yangilanadi (dialoglar uchun)
 
   /* ---------- ob-havo (SAQLANGAN) ---------- */
   let weatherData = null;
@@ -268,17 +266,18 @@ export function renderLakeDetailPage(nav, lakeId) {
   }
 
   /* ----------------------------------------------------------
-     AERATOR ish-vaqti / elektr — oylik arxivdan (LAZY, 1 so'rov:
-     oy diapazoni bugun+haftani ham qoplaydi -> qo'shimcha o'qish yo'q)
+     AERATOR ish-vaqti — 7 kunlik arxivdan (LAZY, 1 so'rov:
+     hafta diapazoni bugunni ham qoplaydi). Elektr (kWh) hisobi
+     Hisobot bo'limida — bu yerda takrorlanmaydi (LAKEDET-V5).
      ---------------------------------------------------------- */
-  let runStats = null;         // { todayMs, weekMs, monthMs, lastOnTs }
+  let runStats = null;         // { todayMs, weekMs, lastOnTs }
   let runStatsLoading = false;
   function loadRunStats(devs) {
     if (runStats || runStatsLoading || !devs.length) return;
     runStatsLoading = true;
     const now = Date.now();
     const startToday = new Date(new Date().setHours(0, 0, 0, 0)).getTime();
-    fetchArchive(s.uid, devs.map((d) => d.id), now - 30 * DAY, now)
+    fetchArchive(s.uid, devs.map((d) => d.id), now - 7 * DAY, now)
       .then((samples) => {
         const inRange = (from) => samples.filter((sm) => sm.ts >= from);
         let lastOnTs = null;
@@ -288,101 +287,41 @@ export function renderLakeDetailPage(nav, lakeId) {
         if (lastOnTs == null) { const on = samples.filter((sm) => sm.aer === 1); lastOnTs = on.length ? on[on.length - 1].ts : null; }
         runStats = {
           todayMs: aeratorRuntimeMs(inRange(startToday)),
-          weekMs: aeratorRuntimeMs(inRange(now - 7 * DAY)),
-          monthMs: aeratorRuntimeMs(samples),
+          weekMs: aeratorRuntimeMs(samples),
           lastOnTs,
         };
         render();
       })
-      .catch(() => { runStats = { todayMs: 0, weekMs: 0, monthMs: 0, lastOnTs: null }; render(); })
+      .catch(() => { runStats = { todayMs: 0, weekMs: 0, lastOnTs: null }; render(); })
       .finally(() => { runStatsLoading = false; });
   }
 
   /* ----------------------------------------------------------
-     TARIX tabidagi ko'p-davrli grafik — endi DS slLineChart'da
-     (eski 500-satrlik inline-hex dvigatel o'rniga)
+     TARIX tabi — HAR QURILMA ALOHIDA (LAKEDET-V5).
+     Sensorlar o'rtachasi CHIQARILMAYDI: qurilma tanlanadi va
+     buildHistoryTab getDevs=()=>[o'sha qurilma] bilan quriladi —
+     historyTab O'ZGARTIRILMAGAN, filtr/jadval(pagination)/eksport
+     (tugmalar yuqorida)/elektr/yem hammasi qurilma kesimida.
      ---------------------------------------------------------- */
-  let rangeKey = '24h';
-
-  const rangeChartBox = el('div');
-  const rangeStatsBox = el('div', { class: 'sl-stack-sm', style: 'margin-top:var(--sl-sp-3)' });
-  const rangeBtns = new Map();
-
-  function statRow(seriesKey, label, st0, unit) {
-    if (!st0) return null;
-    return el('div', { class: 'sl-kv-row' }, [
-      el('span', { class: 'kv-key' }, [
-        el('span', { class: 'sl-swatch', style: `width:9px;height:9px;border-radius:3px;display:inline-block;background:var(--sl-chart-${seriesKey})` }),
-        el('span', { text: label }),
-      ]),
-      el('span', { class: 'kv-val sl-caption', style: 'font-weight:700',
-        text: `${t('lakedet.min')}: ${st0.min.toFixed(1)} · ${t('lakedet.avg')}: ${st0.avg.toFixed(1)} · ${t('lakedet.max')}: ${st0.max.toFixed(1)} ${unit}` }),
-    ]);
-  }
-
-  let rangeReq = 0;
-  async function loadRange(rk) {
-    rangeKey = rk;
-    rangeBtns.forEach((b, k) => b.classList.toggle('active', k === rk));
-    const req = ++rangeReq;
-    mount(rangeChartBox, el('div', { class: 'sl-skeleton card', style: 'height:220px;margin:0' }));
-    rangeStatsBox.replaceChildren();
-    try {
-      const st = dataStore.getState();
-      const devs = st.devices.filter((d) => d.lakeId === lakeId);
-      let all = [];
-      for (const d of devs) {
-        const pts = await historyService.getHistory(d.id, rk);
-        all = all.concat(pts || []);
-      }
-      if (req !== rangeReq) return;   // yangiroq so'rov bor — bunisi tashlanadi
-      const points = toChartPoints(all);
-      if (!points.length) {
-        mount(rangeChartBox, slEmptyState({ icon: 'activity', title: t('common.noData'), desc: '' }));
-      } else {
-        const th = resolveThresholds(st.lakes.find((l) => l.id === lakeId));
-        mount(rangeChartBox, el('div', { class: 'sl-chart-frame' }, [
-          slLineChart({
-            points,
-            series: [
-              { key: 'do', label: 'DO', unit: 'mg/L', area: true },
-              { key: 'temp', label: t('tm.temp'), unit: '°C' },
-              { key: 'ph', label: 'pH' },
-            ],
-            thresholds: [{ seriesKey: 'do', value: th.do.crit }],
-            formatX: (x) => formatTimeLabel(x, rk, isUz),
-            ariaLabel: t('tm.history'),
-          }),
-        ]));
-        mount(rangeStatsBox,
-          el('div', { class: 'sl-label', style: 'color:var(--sl-primary)', text: t('lakedet.rangeStats') }),
-          ...[statRow('do', 'DO', seriesStats(points, 'do'), 'mg/L'),
-            statRow('temp', t('tm.temp'), seriesStats(points, 'temp'), '°C'),
-            statRow('ph', 'pH', seriesStats(points, 'ph'), '')].filter(Boolean));
-      }
-    } catch (e) {
-      mount(rangeChartBox, slEmptyState({ icon: 'info', title: t(handleError(e, 'history').messageKey), desc: '' }));
+  let historyDevId = null;
+  const historyNodes = new Map();   // devId -> tayyor Node (lazy kesh)
+  function historyForDevice(devId) {
+    if (!historyNodes.has(devId)) {
+      historyNodes.set(devId, buildHistoryTab({
+        lakeId, uid: s.uid, isUz,
+        getDevs: () => {
+          const st2 = dataStore.getState();
+          return st2.devices.filter((d) => d.id === devId);   // FAQAT shu qurilma
+        },
+        getTh: () => {
+          const st2 = dataStore.getState();
+          const lk = st2.lakes.find((l) => l.id === lakeId) || st2.archivedLakes.find((l) => l.id === lakeId);
+          return resolveThresholds(lk);
+        },
+      }));
     }
+    return historyNodes.get(devId);
   }
-
-  const rangeCard = slCard([
-    el('div', { class: 'sl-card-head' }, [
-      el('div', { class: 'sl-card-title', text: t('tm.history') }),
-      el('span', {}, [slChartLegend([
-        { key: 'do', label: 'DO' }, { key: 'temp', label: t('tm.temp') }, { key: 'ph', label: 'pH' },
-      ])]),
-    ]),
-    el('div', { class: 'sl-tabs', style: 'padding:0 0 var(--sl-sp-2)' }, Object.keys(RANGES).map((rk) => {
-      const b = el('button', { class: 'sl-tab' + (rk === rangeKey ? ' active' : ''), type: 'button',
-        text: t('tm.range_' + rk) });
-      b.addEventListener('click', () => loadRange(rk));
-      rangeBtns.set(rk, b);
-      return b;
-    })),
-    rangeChartBox,
-    rangeStatsBox,
-  ]);
-  let rangeLoaded = false;
 
   /* ----------------------------------------------------------
      JORIY HOLAT bloklari
@@ -472,6 +411,7 @@ export function renderLakeDetailPage(nav, lakeId) {
     const anyOnline = devs.some((d) => presence((st.telemetry.get(d.id) || {}).ts) === 'online');
 
     loadTrend(devs);
+    trendPts = firstDevPts(devs);
     loadWeather(lake);
     if (!selectedDevId || !devs.some((d) => d.id === selectedDevId)) {
       selectedDevId = devs.length ? devs[0].id : null;
@@ -497,9 +437,24 @@ export function renderLakeDetailPage(nav, lakeId) {
       ]));
 
     // ================= 1 · KO'L SALOMATLIGI (hero) =================
+    // LAKEDET-V5: yuqori-o'ng burchakda ALOQA SIFATI (alohida karta yo'q)
+    const sigPct = bestRssi == null ? null
+      : Math.max(0, Math.min(100, Math.round(((bestRssi + 120) / 70) * 100)));
     const heroNum = el('span', { class: 'sl-num-lg', style: `font-size:42px;color:var(${g.colorVar})` });
+    const signalBlock = el('div', {
+      style: 'text-align:right;flex:none;padding:var(--sl-sp-2) var(--sl-sp-3);'
+        + 'border-radius:var(--sl-r-md);background:var(--sl-card-inset)',
+    }, [
+      el('div', { class: 'sl-row', style: 'gap:5px;justify-content:flex-end' }, [
+        el('span', { style: `display:inline-flex;color:var(--sl-chart-rssi)`, html: slIcon('wifi', 15) }),
+        el('span', { class: 'sl-num-sm', style: 'font-size:15px;color:var(--sl-chart-rssi)',
+          text: sigPct == null ? '—' : `${sigPct}%` }),
+      ]),
+      el('div', { class: 'sl-caption', text: `${t('dash.signal_' + sq)}${bestRssi != null ? ` · ${bestRssi} dBm` : ''}` }),
+      el('div', { class: 'sl-caption', text: fmtAgo(a.lastUpdate, isUz) }),
+    ]);
     const healthHero = slCard([
-      el('div', { class: 'sl-row-between' }, [
+      el('div', { class: 'sl-row-between', style: 'align-items:flex-start' }, [
         el('div', {}, [
           el('div', { class: 'sl-label', style: 'color:var(--sl-text-secondary)', text: t('lakedet.health') }),
           el('div', { class: 'sl-row', style: 'align-items:baseline;gap:6px;margin-top:6px' }, [
@@ -510,8 +465,7 @@ export function renderLakeDetailPage(nav, lakeId) {
           el('div', { class: 'sl-caption', style: 'margin-top:4px',
             text: `${a.online}/${a.deviceCount} ${t('tm.online')} · ${t('lakedet.aiReady')}` }),
         ]),
-        slGaugeChart({ value: devs.length ? a.healthScore : null, min: 0, max: 100,
-          unit: t('tm.health'), colorVar: g.colorVar, size: 116 }),
+        signalBlock,
       ]),
     ], { elevated: true, premium: a.healthScore >= 90 && devs.length > 0,
       critical: a.healthScore <= 60 && devs.length > 0 });
@@ -526,7 +480,24 @@ export function renderLakeDetailPage(nav, lakeId) {
     const anyTel = devs.map((d) => st.telemetry.get(d.id)).filter(Boolean);
     const avgOf = (k) => { const v = anyTel.map((x) => x[k]).filter((n) => typeof n === 'number');
       return v.length ? Math.round((v.reduce((p, q) => p + q, 0) / v.length) * 10) / 10 : null; };
-    const hasNh3 = anyTel.some((x) => typeof x.nh3 === 'number');
+    // LAKEDET-V5: 0 = nosozlik EMAS — sensor mavjudlik holati (sensorState)
+    const STATE_TEXT = {
+      [SENSOR_STATE.ABSENT]: t('lakedet.sensorAbsent'),
+      [SENSOR_STATE.DISABLED]: t('lakedet.sensorDisabled'),
+      [SENSOR_STATE.CALIBRATION]: t('lakedet.sensorCalib'),
+    };
+    function lakeState(key) {
+      let best = SENSOR_STATE.ABSENT;
+      for (const tel of anyTel) {
+        const st0 = sensorState(tel, key);
+        if (st0 === SENSOR_STATE.PRESENT) return SENSOR_STATE.PRESENT;
+        if (st0 !== SENSOR_STATE.ABSENT) best = st0;
+      }
+      return best;
+    }
+    const tdsState = lakeState('tds');
+    const nh3State = lakeState('nh3');
+    const hasNh3 = nh3State === SENSOR_STATE.PRESENT;
     const sensorCards = [
       sensorParamCard({ key: 'do', label: 'DO', ic: 'waves', value: a.avgDo, unit: 'mg/L',
         norm: `≥${th.do.warn}`, stKey: evalDo(a.avgDo), tr: calcTrend(trendPts, 'do'), lastTs: a.lastUpdate }),
@@ -534,13 +505,17 @@ export function renderLakeDetailPage(nav, lakeId) {
         norm: `${th.temp.warnMin}–${th.temp.warnMax}`, stKey: evalTemp(a.avgTemp), tr: calcTrend(trendPts, 't'), lastTs: a.lastUpdate }),
       sensorParamCard({ key: 'ph', label: 'pH', ic: 'activity', value: a.avgPh, unit: '',
         norm: `${th.ph.warnMin}–${th.ph.warnMax}`, stKey: evalPh(a.avgPh), tr: calcTrend(trendPts, 'ph'), lastTs: a.lastUpdate }),
-      sensorParamCard({ key: 'tds', label: 'TDS', ic: 'layers', value: avgOf('tds'), unit: 'ppm',
-        norm: '—', stKey: avgOf('tds') != null ? 'healthy' : 'unknown', tr: null, lastTs: a.lastUpdate,
-        ready: avgOf('tds') != null }),
+      sensorParamCard({ key: 'tds', label: 'TDS', ic: 'layers',
+        value: tdsState === SENSOR_STATE.PRESENT ? avgOf('tds') : null, unit: 'ppm',
+        norm: tdsState === SENSOR_STATE.PRESENT ? '—' : STATE_TEXT[tdsState],
+        stKey: tdsState === SENSOR_STATE.PRESENT ? 'healthy' : 'unknown',
+        tr: null, lastTs: a.lastUpdate }),
     ];
-    if (hasNh3) {
+    if (nh3State !== SENSOR_STATE.ABSENT) {
       sensorCards.push(sensorParamCard({ key: 'nh3', label: isUz ? 'Ammiak' : 'Аммиак', ic: 'droplet',
-        value: avgOf('nh3'), unit: 'mg/L', norm: '—', stKey: 'healthy', tr: null, lastTs: a.lastUpdate }));
+        value: hasNh3 ? avgOf('nh3') : null, unit: 'mg/L',
+        norm: hasNh3 ? '—' : STATE_TEXT[nh3State],
+        stKey: hasNh3 ? 'healthy' : 'unknown', tr: null, lastTs: a.lastUpdate }));
     }
     sensorCards.push(sensorParamCard({ key: 'battery', label: t('lakedet.battery'), ic: 'battery',
       value: avgOf('battery'), unit: '%', norm: `≥${th.battery.warn}%`,
@@ -548,33 +523,50 @@ export function renderLakeDetailPage(nav, lakeId) {
       tr: null, lastTs: a.lastUpdate }));
     const sensors = el('div', { class: 'sl-grid-2' }, sensorCards);
 
-    // ================= 3 · 24h KISLOROD GRAFIGI =================
-    const doPoints = toChartPoints(trendPts);
-    const doStat = seriesStats(doPoints, 'do');
-    const doChartCard = slCard([
-      el('div', { class: 'sl-card-head' }, [
-        el('div', { class: 'sl-card-title', text: t('lakedet.do24') }),
-        el('span', { style: 'color:var(--sl-chart-do);display:inline-flex', html: slIcon('waves', 20) }),
-      ]),
-      doPoints.length ? el('div', { class: 'sl-chart-frame' }, [
-        slLineChart({
-          points: doPoints, height: 200,
-          series: [{ key: 'do', label: 'DO', unit: 'mg/L', area: true }],
-          thresholds: [{ seriesKey: 'do', value: th.do.crit }],
-          formatX: (x) => formatTimeLabel(x, '24h', isUz),
-          ariaLabel: t('lakedet.do24'),
-        }),
-      ]) : slEmptyState({ icon: 'activity', title: t('common.noData'), desc: '' }),
-      doStat ? el('div', { class: 'sl-grid-3', style: 'margin-top:var(--sl-sp-3)' }, [
-        ['min', doStat.min], ['avg', doStat.avg], ['max', doStat.max],
-      ].map(([k, v]) => el('div', { class: 'sl-sensor', style: '--_c:var(--sl-chart-do);min-height:0' }, [
-        el('div', { class: 'sn-lab' }, [el('span', { text: t('lakedet.' + k) })]),
-        el('div', { class: 'sn-val' }, [
-          el('span', { class: 'sl-num', style: 'font-size:18px', text: v.toFixed(1) }),
-          el('span', { class: 'sn-unit', text: 'mg/L' }),
+    // ================= 3 · 48h KISLOROD GRAFIKLARI (har qurilma) =================
+    // LAKEDET-V5: o'rtacha grafik CHIQARILMAYDI — har qurilma alohida.
+    const fmtX48 = (x) => {
+      const d = new Date(x); const pd = (n) => String(n).padStart(2, '0');
+      return `${pd(d.getDate())}.${pd(d.getMonth() + 1)} ${pd(d.getHours())}:${pd(d.getMinutes())}`;
+    };
+    const deviceChartCards = devs.map((d) => {
+      const tr = deviceTrends.get(d.id);
+      const pts = toChartPoints((tr && tr.pts) || []);
+      const st0 = seriesStats(pts, 'do');
+      let bodyNode;
+      if (tr && tr.loading) {
+        bodyNode = el('div', { class: 'sl-skeleton card', style: 'height:200px;margin:0' });
+      } else if (!pts.length) {
+        bodyNode = slEmptyState({ icon: 'activity', title: t('common.noData'), desc: '' });
+      } else {
+        bodyNode = el('div', { class: 'sl-chart-frame' }, [
+          slLineChart({
+            points: pts, height: 200,
+            series: [{ key: 'do', label: 'DO', unit: 'mg/L', area: true }],
+            thresholds: [{ seriesKey: 'do', value: th.do.crit }],
+            formatX: fmtX48,                      // tooltip: sana + soat + qiymat
+            ariaLabel: `${t('lakedet.do48')} · ${d.id}`,
+          }),
+        ]);
+      }
+      return slCard([
+        el('div', { class: 'sl-card-head' }, [
+          el('div', { class: 'sl-card-title', text: t('lakedet.do48') }),
+          slBadge({ type: 'info', dot: false, icon: 'chip',
+            label: `${t('lakedet.deviceOf')} ${d.id.slice(-6)}` }),
         ]),
-      ]))) : null,
-    ].filter(Boolean));
+        bodyNode,
+        st0 ? el('div', { class: 'sl-grid-3', style: 'margin-top:var(--sl-sp-3)' }, [
+          ['min', st0.min], ['avg', st0.avg], ['max', st0.max],
+        ].map(([k, v]) => el('div', { class: 'sl-sensor', style: '--_c:var(--sl-chart-do);min-height:0' }, [
+          el('div', { class: 'sn-lab' }, [el('span', { text: t('lakedet.' + k) })]),
+          el('div', { class: 'sn-val' }, [
+            el('span', { class: 'sl-num', style: 'font-size:18px', text: v.toFixed(1) }),
+            el('span', { class: 'sn-unit', text: 'mg/L' }),
+          ]),
+        ]))) : null,
+      ].filter(Boolean));
+    });
 
     // ================= 4 · AERATOR BOSHQARUVI =================
     loadRunStats(devs);
@@ -601,15 +593,7 @@ export function renderLakeDetailPage(nav, lakeId) {
     btnOff.disabled = true;                                          // qurilmada yo'q (firmware cheklovi)
     if (!selectedDevId || !selOnline) { btnAuto.disabled = true; btnOn.disabled = true; }
 
-    const kw = lakeMeta && lakeMeta.energy ? Number(lakeMeta.energy.kw) || 0 : 0;
-    const tariff = lakeMeta && lakeMeta.energy ? Number(lakeMeta.energy.tariff) || 0 : 0;
-    const kwhOf = (ms) => kw ? (ms / 3600e3) * kw : null;
-    const fmtKwh = (ms) => {
-      const v = kwhOf(ms);
-      if (v == null) return t('lakedet.energyNeedKw');
-      const cost = tariff ? ` · ≈${Math.round(v * tariff).toLocaleString()} ${isUz ? "so'm" : 'сум'}` : '';
-      return `${v.toFixed(1)} kWh${cost}`;
-    };
+    // LAKEDET-V5: elektr (kWh) hisobi Hisobot bo'limida — bu yerda takrorlanmaydi
     const rsVal = (fn) => runStats ? fn(runStats) : (runStatsLoading ? '…' : '—');
 
     const aeratorCard = slCard([
@@ -636,91 +620,12 @@ export function renderLakeDetailPage(nav, lakeId) {
           value: rsVal((r) => fmtHours(r.todayMs, isUz)) }),
         slKvRow({ icon: 'clock', key: t('lakedet.runWeek'),
           value: rsVal((r) => fmtHours(r.weekMs, isUz)) }),
-        slKvRow({ icon: 'zap', key: t('lakedet.kwhToday'),
-          value: rsVal((r) => fmtKwh(r.todayMs)), valueColorVar: '--sl-chart-energy' }),
-        slKvRow({ icon: 'zap', key: t('lakedet.kwhMonth'),
-          value: rsVal((r) => fmtKwh(r.monthMs)), valueColorVar: '--sl-chart-energy' }),
       ]),
     ]);
 
-    // ================= 5 · YEM TAVSIYASI =================
-    const feedPlan = lakeMeta ? computeFeedPlan({ fish: lakeMeta.fish || [], feed: lakeMeta.feed || {},
-      tempC: a.avgTemp, weather: weatherData }) : null;
-    let feedBody;
-    if (feedPlan) {
-      feedBody = el('div', {}, [
-        el('div', { class: 'sl-caption', style: 'margin-bottom:var(--sl-sp-1)', text: t('lakedet.feedMealOnce') + ':' }),
-        el('div', { style: 'display:flex;gap:6px;margin-bottom:var(--sl-sp-2);flex-wrap:wrap' },
-          feedPlan.meals.map((m) => el('div', {
-            class: 'sl-sensor', style: '--_c:var(--sl-chart-feed);flex:1;min-height:0;text-align:center;padding:8px 4px',
-          }, [
-            el('div', { class: 'sn-lab', style: 'justify-content:center', text: m.time }),
-            el('div', { class: 'sn-val', style: 'justify-content:center' }, [
-              el('span', { class: 'sl-num', style: 'font-size:15px', text: m.kg.toFixed(1) }),
-              el('span', { class: 'sn-unit', text: 'kg' }),
-            ]),
-          ]))),
-        ...(feedPlan.notes || []).map((n) => el('div', { class: 'sl-banner warn', style: 'margin-bottom:var(--sl-sp-2)' }, [
-          el('span', { style: 'display:inline-flex;flex:none', html: slIcon('alertTriangle', 15) }),
-          el('span', { text: n.text }),
-        ])),
-        slKvRow({ icon: 'fish', key: t('lakedet.biomass'), value: `${feedPlan.biomass.toFixed(0)} kg` }),
-        slKvRow({ icon: 'thermometer', key: `${t('lakedet.rate')} (${a.avgTemp != null ? a.avgTemp + '°C' : '—'})`,
-          value: `${feedPlan.ratePct}% / ${isUz ? 'kun' : 'день'}` }),
-        slKvRow({ icon: 'feed', key: t('lakedet.feedTotal'), value: `${feedPlan.dailyKg.toFixed(1)} kg`,
-          valueColorVar: '--sl-chart-feed' }),
-        slKvRow({ icon: 'zap', key: t('lakedet.feedCost'),
-          value: feedPlan.dailyCost != null ? `≈${Math.round(feedPlan.dailyCost).toLocaleString()} ${isUz ? "so'm" : 'сум'}` : '—',
-          valueColorVar: '--sl-primary' }),
-        el('div', { class: 'sl-caption', style: 'margin-top:var(--sl-sp-2)', text: t('lakedet.feedAiNote') }),
-      ]);
-    } else {
-      feedBody = el('div', {}, [
-        el('div', { class: 'sl-body-sm sl-text-secondary', text: t('lakedet.feedEmpty') }),
-        el('div', { class: 'sl-caption', style: 'margin-top:4px', text: t('lakedet.feedAiNote') }),
-        el('div', { style: 'margin-top:var(--sl-sp-3)' }, [
-          slButton({ label: t('lakedet.toSettings'), variant: 'secondary',
-            onClick: () => { activeTab = 'sozlama'; render(); } }),
-        ]),
-      ]);
-    }
-    const feedCard = slCard([
-      el('div', { class: 'sl-card-head' }, [
-        el('div', { class: 'sl-card-title', style: 'display:flex;align-items:center;gap:6px' }, [
-          el('span', { style: 'color:var(--sl-chart-feed);display:inline-flex', html: slIcon('feed', 18) }),
-          el('span', { text: t('lakedet.feed') }),
-        ]),
-        slBadge({ type: 'success', label: 'kg', dot: false, icon: 'feed' }),
-      ]),
-      feedBody,
-    ]);
-
-    // ================= 6 · ALOQA HOLATI =================
-    const connCard = slCard([
-      el('div', { class: 'sl-card-head' }, [
-        el('div', { class: 'sl-card-title', style: 'display:flex;align-items:center;gap:6px' }, [
-          el('span', { style: 'color:var(--sl-primary);display:inline-flex', html: slIcon('wifi', 18) }),
-          el('span', { text: t('lakedet.conn') }),
-        ]),
-      ]),
-      ...(devs.length ? devs.map((d) => {
-        const tel = st.telemetry.get(d.id) || null;
-        const pres = tel ? presence(tel.ts) : 'offline';
-        const q = rssiQ(tel && tel.rssi != null ? Number(tel.rssi) : null);
-        return el('div', { class: 'sl-kv-row' }, [
-          el('div', { class: 'kv-key', style: 'flex-direction:column;align-items:flex-start;gap:2px' }, [
-            el('span', { class: 'sl-mono', style: 'font-size:12.5px;font-weight:700;color:var(--sl-text-primary)', text: d.id }),
-            el('span', { class: 'sl-caption', text: `${t('dash.lastContact')}: ${fmtAgo(tel && tel.ts, isUz)}`
-              + (tel && tel.battery != null ? ` · ${t('lakedet.battery')} ${tel.battery}%` : '') }),
-          ]),
-          el('div', { style: 'text-align:right' }, [
-            slStatusBadge(pres === 'online' ? 'online' : 'offline', pres === 'online' ? 'Online' : 'Offline'),
-            el('div', { class: 'sl-caption', style: 'margin-top:3px;font-variant-numeric:tabular-nums',
-              text: tel && tel.rssi != null ? `RSSI ${tel.rssi} dBm · ${t('dash.signal_' + q)}` : 'RSSI —' }),
-          ]),
-        ]);
-      }) : [el('div', { class: 'sl-body-sm sl-text-secondary', text: t('lake.noDevices') })]),
-    ]);
+    // LAKEDET-V5: Yem tavsiyasi bu tabdan OLIB TASHLANDI (Dashboard va
+    // Ko'llar kartalarida bor — takror chiqmaydi); Aloqa holati alohida
+    // karta emas — salomatlik kartasining yuqori-o'ng blokida.
 
     // ================= 7 · OB-HAVO (SAQLANGAN) =================
     let weatherCardNode = null;
@@ -754,18 +659,24 @@ export function renderLakeDetailPage(nav, lakeId) {
     }
 
     // ================= SOZLAMALAR qo'shimchalari (SAQLANGAN) =================
-    const deviceRows = devs.length ? devs.map((d) => slListItem({
-      leading: 'chip', title: d.id,
-      trailing: el('div', { class: 'sl-row', style: 'gap:6px' }, [
-        slStatusBadge(deviceStatus(st.telemetry.get(d.id) || null, th), t('tm.status_' + deviceStatus(st.telemetry.get(d.id) || null, th))),
-        slButton({ label: t('lake.unassign'), variant: 'text', size: 'sm', onClick: async (ev) => {
-          ev.stopPropagation();
-          try { await deviceAssignmentService.unassign(lake.id, d.id, s.uid); await dataStore.refresh(); toast(t('lake.unassigned'), 'ok'); }
-          catch (e) { toast(t(handleError(e, 'unassign').messageKey), 'err'); }
-        } }),
-      ]),
-      onClick: () => nav.push((n) => renderDeviceDetailPage(n, d.id)),
-    })) : [el('div', { class: 'sl-body-sm sl-text-secondary', style: 'padding:8px 4px', text: t('lake.noDevices') })];
+    // LAKEDET-V5: Sozlamalarda qurilma qatorlari — nom, holat, oxirgi aloqa
+    const deviceRows = devs.length ? devs.map((d) => {
+      const tel = st.telemetry.get(d.id) || null;
+      const devSt = deviceStatus(tel, th);
+      return slListItem({
+        leading: 'chip', title: d.id,
+        subtitle: `${t('dash.lastContact')}: ${fmtAgo(tel && tel.ts, isUz)}`,
+        trailing: el('div', { class: 'sl-row', style: 'gap:6px' }, [
+          slStatusBadge(devSt, t('tm.status_' + devSt)),
+          slButton({ label: t('lake.unassign'), variant: 'text', size: 'sm', onClick: async (ev) => {
+            ev.stopPropagation();
+            try { await deviceAssignmentService.unassign(lake.id, d.id, s.uid); await dataStore.refresh(); toast(t('lake.unassigned'), 'ok'); }
+            catch (e) { toast(t(handleError(e, 'unassign').messageKey), 'err'); }
+          } }),
+        ]),
+        onClick: () => nav.push((n) => renderDeviceDetailPage(n, d.id)),
+      });
+    }) : [el('div', { class: 'sl-body-sm sl-text-secondary', style: 'padding:8px 4px', text: t('lake.noDevices') })];
 
     const assignRow = [];
     if (assignable.length) {
@@ -816,12 +727,25 @@ export function renderLakeDetailPage(nav, lakeId) {
     tabBtns.forEach((b, id) => b.classList.toggle('active', id === activeTab));
     let components;
     if (activeTab === 'tarix') {
-      if (!rangeLoaded) { rangeLoaded = true; loadRange(rangeKey); }
-      components = [rangeCard, getHistoryTabNode()];
+      // LAKEDET-V5: har qurilma alohida — o'rtacha chiqarilmaydi
+      if (!devs.length) {
+        components = [slEmptyState({ icon: 'chip', title: t('lake.noDevices'), desc: '' })];
+      } else {
+        if (!historyDevId || !devs.some((d) => d.id === historyDevId)) historyDevId = devs[0].id;
+        const devTabs = devs.length > 1 ? el('div', { class: 'sl-tabs', role: 'tablist', style: 'padding:0' },
+          devs.map((d) => {
+            const b = el('button', { class: 'sl-tab' + (d.id === historyDevId ? ' active' : ''),
+              type: 'button', role: 'tab', text: `${t('lakedet.deviceOf')} ${d.id.slice(-6)}` });
+            b.addEventListener('click', () => { historyDevId = d.id; render(); });
+            return b;
+          })) : null;
+        components = [devTabs, historyForDevice(historyDevId)].filter(Boolean);
+      }
     } else if (activeTab === 'ai') components = [getAiTabNode()];
-    else if (activeTab === 'sozlama') components = [getSettingsTabNode(), devicesCard, ...actions];
+    else if (activeTab === 'sozlama') components = [devicesCard, getSettingsTabNode(), ...actions];   // qurilmalar ENG YUQORIDA
     else {
-      components = [healthHero, sensors, doChartCard, aeratorCard, feedCard, connCard];
+      components = [healthHero, sensors, ...deviceChartCards];
+      components.push(aeratorCard);
       if (weatherCardNode) components.push(weatherCardNode);
     }
     mount(content, el('div', { class: 'sl-stack sl-anim-fade' }, components));

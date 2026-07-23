@@ -361,6 +361,39 @@ Object.assign(uz.lakespg, {
   feedPending: 'Hozircha hisoblanmagan',
 });
 
+// --- LAKEDET-V5: Lake Control Center + katalogli sozlamalar ---
+Object.assign(uz.lakedet, {
+  do48: 'Kislorod — oxirgi 48 soat',
+  deviceOf: 'Qurilma',
+  signalQ: 'Aloqa sifati',
+  sensorAbsent: 'Sensor mavjud emas',
+  sensorDisabled: "Sensor o'chirilgan",
+  sensorCalib: 'Kalibrovka talab qilinadi',
+});
+uz.lset = {
+  passport: "Ko'l pasporti",
+  area: 'Suv maydoni (ga)', avgDepth: "O'rtacha chuqurlik (m)", maxDepth: 'Maks chuqurlik (m)',
+  fishTitle: 'Baliq turlari (maks {n} ta)',
+  fishN: 'Baliq', type: 'Turi', pickType: 'Katalogdan tanlang',
+  count: 'Soni (dona)', startW: 'Boshl. vazni (g)', avgW: 'Joriy vazni (g)',
+  stockedAt: 'Tashlangan sana',
+  dead: "O'lgan (dona)", deadBtn: "O'lim kiritish", deadDone: '{n} ta ayirildi — Saqlashni unutmang',
+  enterNum: 'Sonni kiriting',
+  addFish: "+ Baliq qo'shish", noFish: 'Hali baliq kiritilmagan',
+  biomass: 'Umumiy biomassa',
+  estW: 'Taxminiy joriy vazn (yem koeffitsiyenti bo\'yicha)', apply: "Qo'llash",
+  noGrowth: "Bu tur yem bilan o'smaydi — avtomatik vazn hisobi qo'llanmaydi",
+  estHint: "Hisob uchun boshlang'ich vazn va tashlangan sana kerak",
+  feedTitle: 'Yem', feedType: 'Yem turi (katalogdan)', price: "Narxi (so'm/kg)",
+  fromCatalog: 'Protein {p}% · FCR {f} — katalogdan',
+  aerTitle: 'Aeratorlar', aerCount: 'Soni', aerKw: 'Bittasining quvvati (kW)',
+  aerTariff: "Elektr narxi (so'm/kWh)",
+  aerNote: "Saqlanganda Hisobotdagi umumiy quvvat (soni × kW) avtomatik yangilanadi.",
+  fishSaved: "Baliq ma'lumotlari saqlandi",
+  metaNote: "Bu ma'lumotlar faqat Firebase'da saqlanadi — qurilmaga yuborilmaydi. Yem va elektr hisoblari shu yerdan oziqlanadi.",
+  legacy: '(eski yozuv)',
+};
+
 uz.reports = {
   title: 'Hisobot',
   pickLake: "Ko'lni tanlang",
