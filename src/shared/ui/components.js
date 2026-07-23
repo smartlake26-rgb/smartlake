@@ -5,6 +5,9 @@
 
 import { el } from '../dom.js';
 import { icon } from '../icons.js';
+// DS 3.0 icon registri — asosiy registrning superset'i (sparkles, menu,
+// trendUp kabi yangi nomlar uchun); mavjud nomlar avvalgidek ishlaydi.
+import { slIcon } from '../../design-system/components/icons.js';
 
 /* --- Buttons --- */
 export function mdButton({ label, variant = 'filled', icon: ic, onClick, disabled = false, full = false, type = 'button' }) {
@@ -61,7 +64,7 @@ export function appBar({ title, subtitle, leading, actions = [] }) {
 export function bottomNav({ items, active, onSelect }) {
   return el('nav', { class: 'md-bottomnav' }, items.map((it) => {
     const item = el('button', { class: `md-navitem${it.id === active ? ' active' : ''}` }, [
-      el('span', { class: 'ni-ic', html: icon(it.icon, 22) + (it.dot ? '<span class="ni-dot"></span>' : '') }),
+      el('span', { class: 'ni-ic', html: slIcon(it.icon, 22) + (it.dot ? '<span class="ni-dot"></span>' : '') }),
       el('span', { class: 'ni-label', text: it.label }),
     ]);
     item.addEventListener('click', () => onSelect && onSelect(it.id));

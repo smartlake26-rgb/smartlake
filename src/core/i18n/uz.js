@@ -223,4 +223,43 @@ Object.assign(uz.cmd, {
 uz.cmdGroup = Object.assign(uz.cmdGroup, { mode: 'Ishlash rejimi', thresholds: 'Kislorod chegaralari (qurilma)' });
 Object.assign(uz.error, { cmdUnsupported: "Bu buyruq qurilma tomonidan qo'llab-quvvatlanmaydi yoki qiymat noto'g'ri" });
 
+// --- DASH-V3: Mission Control dashboard + yangi navigatsiya ---
+Object.assign(uz.nav, { ai: 'AI', reports: 'Hisobot', menu: 'Menyu' });
+uz.dash = {
+  morning: 'Xayrli tong', day: 'Assalomu alaykum', evening: 'Xayrli kech',
+  systemHealth: 'Tizim salomatligi',
+  gradeA: "A'lo", gradeB: 'Yaxshi', gradeC: 'Ogohlantirish', gradeD: 'Kritik',
+  healthDetail: "Ko'llar bo'yicha salomatlik",
+  onlineLakes: 'Onlayn', offlineLakes: 'Oflayn',
+  lastContact: 'Oxirgi aloqa', signal: 'Signal',
+  signal_good: 'Yaxshi', signal_fair: "O'rtacha", signal_poor: 'Zaif', signal_unknown: '—',
+  noOnline: "Onlayn ko'l yo'q", allOnline: "Barcha ko'llar onlayn",
+  alerts: 'Ogohlantirishlar', noAlerts: "Ogohlantirish yo'q", allCalm: 'Hammasi tinch',
+  unresolved: 'Hal qilinmagan', openAlertsPage: "Barchasini ko'rish",
+  aiTitle: 'AI tavsiyasi', aiOpen: 'Batafsil',
+  aiPlaceholder: "AI maslahatchi ma'lumot to'planishini kutmoqda. Qurilmalar ulangach tavsiyalar shu yerda chiqadi.",
+  lakesTitle: "Ko'llar", allLakes: 'Hammasi',
+  feedToday: 'Bugungi yem', feedCost: 'Taxminiy qiymat',
+  feedPlaceholder: "Yem rejasi uchun ko'l sozlamalarida baliq ma'lumotini kiriting. Kelajakda AI tavsiyasi bilan bog'lanadi.",
+  energy: 'Elektr energiyasi', energyToday: 'Bugun', energyWeek: 'Hafta', energyMonth: 'Oy',
+  energyCost: 'Taxminiy xarajat', energyHint: "Aerator ish vaqtidan hisoblanadi. Quvvat/tarif — ko'l sozlamalarida.",
+  energyLoad: 'Hisoblash', energyLoading: 'Hisoblanmoqda...',
+  weather: 'Ob-havo', weatherTomorrow: 'Ertaga',
+  weatherPlaceholder: "Ob-havo ko'l joylashuvi kiritilgach ko'rinadi.",
+  updated: 'Yangilandi',
+};
+uz.menu = {
+  title: 'Menyu',
+  profile: 'Profil', profileDesc: "Shaxsiy ma'lumotlar va sozlamalar",
+  devices: 'Qurilmalar', devicesDesc: 'Datchiklar holati va ulash',
+  alerts: 'Bildirishnomalar', alertsDesc: 'Ogohlantirishlar tarixi',
+  theme: "Tungi rejim", themeDesc: "Ko'rinishni almashtirish",
+};
+uz.reports = {
+  title: 'Hisobot',
+  pickLake: "Ko'lni tanlang",
+  empty: "Hisobot uchun avval ko'l qo'shing",
+  hint: "Davr bo'yicha o'lchovlar, yem va elektr hisobi, XLSX/CSV/PDF eksport",
+};
+
 export default uz;

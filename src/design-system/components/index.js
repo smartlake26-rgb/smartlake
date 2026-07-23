@@ -19,3 +19,4 @@ export {
   svgEl, slChartLegend, slLineChart, slBarChart, slPieChart,
   slGaugeChart, slTimeline,
 } from './chart.js';
+export { slCountUp } from './countup.js';

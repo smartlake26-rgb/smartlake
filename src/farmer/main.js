@@ -6,6 +6,7 @@
 
 import '../shared/ui/tokens.css';
 import '../shared/ui/ui.css';
+import '../design-system/index.css';   // DS 3.0 (sl-*) — mavjud md-* bilan to'qnashmaydi
 import '../core/firebase.js';
 
 import { el } from '../shared/dom.js';

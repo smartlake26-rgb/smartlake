@@ -13,12 +13,21 @@ import { renderNotificationsTab } from '../features/telemetry/views/notification
 import { renderLakesTab } from '../features/lakes/views/lakesTab.js';
 import { renderDevicesTab } from '../features/devices/views/devicesTab.js';
 import { renderProfileTab } from '../features/auth/views/profileTab.js';
+import { renderAiHomeTab } from '../features/ai/views/aiHomeTab.js';
+import { renderReportsTab } from '../features/telemetry/views/reportsTab.js';
+import { renderMenuTab } from './menuTab.js';
 import { renderOnboarding } from './onboarding.js';
 import { authStore } from '../features/auth/index.js';
 
+// DASH-V3: bottom-nav 5 bo'lim (home/lakes/ai/reports/menu).
+// devices/alerts/profile TABS'da SAQLANGAN — Menyu va header'dagi
+// qo'ng'iroq orqali ochiladi (hech qanday funksiya olib tashlanmagan).
 const TABS = {
   home: renderHomeTab,
   lakes: renderLakesTab,
+  ai: renderAiHomeTab,
+  reports: renderReportsTab,
+  menu: renderMenuTab,
   devices: renderDevicesTab,
   alerts: renderNotificationsTab,
   profile: renderProfileTab,
@@ -41,12 +50,13 @@ export function createShell(root, ctx = {}) {
     onboardingActive = true;
   }
 
+  const NAV_IDS = ['home', 'lakes', 'ai', 'reports', 'menu'];
   const navItems = () => [
     { id: 'home', icon: 'home', label: t('nav.home') },
     { id: 'lakes', icon: 'droplet', label: t('nav.lakes') },
-    { id: 'devices', icon: 'chip', label: t('nav.devices') },
-    { id: 'alerts', icon: 'bell', label: t('nav.alerts'), dot: ctx.alerts && ctx.alerts() > 0 },
-    { id: 'profile', icon: 'user', label: t('nav.profile') },
+    { id: 'ai', icon: 'sparkles', label: t('nav.ai') },
+    { id: 'reports', icon: 'trendUp', label: t('nav.reports') },
+    { id: 'menu', icon: 'menu', label: t('nav.menu') },
   ];
 
   const nav = {
@@ -76,7 +86,10 @@ export function createShell(root, ctx = {}) {
     if (subPage) { mountNode(subPage.render(nav)); return; }
     const tabNode = TABS[activeTab](nav);
     tabNode.classList.add('anim-up');   // DS-F: sahifa o'tish animatsiyasi
-    const shell = el('div', { class: 'md-app' }, [tabNode, bottomNav({ items: navItems(), active: activeTab, onSelect: nav.switchTab })]);
+    // Nav'da ko'rinmaydigan tab (devices/alerts/profile) ochiq bo'lsa —
+    // "Menyu" belgilanadi (ular Menyu orqali ochiladi).
+    const navActive = NAV_IDS.includes(activeTab) ? activeTab : 'menu';
+    const shell = el('div', { class: 'md-app' }, [tabNode, bottomNav({ items: navItems(), active: navActive, onSelect: nav.switchTab })]);
     shell.__cleanup = tabNode.__cleanup;
     mountNode(shell);
   }

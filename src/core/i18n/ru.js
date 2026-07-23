@@ -215,4 +215,43 @@ ru.cmdGroup = Object.assign(ru.cmdGroup || {}, { aerator: 'Аэратор', mode
 ru.cmdStatus = Object.assign(ru.cmdStatus || {}, { pending: 'Ожидает', sent: 'Отправлено', executed: 'Выполнено', failed: 'Ошибка', expired: 'Просрочено' });
 Object.assign(ru.error, { cmdUnsupported: 'Команда не поддерживается устройством или значение неверно' });
 
+// --- DASH-V3: Mission Control dashboard + новая навигация ---
+Object.assign(ru.nav, { ai: 'AI', reports: 'Отчёт', menu: 'Меню' });
+ru.dash = {
+  morning: 'Доброе утро', day: 'Здравствуйте', evening: 'Добрый вечер',
+  systemHealth: 'Здоровье системы',
+  gradeA: 'Отлично', gradeB: 'Хорошо', gradeC: 'Внимание', gradeD: 'Критично',
+  healthDetail: 'Здоровье по озёрам',
+  onlineLakes: 'Онлайн', offlineLakes: 'Офлайн',
+  lastContact: 'Последняя связь', signal: 'Сигнал',
+  signal_good: 'Хороший', signal_fair: 'Средний', signal_poor: 'Слабый', signal_unknown: '—',
+  noOnline: 'Нет озёр онлайн', allOnline: 'Все озёра онлайн',
+  alerts: 'Оповещения', noAlerts: 'Оповещений нет', allCalm: 'Всё спокойно',
+  unresolved: 'Не решено', openAlertsPage: 'Показать все',
+  aiTitle: 'Рекомендация AI', aiOpen: 'Подробнее',
+  aiPlaceholder: 'AI-консультант ждёт накопления данных. Рекомендации появятся здесь после подключения устройств.',
+  lakesTitle: 'Озёра', allLakes: 'Все',
+  feedToday: 'Корм на сегодня', feedCost: 'Примерная стоимость',
+  feedPlaceholder: 'Для расчёта корма укажите данные о рыбе в настройках озера. В будущем будет связано с AI.',
+  energy: 'Электроэнергия', energyToday: 'Сегодня', energyWeek: 'Неделя', energyMonth: 'Месяц',
+  energyCost: 'Примерный расход', energyHint: 'Рассчитывается по времени работы аэратора. Мощность/тариф — в настройках озера.',
+  energyLoad: 'Рассчитать', energyLoading: 'Расчёт...',
+  weather: 'Погода', weatherTomorrow: 'Завтра',
+  weatherPlaceholder: 'Погода появится после указания расположения озера.',
+  updated: 'Обновлено',
+};
+ru.menu = {
+  title: 'Меню',
+  profile: 'Профиль', profileDesc: 'Личные данные и настройки',
+  devices: 'Устройства', devicesDesc: 'Состояние датчиков и подключение',
+  alerts: 'Уведомления', alertsDesc: 'История оповещений',
+  theme: 'Тёмный режим', themeDesc: 'Переключить оформление',
+};
+ru.reports = {
+  title: 'Отчёт',
+  pickLake: 'Выберите озеро',
+  empty: 'Сначала добавьте озеро',
+  hint: 'Замеры за период, корм и электроэнергия, экспорт XLSX/CSV/PDF',
+};
+
 export default ru;
