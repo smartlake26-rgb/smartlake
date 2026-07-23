@@ -33,7 +33,7 @@ import { buildDateFilter } from '../components/dateFilter.js';
 import { buildExportToolbar } from '../components/exportToolbar.js';
 import {
   slIcon, slCard, slButton, slBadge, slTable, slEmptyState,
-  slHistoryChart, slCountUp,
+  slHistoryChart, slCountUp, slLineChart, slChartLegend,
 } from '../../../design-system/index.js';
 
 const DAY = 24 * 3600e3;
@@ -176,35 +176,120 @@ export function buildHistoryTab({ lakeId, uid, isUz, getDevs, getTh, lakeName = 
     ]));
   }
 
-  /* ---------- HAR SENSOR UCHUN ALOHIDA GRAFIK (zoom+pan) ---------- */
-  const SENSORS = [
-    ['do', 'DO', 'mg/L', 'do'], ['t', null, '°C', 'temp'],
-    ['ph', 'pH', '', 'ph'], ['tds', 'TDS', 'ppm', 'rssi'],
+  /* ---------- BITTA KOMBINATSIYALANGAN GRAFIK + DIAPAZON TUGMALARI ---------- */
+
+  // Diapazon: 1h/24h/7d/30d/1y — buildDateFilter'dan mustaqil (tez almashtirish)
+  const RANGES = [
+    { id: '1h',  labelUz: '1 soat',  labelRu: '1 час',   ms: 3600e3 },
+    { id: '24h', labelUz: '24 soat', labelRu: '24 часа', ms: 24*3600e3 },
+    { id: '7d',  labelUz: '7 kun',   labelRu: '7 дней',  ms: 7*24*3600e3 },
+    { id: '30d', labelUz: '30 kun',  labelRu: '30 дней', ms: 30*24*3600e3 },
+    { id: '1y',  labelUz: '1 yil',   labelRu: '1 год',   ms: 365*24*3600e3 },
   ];
-  function renderCharts() {
+  let activeRange = '24h';
+  const rangeBtns = new Map();
+  const chartFrame = el('div', { class: 'sl-chart-frame', style: 'min-height:220px' });
+
+  function getChartLabel(r) { return isUz ? r.labelUz : r.labelRu; }
+
+  // Diapazonni rows dan kesilgan nuqtalar
+  function rangePoints() {
+    const rDef = RANGES.find((r) => r.id === activeRange) || RANGES[1];
+    const cutoff = Date.now() - rDef.ms;
+    return rows.filter((r) => r.ts >= cutoff);
+  }
+
+  function fmtXRange(ts) {
+    const rDef = RANGES.find((r) => r.id === activeRange) || RANGES[1];
+    if (rDef.ms <= 24 * 3600e3) return fmtTime(ts);
+    if (rDef.ms <= 7 * 24 * 3600e3)
+      return `${p2(new Date(ts).getDate())}.${p2(new Date(ts).getMonth()+1)} ${fmtTime(ts)}`;
+    return `${p2(new Date(ts).getDate())}.${p2(new Date(ts).getMonth()+1)}`;
+  }
+
+  function drawChart() {
     const th = getTh();
-    const zoomLabels = { zoomIn: t('hist.zoomIn'), zoomOut: t('hist.zoomOut'),
-      reset: t('hist.resetZoom'), prev: t('hist.panPrev'), next: t('hist.panNext') };
-    const cards = SENSORS.map(([k, lb, unit, colorKey]) => {
-      const label = k === 't' ? t('tm.temp') : lb;
-      const pts = rows.filter((r) => typeof r[k] === 'number')
-        .map((r) => ({ x: r.ts, [colorKey]: r[k] }));
-      if (!pts.length) return null;
-      return slCard([
-        el('div', { class: 'sl-card-head' }, [
-          el('div', { class: 'sl-card-title', text: label }),
-          slBadge({ type: 'info', dot: false, label: unit || '·' }),
+    const pts = rangePoints();
+
+    // Uch seriya bitta grafikda: DO, Harorat, pH
+    // Y-o'qlari har xil birlikda — normalize qilamiz displey uchun
+    // (slLineChart har seriyaga o'z Y shkalasini quradi)
+    const hasData = pts.some((p) =>
+      typeof p.do === 'number' || typeof p.t === 'number' || typeof p.ph === 'number'
+    );
+
+    if (!hasData) {
+      mount(chartFrame, slEmptyState({ icon: 'activity', title: t('hist.empty'), desc: t('hist.emptyDesc') }));
+      return;
+    }
+
+    // Nuqtalar: har seriya uchun kerak kalit
+    const points = pts.map((r) => ({
+      x: r.ts,
+      do:   r.do,
+      temp: r.t,
+      ph:   r.ph,
+    }));
+
+    mount(chartFrame, el('div', {}, [
+      slLineChart({
+        points,
+        height: 220,
+        series: [
+          { key: 'do',   label: 'DO',         unit: 'mg/L', area: false },
+          { key: 'temp', label: t('tm.temp'), unit: '°C',   area: false },
+          { key: 'ph',   label: 'pH',         unit: '',     area: false },
+        ],
+        thresholds: [{ seriesKey: 'do', value: th.do.crit }],
+        formatX: fmtXRange,
+        ariaLabel: 'DO · Harorat · pH',
+      }),
+      slChartLegend([
+        { key: 'do',   label: `DO (mg/L)` },
+        { key: 'temp', label: `${t('tm.temp')} (°C)` },
+        { key: 'ph',   label: 'pH' },
+      ]),
+    ]));
+  }
+
+  function renderCharts() {
+    // Diapazon tugmalari
+    const rangeRow = el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:var(--sl-sp-3)' },
+      RANGES.map((r) => {
+        const btn = el('button', {
+          type: 'button',
+          class: 'sl-btn outlined sm' + (r.id === activeRange ? ' active' : ''),
+          style: r.id === activeRange
+            ? 'background:var(--sl-primary);color:#fff;border-color:var(--sl-primary)'
+            : '',
+          text: getChartLabel(r),
+        });
+        btn.addEventListener('click', () => {
+          activeRange = r.id;
+          rangeBtns.forEach((b, id) => {
+            const active = id === activeRange;
+            b.style.background = active ? 'var(--sl-primary)' : '';
+            b.style.color = active ? '#fff' : '';
+            b.style.borderColor = active ? 'var(--sl-primary)' : '';
+          });
+          drawChart();
+        });
+        rangeBtns.set(r.id, btn);
+        return btn;
+      }));
+
+    drawChart();
+
+    mount(chartsBox, slCard([
+      el('div', { class: 'sl-card-head', style: 'margin-bottom:var(--sl-sp-3)' }, [
+        el('div', { class: 'sl-card-title' }, [
+          el('span', { html: slIcon('activity', 16), style: 'display:inline-flex;margin-right:6px;color:var(--sl-primary)' }),
+          el('span', { text: isUz ? 'Sensor grafigi' : 'График сенсоров' }),
         ]),
-        slHistoryChart({
-          points: pts, height: 190,
-          series: [{ key: colorKey, label, unit, area: true }],
-          thresholds: k === 'do' ? [{ seriesKey: 'do', value: th.do.crit }] : [],
-          formatX: fmtX,                                  // tooltip: sana + soat + qiymat
-          ariaLabel: label, labels: zoomLabels,
-        }),
-      ]);
-    }).filter(Boolean);
-    mount(chartsBox, ...(cards.length ? cards : [el('span')]));
+      ]),
+      rangeRow,
+      chartFrame,
+    ]));
   }
 
   /* ---------- JADVAL (sticky/saralash/qidiruv/pagination) ---------- */
