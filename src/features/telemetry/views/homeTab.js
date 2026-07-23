@@ -122,8 +122,12 @@ export function renderHomeTab(nav) {
     // Qurilma darajasidagi statlar (DASH-V4: "Aktiv qurilmalar")
     const assigned = st.devices.filter((d) => d.lakeId);
     const onlineDevs = assigned.filter((d) => presence((st.telemetry.get(d.id) || {}).ts) === 'online').length;
+    const withDev = perLake.filter((x) => x.devs.length);
+    const overall = withDev.length
+      ? Math.round(withDev.reduce((s0, x) => s0 + x.a.healthScore, 0) / withDev.length) : null;
     return {
       perLake,
+      overall,
       alerts: perLake.filter((x) => x.a.hasAlarm || x.msgs.length),
       activeDevices: assigned.length,
       onlineDevs,
@@ -183,6 +187,59 @@ export function renderHomeTab(nav) {
   }
 
   /* --------- 1 · 4 STAT KARTA --------- */
+  /* --------- HERO SLAYD --------- */
+  function heroSlide(snap) {
+    const now = new Date();
+    const h = now.getHours();
+    const greeting = `${t(greetKey(h))}, ${s.profile ? s.profile.ism : ''}`;
+    const dateStr  = `${fmtDate(now, isUz)} · ${fmtClock(now)}`;
+    const overall  = snap.overall;
+    const g        = gradeOf(overall ?? 0);
+    const wEntry   = snap.perLake.map((x) => weatherCache.get(x.lake.id)).find((w) => w && w.data);
+    const wd       = wEntry ? wEntry.data : null;
+    const colA = overall == null ? '#0A3B33' : overall >= 75 ? '#0A4D3C' : overall >= 60 ? '#5C3A00' : '#5C1A1A';
+    const colB = overall == null ? '#15AEC2' : overall >= 75 ? '#0E9F7E' : overall >= 60 ? '#B36A00' : '#C6362B';
+    return el('div', {
+      style: `background:linear-gradient(135deg,${colA} 0%,${colB} 100%);`
+           + 'border-radius:var(--sl-r-xl);padding:var(--sl-sp-5);'
+           + 'color:#fff;position:relative;overflow:hidden;min-height:130px;'
+           + 'display:flex;flex-direction:column;justify-content:space-between;',
+    }, [
+      el('div', { 'aria-hidden': 'true', style: 'position:absolute;bottom:0;left:0;right:0;height:56px;opacity:.13;pointer-events:none',
+        html: `<svg viewBox="0 0 400 56" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M0,36 C80,22 160,50 240,34 C320,18 370,44 400,30 L400,56 L0,56Z" fill="#fff"/>
+          <path d="M0,46 C100,34 200,56 300,42 C360,32 390,50 400,44 L400,56 L0,56Z" fill="#fff"/>
+        </svg>` }),
+      el('div', {}, [
+        el('div', { style: 'font-size:18px;font-weight:800;line-height:1.2', text: greeting }),
+        el('div', { style: 'font-size:12px;opacity:.8;margin-top:2px', text: dateStr }),
+      ]),
+      el('div', { style: 'display:flex;align-items:flex-end;justify-content:space-between;margin-top:var(--sl-sp-4)' }, [
+        el('div', {}, [
+          el('div', { style: 'font-size:11px;opacity:.75;text-transform:uppercase;letter-spacing:.04em',
+            text: isUz ? "Ko'llar salomatligi" : 'Здоровье озёр' }),
+          el('div', { style: 'display:flex;align-items:baseline;gap:5px;margin-top:2px' }, [
+            el('span', { style: 'font-size:40px;font-weight:800;line-height:1;letter-spacing:-1px',
+              text: overall != null ? `${overall}%` : '—' }),
+            overall != null ? el('span', { style: 'font-size:13px;font-weight:700;opacity:.9', text: t(g.key) }) : null,
+          ].filter(Boolean)),
+          el('div', { style: 'display:flex;gap:8px;margin-top:4px;font-size:11px;opacity:.75' }, [
+            el('span', { html: `${slIcon('wifi', 13)} ${snap.onlineDevs} ${isUz ? 'onlayn' : 'онлайн'}` }),
+            snap.alerts.length ? el('span', { html: `${slIcon('bell', 13)} ${snap.alerts.length} ${isUz ? 'ogohlantirish' : 'оповещ.'}` }) : null,
+          ].filter(Boolean)),
+        ]),
+        el('div', { style: 'text-align:right;flex:none' }, wd ? [
+          el('div', { style: 'font-size:26px;line-height:1', html: slIcon(getWeatherIcon(wd.code), 26) }),
+          el('div', { style: 'font-size:22px;font-weight:800;line-height:1.1;margin-top:2px', text: `${wd.temp}°C` }),
+          el('div', { style: 'font-size:11px;opacity:.75', text: wd.label }),
+        ] : [
+          el('div', { style: 'font-size:26px;line-height:1', html: slIcon('sun', 26) }),
+          el('div', { style: 'font-size:11px;opacity:.6;margin-top:6px', text: isUz ? "Ob-havo yo'q" : 'Нет данных' }),
+        ]),
+      ]),
+    ]);
+  }
+
   function statsRow(snap) {
     return el('div', { class: 'sl-grid-2' }, [
       slStatCard({ icon: 'chip', value: snap.activeDevices, label: t('dash.activeDevices'),
@@ -364,6 +421,7 @@ export function renderHomeTab(nav) {
     loadAnnPreview();
 
     mount(content, el('div', { class: 'sl-stack' }, [
+      heroSlide(snap),
       statsRow(snap),
       lakeSection(snap),
       recentAlertsSection(snap),
