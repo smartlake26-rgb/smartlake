@@ -328,6 +328,25 @@ ru.hist = {
   param: 'Показатель', value: 'Значение',
 };
 
+// --- DASH-V4 + ANN-V1: упрощённый дашборд и Объявления ---
+Object.assign(ru.nav, { announcements: 'Объявления' });
+Object.assign(ru.dash, {
+  activeDevices: 'Активные устройства',
+  onlineDevices: 'Онлайн', offlineDevices: 'Офлайн',
+  todayFeed: 'Корм на сегодня', feedNoData: 'Корм: укажите рыбу в Настройках',
+  recentAlerts: 'Последние оповещения',
+});
+ru.ann = {
+  title: 'Объявления', subtitle: 'Сообщения от команды SmartLake',
+  type_news: 'Новость', type_video: 'Видеоурок', type_warning: 'Важно',
+  type_maintenance: 'Тех. работы', type_tip: 'Совет',
+  open: 'Открыть',
+  empty: 'Объявлений пока нет',
+  emptyDesc: 'Новости, видеоуроки и советы от SuperAdmin появятся здесь',
+  onDash: 'Объявления',
+  seeAll: 'Показать все',
+};
+
 ru.reports = {
   title: 'Отчёт',
   pickLake: 'Выберите озеро',

@@ -57,6 +57,8 @@ function healthRing(pct, colorVar, size = 46) {
  * @param {Array}  [p.cells]        — slSensorCard props ro'yxati (DO/Temp ...)
  * @param {string} [p.updatedText]  — "Yangilandi: 5 daq oldin"
  * @param {string} [p.signalText]   — "Signal: Yaxshi (-72 dBm)" (bo'lsa)
+ * @param {Array<Node>} [p.extra]   — katakchalardan keyin qo'shimcha kontent
+ *                                    (masalan, bugungi yem rejasi, ob-havo qatori)
  * @param {Function} [p.onClick]
  * @param {string} [p.ariaLabel]
  * @param {boolean} [p.dim=false]   — arxiv/inactive uchun xira ko'rinish
@@ -64,7 +66,7 @@ function healthRing(pct, colorVar, size = 46) {
 export function slLakeMonitorCard({
   name, statusKind = 'unknown', statusLabel = '', meta = '',
   health = null, gradeLabel = '', gradeColorVar = '--sl-success',
-  cells = [], updatedText = '', signalText = '',
+  cells = [], updatedText = '', signalText = '', extra = [],
   onClick, ariaLabel, dim = false,
 } = {}) {
   const stateVar = STATE_VAR[statusKind] || STATE_VAR.unknown;
@@ -110,6 +112,7 @@ export function slLakeMonitorCard({
     healthRow,
     cells.length ? el('div', { class: 'sl-grid-2', style: 'margin-top:var(--sl-sp-3)' },
       cells.map((c) => slSensorCard(c))) : null,
+    ...[].concat(extra || []).filter(Boolean),
     (updatedText || signalText) ? el('div', { class: 'sl-monitor-foot' }, [
       updatedText ? el('span', { class: 'sl-row', style: 'gap:4px' }, [
         el('span', { style: 'display:inline-flex;opacity:.7', html: slIcon('clock', 12) }),

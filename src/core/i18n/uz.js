@@ -336,6 +336,25 @@ uz.hist = {
   param: "Ko'rsatkich", value: 'Qiymat',
 };
 
+// --- DASH-V4 + ANN-V1: soddalashtirilgan dashboard va E'lonlar ---
+Object.assign(uz.nav, { announcements: "E'lonlar" });
+Object.assign(uz.dash, {
+  activeDevices: 'Aktiv qurilmalar',
+  onlineDevices: 'Onlayn', offlineDevices: 'Oflayn',
+  todayFeed: 'Bugungi yem', feedNoData: "Yem: Sozlamalarda baliq kiriting",
+  recentAlerts: "So'nggi ogohlantirishlar",
+});
+uz.ann = {
+  title: "E'lonlar", subtitle: 'SmartLake jamoasidan xabarlar',
+  type_news: 'Yangilik', type_video: 'Video dars', type_warning: 'Muhim',
+  type_maintenance: 'Texnik xizmat', type_tip: 'Tavsiya',
+  open: 'Ochish',
+  empty: "Hozircha e'lonlar yo'q",
+  emptyDesc: "SuperAdmin yuborgan yangiliklar, video darslar va tavsiyalar shu yerda chiqadi",
+  onDash: "E'lonlar",
+  seeAll: "Barchasini ko'rish",
+};
+
 uz.reports = {
   title: 'Hisobot',
   pickLake: "Ko'lni tanlang",

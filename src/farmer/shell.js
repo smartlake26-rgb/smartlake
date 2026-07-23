@@ -15,19 +15,21 @@ import { renderDevicesTab } from '../features/devices/views/devicesTab.js';
 import { renderProfileTab } from '../features/auth/views/profileTab.js';
 import { renderAiHomeTab } from '../features/ai/views/aiHomeTab.js';
 import { renderReportsTab } from '../features/telemetry/views/reportsTab.js';
+import { renderAnnouncementsTab } from '../features/announcements/views/announcementsTab.js';
 import { renderMenuTab } from './menuTab.js';
 import { renderOnboarding } from './onboarding.js';
 import { authStore } from '../features/auth/index.js';
 
-// DASH-V3: bottom-nav 5 bo'lim (home/lakes/ai/reports/menu).
-// devices/alerts/profile TABS'da SAQLANGAN — Menyu va header'dagi
-// qo'ng'iroq orqali ochiladi (hech qanday funksiya olib tashlanmagan).
+// DASH-V4: bottom-nav'da AI o'rniga E'LONLAR (AI umumiy emas — har
+// ko'l ichida individual ishlaydi, lakeDetailPage AI tabida qoladi).
+// ai/devices/alerts/profile TABS'da SAQLANGAN (funksiya yo'qolmagan).
 const TABS = {
   home: renderHomeTab,
   lakes: renderLakesTab,
-  ai: renderAiHomeTab,
+  elonlar: renderAnnouncementsTab,
   reports: renderReportsTab,
   menu: renderMenuTab,
+  ai: renderAiHomeTab,
   devices: renderDevicesTab,
   alerts: renderNotificationsTab,
   profile: renderProfileTab,
@@ -50,11 +52,11 @@ export function createShell(root, ctx = {}) {
     onboardingActive = true;
   }
 
-  const NAV_IDS = ['home', 'lakes', 'ai', 'reports', 'menu'];
+  const NAV_IDS = ['home', 'lakes', 'elonlar', 'reports', 'menu'];
   const navItems = () => [
     { id: 'home', icon: 'home', label: t('nav.home') },
     { id: 'lakes', icon: 'droplet', label: t('nav.lakes') },
-    { id: 'ai', icon: 'sparkles', label: t('nav.ai') },
+    { id: 'elonlar', icon: 'bell', label: t('nav.announcements') },
     { id: 'reports', icon: 'trendUp', label: t('nav.reports') },
     { id: 'menu', icon: 'menu', label: t('nav.menu') },
   ];
