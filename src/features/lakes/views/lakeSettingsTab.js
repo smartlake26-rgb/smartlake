@@ -25,6 +25,7 @@ import { loadLakeMeta, saveLakeMeta } from '../../telemetry/services/archiveServ
 import { biomassKg } from '../../telemetry/domain/feedEngine.js';
 import { estimateAvgWeightG } from '../../telemetry/domain/growth.js';
 import { loadCatalogs, catalogName } from '../../catalog/catalogService.js';
+import * as dataStore from '../../../farmer/dataStore.js';
 import { slIcon, slCard, slButton, slField, slSelect, slKvRow } from '../../../design-system/index.js';
 
 const MAX_FISH = 4;
@@ -344,20 +345,51 @@ export function buildLakeSettingsTab({ lakeId, uid, isUz, devicesCard, onSaved }
   ]).then(([cats, m]) => {
     catalogs = cats;
     meta = m || null;
-    if (m) {
-      if (m.passport) {
-        if (m.passport.area     != null) areaIn.input.value     = m.passport.area;
-        if (m.passport.avgDepth != null) avgDepthIn.input.value = m.passport.avgDepth;
-        if (m.passport.maxDepth != null) maxDepthIn.input.value = m.passport.maxDepth;
-      }
-      fish = Array.isArray(m.fish) ? m.fish.map((f) => ({ ...f })) : [];
-      if (m.feed && m.feed.price != null) feedPriceIn.input.value = m.feed.price;
-      if (m.aerators) {
-        if (m.aerators.count != null) aerCountIn.input.value = m.aerators.count;
-        if (m.aerators.kw    != null) aerKwIn.input.value    = m.aerators.kw;
-      }
-      if (m.energy && m.energy.tariff != null) tariffIn.input.value = m.energy.tariff;
+
+    // KO'L HUJJATI (lakes) — ko'l yaratishda kiritilgan ma'lumotlar fallback:
+    // lakeMeta'da yo'q bo'lsa, ko'l yaratish formasida kiritilganlari ko'rsatiladi
+    const lk = dataStore.getState().lakes.find((l) => l.id === lakeId)
+      || dataStore.getState().archivedLakes.find((l) => l.id === lakeId) || null;
+
+    // Pasport: meta > lake
+    const pArea  = m?.passport?.area     ?? (lk && lk.area != null ? parseFloat(lk.area) : null);
+    const pAvgD  = m?.passport?.avgDepth ?? (lk && lk.averageDepth != null ? parseFloat(lk.averageDepth) : null);
+    const pMaxD  = m?.passport?.maxDepth ?? null;
+    if (pArea != null && Number.isFinite(pArea)) areaIn.input.value = pArea;
+    if (pAvgD != null && Number.isFinite(pAvgD)) avgDepthIn.input.value = pAvgD;
+    if (pMaxD != null) maxDepthIn.input.value = pMaxD;
+
+    // Baliq: meta.fish bo'lsa u; bo'lmasa lake.fishSpecies dan konvert
+    if (Array.isArray(m?.fish) && m.fish.length) {
+      fish = m.fish.map((f) => ({ ...f }));
+    } else if (lk && Array.isArray(lk.fishSpecies) && lk.fishSpecies.length) {
+      // Katalogda nomi mos kelsa typeId avtomatik bog'lanadi
+      const byName = (name) => cats.fish.find((c) =>
+        catalogName(c, true) === name || catalogName(c, false) === name || c.id === name) || null;
+      fish = lk.fishSpecies
+        .filter((it) => it && (typeof it === 'object' ? it.species : it))
+        .map((it) => {
+          const nm = typeof it === 'object' ? it.species : String(it);
+          const cat = byName(nm);
+          return {
+            typeId: cat ? cat.id : null,
+            type: nm,
+            count: typeof it === 'object' ? (it.count ?? null) : null,
+            startWeight: null,
+            avgWeight: typeof it === 'object' ? (it.avgWeight ?? null) : null,
+          };
+        });
+    } else {
+      fish = [];
     }
+
+    if (m?.feed && m.feed.price != null) feedPriceIn.input.value = m.feed.price;
+    if (m?.aerators) {
+      if (m.aerators.count != null) aerCountIn.input.value = m.aerators.count;
+      if (m.aerators.kw    != null) aerKwIn.input.value    = m.aerators.kw;
+    }
+    if (m?.energy && m.energy.tariff != null) tariffIn.input.value = m.energy.tariff;
+
     buildFeedSelect();
     renderFish();
   });
