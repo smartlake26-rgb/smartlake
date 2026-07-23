@@ -427,4 +427,19 @@ uz.lakedet = {
   rangeStats: 'Tanlangan davr statistikasi',
 };
 
+// --- HIST-V4 + REP-V1: sof Data History va Hisobot moduli ---
+Object.assign(uz.hist, {
+  zoomIn: 'Yaqinlashtirish', zoomOut: 'Uzoqlashtirish', resetZoom: 'Toza ko\'rinish',
+  panPrev: 'Oldingi oraliq', panNext: 'Keyingi oraliq',
+  exportFull: "Eksportda tanlangan davrning BARCHA yozuvlari chiqadi — ma'lumot qisqartirilmaydi",
+});
+Object.assign(uz.reports, {
+  hint: "Elektr energiyasi, yem statistikasi va moliyaviy xulosa. Sensor tarixi: Ko'l sahifasi → Tarix",
+});
+uz.rep = {
+  finance: 'Moliyaviy xulosa',
+  finTotal: 'Jami xarajat (davr)',
+  scope: "Elektr · Yem · Moliya",
+};
+
 export default uz;

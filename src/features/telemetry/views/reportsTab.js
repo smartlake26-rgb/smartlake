@@ -14,8 +14,7 @@ import { appBar, skeletonCards } from '../../../shared/ui/index.js';
 import { slEmptyState } from '../../../design-system/index.js';
 import { authStore } from '../../auth/index.js';
 import * as dataStore from '../../../farmer/dataStore.js';
-import { resolveThresholds } from '../domain/thresholds.js';
-import { buildHistoryTab } from './historyTab.js';
+import { buildReportTab } from './reportModule.js';
 
 export function renderReportsTab(nav) {
   const s = authStore.getState();
@@ -29,16 +28,16 @@ export function renderReportsTab(nav) {
   let selectedLakeId = null;
   const historyNodes = new Map();   // lakeId -> tayyor hisobot Node (lazy, keshlanadi)
 
+  // HIST-V4: bottom-nav Hisobot endi ELEKTR/YEM/MOLIYA moduli
+  // (Tarixdan ko'chirilgan bo'limlar). Sensor tarixi — Ko'l > Tarix.
   function historyFor(lakeId) {
     if (!historyNodes.has(lakeId)) {
-      historyNodes.set(lakeId, buildHistoryTab({
+      const st0 = dataStore.getState();
+      const lk = st0.lakes.find((l) => l.id === lakeId);
+      historyNodes.set(lakeId, buildReportTab({
         lakeId, uid: s.uid, isUz,
+        lakeName: lk ? lk.name : '',
         getDevs: () => dataStore.getState().devices.filter((d) => d.lakeId === lakeId),
-        getTh: () => {
-          const st = dataStore.getState();
-          const lk = st.lakes.find((l) => l.id === lakeId);
-          return resolveThresholds(lk);
-        },
       }));
     }
     return historyNodes.get(lakeId);

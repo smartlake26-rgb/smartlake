@@ -307,8 +307,11 @@ export function renderLakeDetailPage(nav, lakeId) {
   const historyNodes = new Map();   // devId -> tayyor Node (lazy kesh)
   function historyForDevice(devId) {
     if (!historyNodes.has(devId)) {
+      const st0 = dataStore.getState();
+      const lk0 = st0.lakes.find((l) => l.id === lakeId) || st0.archivedLakes.find((l) => l.id === lakeId);
       historyNodes.set(devId, buildHistoryTab({
         lakeId, uid: s.uid, isUz,
+        lakeName: lk0 ? lk0.name : '',
         getDevs: () => {
           const st2 = dataStore.getState();
           return st2.devices.filter((d) => d.id === devId);   // FAQAT shu qurilma

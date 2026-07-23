@@ -22,3 +22,4 @@ export {
 export { slCountUp } from './countup.js';
 export { slLakeMonitorCard } from './monitorCard.js';
 export { slFeedSchedule } from './feedSchedule.js';
+export { slHistoryChart } from './historyChart.js';
