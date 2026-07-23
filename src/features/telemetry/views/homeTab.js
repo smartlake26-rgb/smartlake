@@ -41,6 +41,7 @@ import {
 } from '../services/archiveService.js';
 import { getLakeWeather, getWeatherIcon } from '../services/weatherService.js';
 import { renderLakeDetailPage } from '../../lakes/views/lakeDetailPage.js';
+import { toggleTheme, getTheme } from '../../../shared/ui/theme.js';
 import {
   slIcon, ICONS, slIconButton, slCard, slStatCard,
   slLakeCard, slAiCard, slWeatherCard, slEmptyState, slKvRow,
