@@ -35,6 +35,7 @@ jobs:
     timeout-minutes: 15
 
     strategy:
+      fail-fast: false
       matrix:
         include:
           - name: gateway
@@ -77,14 +78,34 @@ jobs:
           unzip -q /tmp/fb.zip -d ~/Arduino/libraries/
           mv ~/Arduino/libraries/Firebase-ESP-Client-${FIREBASE_VER} ~/Arduino/libraries/Firebase_ESP_Client
 
+      - name: Prepare sketch folders
+        if: steps.skip.outputs.skip != 'true'
+        run: |
+          SKETCH="${{ matrix.sketch }}"
+          BASENAME=$(basename "$SKETCH" .ino)
+          DIR="firmware/${BASENAME}"
+          # Agar papka ichida bo'lsa — tayyor
+          if [ -f "${DIR}/${BASENAME}.ino" ]; then
+            echo "✓ Sketch papkada: ${DIR}/${BASENAME}.ino"
+          # Agar ildizda bo'lsa — papkaga nusxalash
+          elif [ -f "firmware/${BASENAME}.ino" ]; then
+            mkdir -p "$DIR"
+            cp "firmware/${BASENAME}.ino" "${DIR}/${BASENAME}.ino"
+            echo "✓ Ildizdan papkaga ko'chirildi: ${DIR}/${BASENAME}.ino"
+          else
+            echo "✗ Sketch topilmadi!"
+            exit 1
+          fi
+
       - name: Compile ${{ matrix.name }}
         if: steps.skip.outputs.skip != 'true'
         run: |
+          BASENAME=$(basename "${{ matrix.sketch }}" .ino)
           arduino-cli compile \
             --fqbn ${{ matrix.board }} \
             --build-property "build.partitions=min_spiffs" \
             --output-dir build/${{ matrix.name }} \
-            ${{ matrix.sketch }}
+            "firmware/${BASENAME}"
 
       - name: Generate SHA256
         if: steps.skip.outputs.skip != 'true'
