@@ -465,106 +465,94 @@ export function renderLakeDetailPage(nav, lakeId) {
       el('div', { class: 'sl-caption', text: `${t('dash.signal_' + sq)}${bestRssi != null ? ` · ${bestRssi} dBm` : ''}` }),
       el('div', { class: 'sl-caption', text: fmtAgo(a.lastUpdate, isUz) }),
     ]);
-    const healthHero = slCard([
-      el('div', { class: 'sl-row-between', style: 'align-items:flex-start' }, [
-        el('div', {}, [
-          el('div', { class: 'sl-label', style: 'color:var(--sl-text-secondary)', text: t('lakedet.health') }),
-          el('div', { class: 'sl-row', style: 'align-items:baseline;gap:6px;margin-top:6px' }, [
-            heroNum, el('span', { class: 'sl-num-md', style: `color:var(${g.colorVar})`, text: devs.length ? '%' : '' }),
-          ]),
-          el('div', { style: `margin-top:4px;font-weight:700;color:var(${g.colorVar})`,
-            text: devs.length ? t(g.key) : t('common.noData') }),
-          el('div', { class: 'sl-caption', style: 'margin-top:4px',
-            text: `${a.online}/${a.deviceCount} ${t('tm.online')} · ${t('lakedet.aiReady')}` }),
-        ]),
-        signalBlock,
-      ]),
-    ], { elevated: true, premium: a.healthScore >= 90 && devs.length > 0,
-      critical: a.healthScore <= 60 && devs.length > 0 });
-    slCountUp(heroNum, devs.length ? a.healthScore : null, { decimals: 0 });
-
-    // ================= 2 · SENSORLAR =================
+    // ================= YANGI DIZAYN: DO HERO + 4 KARTA =================
     const evalDo = (v) => v == null ? 'unknown' : v < th.do.crit ? 'critical' : v < th.do.warn ? 'warning' : 'healthy';
     const evalTemp = (v) => v == null ? 'unknown' : (v < th.temp.critMin || v > th.temp.critMax) ? 'critical'
       : (v < th.temp.warnMin || v > th.temp.warnMax) ? 'warning' : 'healthy';
     const evalPh = (v) => v == null ? 'unknown' : (v < th.ph.critMin || v > th.ph.critMax) ? 'critical'
       : (v < th.ph.warnMin || v > th.ph.warnMax) ? 'warning' : 'healthy';
     const anyTel = devs.map((d) => st.telemetry.get(d.id)).filter(Boolean);
-    const avgOf = (k) => { const v = anyTel.map((x) => x[k]).filter((n) => typeof n === 'number');
-      return v.length ? Math.round((v.reduce((p, q) => p + q, 0) / v.length) * 10) / 10 : null; };
 
-    // Barcha sensorlar uchun holat — lakeSensorState QAYTA ISHLATILADI (sensorState.js)
-    function lakeState(key) {
-      return lakeSensorState(anyTel, key);
-    }
-    // Faqat PRESENT bo'lsa qiymat, aks holda null -> sensorParamCard status ko'rsatadi
-    function safeAvg(key, aggVal) {
-      return lakeState(key) === SENSOR_STATE.PRESENT ? aggVal : null;
-    }
-    // Sensor holati matni (UI'da qiymat o'rniga)
-    const sensorStateText = (state) => {
-      const KEY_MAP = {
-        [SENSOR_STATE.ABSENT]:       'sensor.absent',
-        [SENSOR_STATE.DISCONNECTED]: 'sensor.disconnected',
-        [SENSOR_STATE.DISABLED]:     'sensor.disabled',
-        [SENSOR_STATE.FAULTY]:       'sensor.faulty',
-        [SENSOR_STATE.CALIBRATION]:  'sensor.calibration',
-      };
-      return t(KEY_MAP[state] || 'sensor.absent');
-    };
+    function lakeState(key) { return lakeSensorState(anyTel, key); }
+    function safeAvg(key, aggVal) { return lakeState(key) === SENSOR_STATE.PRESENT ? aggVal : null; }
     function sensorNorm(key, defaultNorm) {
-      const st = lakeState(key);
-      return st === SENSOR_STATE.PRESENT ? defaultNorm : sensorStateText(st);
+      const st0 = lakeState(key);
+      if (st0 === SENSOR_STATE.PRESENT) return defaultNorm;
+      const MAP = { [SENSOR_STATE.ABSENT]:'sensor.absent', [SENSOR_STATE.DISCONNECTED]:'sensor.disconnected',
+        [SENSOR_STATE.DISABLED]:'sensor.disabled', [SENSOR_STATE.FAULTY]:'sensor.faulty', [SENSOR_STATE.CALIBRATION]:'sensor.calibration' };
+      return t(MAP[st0] || 'sensor.absent');
     }
-    function sensorStKey(key, presentKey) {
-      return lakeState(key) === SENSOR_STATE.PRESENT ? presentKey : 'unknown';
+    function sensorStKey(key, presentKey) { return lakeState(key) === SENSOR_STATE.PRESENT ? presentKey : 'unknown'; }
+
+    const doState = lakeState('do'), tempState = lakeState('t'), phState = lakeState('ph');
+    const doVal  = safeAvg('do', a.avgDo);
+    const tmpVal = safeAvg('t', a.avgTemp);
+    const phVal  = safeAvg('ph', a.avgPh);
+    const doSt   = sensorStKey('do', evalDo(doVal));
+    const tmpSt  = sensorStKey('t', evalTemp(tmpVal));
+    const phSt   = sensorStKey('ph', evalPh(phVal));
+    const doTr   = doState === SENSOR_STATE.PRESENT ? calcTrend(trendPts, 'do') : null;
+    const tmpTr  = tempState === SENSOR_STATE.PRESENT ? calcTrend(trendPts, 't') : null;
+    const firstTel = anyTel[0] || {};
+    const gwOnline = a.online > 0;
+    const lastTs = a.lastUpdate;
+    const rssiVal = firstTel.rssi;
+
+    const doColor = doSt === 'healthy' ? '#0E7C6B' : doSt === 'warning' ? '#E8922A' : doSt === 'critical' ? '#D93025' : '#8aa';
+    const doStatusTxt = doSt === 'healthy' ? 'Normal' : doSt === 'warning' ? (isUz ? 'Ogohlantirish' : 'Внимание') : doSt === 'critical' ? (isUz ? 'Xavfli' : 'Опасно') : '\u2014';
+    const doProgress = doVal != null ? Math.min(100, Math.max(0, (doVal / 10) * 100)) : 0;
+
+    const healthHero = el('div', {
+      style: 'background:var(--sl-card,#fff);border-radius:16px;padding:20px;box-shadow:0 1px 8px rgba(0,0,0,.05);cursor:pointer',
+      role: 'button', tabindex: '0',
+    }, [
+      el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:14px' }, [
+        el('span', { style: 'font-size:12px;font-weight:600;color:#0E7C6B;padding:3px 10px;border:1.5px solid #0E7C6B;border-radius:20px', text: lake.name }),
+        el('span', { style: `font-size:11px;font-weight:700;padding:3px 10px;border-radius:20px;${gwOnline ? 'background:#E8FAF6;color:#0E7C6B' : 'background:#FEE;color:#D93025'}`, text: gwOnline ? 'ONLINE' : 'OFFLINE' }),
+      ]),
+      el('div', { style: 'margin-bottom:6px' }, [
+        el('span', { style: 'font-size:42px;font-weight:800;color:var(--sl-on-surface,#1a2a3a);line-height:1;letter-spacing:-1px', text: doVal != null ? String(doVal) : '\u2014' }),
+        el('span', { style: 'font-size:18px;font-weight:600;color:var(--sl-text-secondary,#5a7a8a);margin-left:4px', text: 'mg/L' }),
+      ]),
+      el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px' }, [
+        el('span', { style: 'font-size:14px;font-weight:600;color:var(--sl-on-surface-variant,#3a5a6a)', text: isUz ? 'Eritilgan kislorod' : 'Растворённый кислород' }),
+        el('span', { style: `display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;color:${doColor}`, html: `<span style="width:8px;height:8px;border-radius:50%;background:${doColor};display:inline-block"></span> ${doStatusTxt}` }),
+      ]),
+      el('div', { style: 'height:10px;border-radius:5px;background:var(--sl-card-inset,#f0f4f5);overflow:hidden;margin-bottom:6px' }, [
+        el('div', { style: `height:100%;width:${doProgress}%;border-radius:5px;background:${doColor};transition:width .5s` }),
+      ]),
+      el('div', { style: 'display:flex;justify-content:space-between;font-size:11px;color:var(--sl-text-disabled,#8aa)' }, [
+        el('span', { text: `${isUz ? 'Kritik' : 'Крит.'}: <${th.do.crit}` }),
+        el('span', { text: `${isUz ? 'Maqsad' : 'Цель'}: ${th.do.warn}-8` }),
+      ]),
+    ]);
+    healthHero.addEventListener('click', () => openSensorDialog({ key: 'do', label: 'DO', unit: 'mg/L', norm: `\u2265${th.do.warn}` }));
+
+    function miniCard(cfg) {
+      const color = cfg.st === 'healthy' ? '#0E7C6B' : cfg.st === 'warning' ? '#E8922A' : cfg.st === 'critical' ? '#D93025' : '#8aa';
+      const c = el('div', { style: 'background:var(--sl-card,#fff);border-radius:14px;padding:16px;box-shadow:0 1px 6px rgba(0,0,0,.04);cursor:pointer;border:1px solid var(--sl-divider,#f0f2f4)', role:'button', tabindex:'0' }, [
+        el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px' }, [
+          el('span', { style: 'font-size:12px;font-weight:600;color:var(--sl-text-secondary,#5a7a8a)', text: cfg.label }),
+          el('span', { style: `display:inline-flex;color:${color}`, html: slIcon(cfg.ic, 16) }),
+        ]),
+        el('div', { style: 'margin-bottom:4px' }, [
+          el('span', { style: 'font-size:24px;font-weight:800;color:var(--sl-on-surface,#1a2a3a);line-height:1', text: cfg.val != null ? String(cfg.val) : '\u2014' }),
+          cfg.unit ? el('span', { style: 'font-size:12px;color:var(--sl-text-secondary);margin-left:2px', text: cfg.unit }) : null,
+        ].filter(Boolean)),
+        cfg.trend ? el('div', { style: `font-size:11px;font-weight:700;color:${cfg.trend.dir > 0 ? '#0E7C6B' : cfg.trend.dir < 0 ? '#E8922A' : '#8aa'}`,
+          html: `${cfg.trend.dir > 0 ? '\u2191' : cfg.trend.dir < 0 ? '\u2193' : '\u2014'} ${cfg.trend.d != null ? Math.abs(cfg.trend.d).toFixed(1) : ''}` })
+        : cfg.sub ? el('div', { style: `font-size:11px;font-weight:600;color:${color}`, text: cfg.sub }) : null,
+      ].filter(Boolean));
+      if (cfg.onClick) c.addEventListener('click', cfg.onClick);
+      return c;
     }
 
-    const doState   = lakeState('do');
-    const tempState = lakeState('t');
-    const phState   = lakeState('ph');
-    const tdsState  = lakeState('tds');
-    const nh3State  = lakeState('nh3');
-    const hasNh3 = nh3State === SENSOR_STATE.PRESENT;
-    const sensorCards = [
-      sensorParamCard({ key: 'do', label: 'DO', ic: 'waves',
-        value: safeAvg('do', a.avgDo), unit: 'mg/L',
-        norm: sensorNorm('do', `≥${th.do.warn}`),
-        stKey: sensorStKey('do', evalDo(a.avgDo)),
-        tr: doState === SENSOR_STATE.PRESENT ? calcTrend(trendPts, 'do') : null,
-        lastTs: a.lastUpdate }),
-      sensorParamCard({ key: 'temp', label: t('tm.temp'), ic: 'thermometer',
-        value: safeAvg('t', a.avgTemp), unit: '°C',
-        norm: sensorNorm('t', `${th.temp.warnMin}–${th.temp.warnMax}`),
-        stKey: sensorStKey('t', evalTemp(a.avgTemp)),
-        tr: tempState === SENSOR_STATE.PRESENT ? calcTrend(trendPts, 't') : null,
-        lastTs: a.lastUpdate }),
-      sensorParamCard({ key: 'ph', label: 'pH', ic: 'activity',
-        value: safeAvg('ph', a.avgPh), unit: '',
-        norm: sensorNorm('ph', `${th.ph.warnMin}–${th.ph.warnMax}`),
-        stKey: sensorStKey('ph', evalPh(a.avgPh)),
-        tr: phState === SENSOR_STATE.PRESENT ? calcTrend(trendPts, 'ph') : null,
-        lastTs: a.lastUpdate }),
-      sensorParamCard({ key: 'tds', label: 'TDS', ic: 'layers',
-        value: safeAvg('tds', avgOf('tds')), unit: 'ppm',
-        norm: sensorNorm('tds', '—'),
-        stKey: sensorStKey('tds', 'healthy'),
-        tr: null, lastTs: a.lastUpdate }),
-    ];
-    if (nh3State !== SENSOR_STATE.ABSENT) {
-      sensorCards.push(sensorParamCard({ key: 'nh3', label: isUz ? 'Ammiak' : 'Аммиак', ic: 'droplet',
-        value: safeAvg('nh3', avgOf('nh3')), unit: 'mg/L',
-        norm: sensorNorm('nh3', '—'),
-        stKey: sensorStKey('nh3', 'healthy'), tr: null, lastTs: a.lastUpdate }));
-    }
-    const batState = lakeState('battery');
-    sensorCards.push(sensorParamCard({ key: 'battery', label: t('lakedet.battery'), ic: 'battery',
-      value: safeAvg('battery', avgOf('battery')), unit: '%', norm: `≥${th.battery.warn}%`,
-      stKey: sensorStKey('battery',
-        avgOf('battery') != null && avgOf('battery') < th.battery.warn ? 'warning' : 'healthy'),
-      tr: null, lastTs: a.lastUpdate }));
-    const sensors = el('div', { class: 'sl-grid-2' }, sensorCards);
-
+    const sensors = el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px' }, [
+      miniCard({ label: isUz ? 'Harorat' : 'Температура', val: tmpVal, unit: '\u00B0C', ic: 'thermometer', st: tmpSt, trend: tmpTr, onClick: () => openSensorDialog({ key: 'temp', label: t('tm.temp'), unit: '\u00B0C', norm: `${th.temp.warnMin}\u2013${th.temp.warnMax}` }) }),
+      miniCard({ label: 'pH', val: phVal, unit: '', ic: 'activity', st: phSt, sub: phSt === 'healthy' ? (isUz ? 'Barqaror' : 'Стабильно') : sensorNorm('ph', ''), onClick: () => openSensorDialog({ key: 'ph', label: 'pH', unit: '', norm: `${th.ph.warnMin}\u2013${th.ph.warnMax}` }) }),
+      miniCard({ label: 'Gateway', val: gwOnline ? 'Online' : 'Offline', unit: '', ic: 'wifi', st: gwOnline ? 'healthy' : 'critical', sub: fmtAgo(lastTs, isUz) }),
+      miniCard({ label: 'Node', val: rssiVal != null ? `${rssiVal}` : '\u2014', unit: rssiVal != null ? 'dBm' : '', ic: 'radio', st: rssiVal != null && rssiVal > -80 ? 'healthy' : 'warning', sub: isUz ? 'Yangilanish' : 'Обновление' }),
+    ]);
     // ================= 3 · 48h KISLOROD GRAFIKLARI (har qurilma) =================
     // LAKEDET-V5: o'rtacha grafik CHIQARILMAYDI — har qurilma alohida.
     const fmtX48 = (x) => {
