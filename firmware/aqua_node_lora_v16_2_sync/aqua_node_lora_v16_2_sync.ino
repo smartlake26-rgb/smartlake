@@ -145,7 +145,12 @@ static const uint32_t BROADCAST_ID = 0xFFFFFFFFUL;
 #define CMD_FARQ      0x04   // val = mg/L
 #define CMD_KRITIK    0x05   // val = mg/L
 #define CMD_MODE      0x06   // val = 0 (kislorod) / 1 (vaqt)
-#define CMD_STATUS    0x07   // darhol telemetriya yuborishni so'raydi
+#define CMD_STATUS    0x07
+#define CMD_OTA_BEGIN   0xF0
+#define CMD_OTA_DATA    0xF1
+#define CMD_OTA_END     0xF2
+#define CMD_OTA_ACK     0xF3
+#define CMD_OTA_ABORT   0xF4
 #define CMD_TIME      0x08   // Fix 6: val = Unix timestamp — RTC ni internetdan sinxronlash
 #define CMD_HIST      0x09   // Fix 13: NVS tarixini ilovaga yuborish
 
@@ -1877,7 +1882,7 @@ void nodeOtaHandleBegin(const uint8_t* payload, uint8_t len) {
   }
 
   // ESP32 OTA boshlash
-  if (!Update.begin(nodeOtaTotalSize)) {
+  if (!Update.begin((size_t)nodeOtaTotalSize)) {
     Serial.printf("[NODE-OTA] Update.begin xato: %s\n", Update.errorString());
     nodeOtaSendAck(0, 2);   // abort
     return;
@@ -1921,7 +1926,7 @@ void nodeOtaHandleData(const uint8_t* payload, uint8_t len) {
   }
 
   // Flash'ga yozish
-  if (Update.write(data, dataLen) != dataLen) {
+  if (Update.write((uint8_t*)data, (size_t)dataLen) != (size_t)dataLen) {
     Serial.printf("[NODE-OTA] Write xato: %s\n", Update.errorString());
     nodeOtaAbort("write xato");
     return;
