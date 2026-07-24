@@ -1834,6 +1834,9 @@ void loraInfoKorsat() {
 // ---- OTA buyruq kodlari (Gateway va Node bir xil) ----
 
 // ---- Node OTA holati ----
+#define NODE_OTA_TIMEOUT_MS  15000UL
+#define NODE_OTA_MAX_RETRY   5
+#define NODE_OTA_CHUNK_SIZE  200
 static bool nodeOtaActive = false;
 static uint32_t nodeOtaTotalSize = 0;
 static uint32_t nodeOtaExpectedCrc = 0;
@@ -1966,10 +1969,9 @@ void nodeOtaHandleEnd(const uint8_t* payload, uint8_t len) {
 
 // ---- ACK yuborish (Gateway'ga) ----
 void nodeOtaSendAck(uint16_t seq, uint8_t status) {
-  uint8_t pkt[3] = { (uint8_t)(seq & 0xFF), (uint8_t)(seq >> 8), status };
-  // loraCmdYubor mavjud funksiyasi bilan yuboriladi
-  // Bu yerda loyihaga mos LoRa yuborish chaqiruvi bo'lishi kerak:
-  // loraYuborOtaAck(pkt, 3);
+  // Gateway'ga OTA ACK yuborish (mavjud loraCmdAckYubor orqali)
+  // cmd = CMD_OTA_ACK, ok = status (0=ok, 1=retry, 2=abort)
+  loraCmdAckYubor(CMD_OTA_ACK, status, 0);  // dst=0 = gateway
   Serial.printf("[NODE-OTA] ACK: seq=%u, status=%u\n", seq, status);
 }
 
