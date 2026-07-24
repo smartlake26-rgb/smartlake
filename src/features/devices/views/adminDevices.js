@@ -52,7 +52,6 @@ function provisioningCard() {
   async function makePdf({ deviceId, serialNumber, region, activationKey }) {
     const { jsPDF } = await import('jspdf');
     const doc = new jsPDF({ format: [90, 130], unit: 'mm' });
-    const qrUrl = `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(deviceId + '|' + activationKey)}&choe=UTF-8&chld=M|1`;
 
     doc.setFillColor(14, 124, 107);
     doc.rect(0, 0, 90, 22, 'F');
@@ -83,8 +82,9 @@ function provisioningCard() {
     doc.setFontSize(11); doc.setFont('courier', 'bold'); doc.setTextColor(14, 80, 60);
     doc.text(activationKey, 8, y + 10); y += 18;
 
-    // QR kod
+    // QR kod (Google Charts API)
     try {
+      const qrUrl = `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(deviceId + '|' + activationKey)}&choe=UTF-8&chld=M|1`;
       const resp = await fetch(qrUrl);
       const blob = await resp.blob();
       const b64 = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
@@ -219,7 +219,6 @@ export function renderAdminDevices() {
               catch { key = '????-????-????-????'; }
               const { jsPDF } = await import('jspdf');
               const doc = new jsPDF({ format: [90, 130], unit: 'mm' });
-              const qrUrl = `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(r.id + '|' + key)}&choe=UTF-8`;
               doc.setFillColor(14, 124, 107); doc.rect(0, 0, 90, 22, 'F');
               doc.setTextColor(255, 255, 255); doc.setFontSize(13); doc.setFont('helvetica', 'bold');
               doc.text('SmartLake', 7, 10);
@@ -237,9 +236,11 @@ export function renderAdminDevices() {
               doc.setFontSize(11); doc.setFont('courier','bold'); doc.setTextColor(14,80,60);
               doc.text(key, 8, y+10); y+=18;
               try {
-                const resp = await fetch(qrUrl); const blob = await resp.blob();
-                const b64 = await new Promise((res) => { const rdr = new FileReader(); rdr.onload = () => res(rdr.result); rdr.readAsDataURL(blob); });
-                doc.addImage(b64, 'PNG', 20, y, 50, 50); y+=54;
+                const qrUrl2 = `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(r.id + '|' + key)}&choe=UTF-8&chld=M|1`;
+                const resp2 = await fetch(qrUrl2);
+                const blob2 = await resp2.blob();
+                const b642 = await new Promise((res) => { const rdr = new FileReader(); rdr.onload = () => res(rdr.result); rdr.readAsDataURL(blob2); });
+                doc.addImage(b642, 'PNG', 20, y, 50, 50); y+=54;
               } catch {}
               const url = URL.createObjectURL(doc.output('blob'));
               const a = document.createElement('a'); a.href=url; a.download=`smartlake-${r.id}.pdf`; a.click();
