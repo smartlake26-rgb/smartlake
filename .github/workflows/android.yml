@@ -1,1 +1,123 @@
+# ============================================================
+#  SmartLake 2.0 — Android APK Build
+#  main branch'ga push bo'lganda yoki qo'lda (workflow_dispatch)
+#  ishga tushadi. Capacitor orqali PWA'ni native Android
+#  ilovasiga o'giradi va APK hosil qiladi.
+# ============================================================
 
+name: Android APK Build
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**.md'
+      - 'firmware/**'
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build turi'
+        required: true
+        default: 'debug'
+        type: choice
+        options:
+          - debug
+          - release
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Java (Android SDK uchun)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build web (vite)
+        run: npm run build
+
+      - name: Install Capacitor CLI
+        run: npm install -g @capacitor/cli
+
+      - name: Init Capacitor (agar android/ yo'q bo'lsa)
+        run: |
+          if [ ! -f "capacitor.config.ts" ] && [ ! -f "capacitor.config.json" ]; then
+            echo "Capacitor config yaratilmoqda..."
+            npx cap init SmartLake uz.smartlake.app --web-dir dist
+          fi
+          if [ ! -d "android" ]; then
+            echo "Android platforma qo'shilmoqda..."
+            npm install @capacitor/core @capacitor/android
+            npx cap add android
+          fi
+
+      - name: Sync web → Android
+        run: npx cap sync android
+
+      - name: Build APK (debug)
+        if: ${{ github.event.inputs.build_type != 'release' }}
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Build APK (release)
+        if: ${{ github.event.inputs.build_type == 'release' }}
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Find APK
+        id: apk
+        run: |
+          APK=$(find android/app/build/outputs/apk -name "*.apk" | head -1)
+          echo "path=$APK" >> $GITHUB_OUTPUT
+          echo "name=SmartLake-$(date +%Y%m%d)-$(git rev-parse --short HEAD).apk" >> $GITHUB_OUTPUT
+          echo "APK topildi: $APK"
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.apk.outputs.name }}
+          path: ${{ steps.apk.outputs.path }}
+          retention-days: 30
+
+      - name: Create Release (faqat main branch, release build)
+        if: ${{ github.ref == 'refs/heads/main' && github.event.inputs.build_type == 'release' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ github.run_number }}
+          name: SmartLake v2.0.${{ github.run_number }}
+          files: ${{ steps.apk.outputs.path }}
+          body: |
+            ## SmartLake Android APK
+            - Build: #${{ github.run_number }}
+            - Commit: ${{ github.sha }}
+          draft: false
+          prerelease: false

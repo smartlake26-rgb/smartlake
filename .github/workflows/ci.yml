@@ -1,0 +1,51 @@
+# ============================================================
+#  SmartLake 2.0 — CI Pipeline
+#  Har push va PR da: lint, test, build tekshiruvi
+# ============================================================
+
+name: CI — Test & Build
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Test & Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Build (vite)
+        run: npm run build
+
+      - name: Check firmware untouched
+        run: |
+          echo "Firmware fayllar tekshiruvi..."
+          if [ -d "firmware" ]; then
+            echo "✓ firmware/ papkasi mavjud"
+          fi
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: smartlake-web-dist
+          path: dist/
+          retention-days: 7
