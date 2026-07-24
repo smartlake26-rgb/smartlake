@@ -1804,6 +1804,10 @@ void loraInfoKorsat() {
 //  SETUP
 // ================================================================
 
+
+// OTA uchun forward deklaratsiyalar
+void loraCmdAckYubor(uint8_t cmd, uint8_t ok, uint32_t dst);
+
 // ================================================================
 //  OTA: NODE FIRMWARE YANGILASH (LoRa orqali)
 // ================================================================

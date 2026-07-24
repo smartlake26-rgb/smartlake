@@ -1147,7 +1147,7 @@ static bool otaDownloadAndFlash(const String& url, const String& expectedSha) {
   while (http.connected() && written < contentLen) {
     size_t avail = stream->available();
     if (avail == 0) { delay(1); continue; }
-    int rd = stream->readBytes(buf, min(avail, sizeof(buf)));
+    int rd = stream->readBytes(buf, (avail < sizeof(buf)) ? avail : sizeof(buf));
     if (rd <= 0) break;
 
     if (Update.write(buf, rd) != (size_t)rd) {
@@ -1354,11 +1354,7 @@ static bool otaRelayDownload(const String& url) {
   // RAM'ga yuklash (ESP32 ~280KB free heap, PSRAM bo'lsa 4MB)
   if (relayBuf) { free(relayBuf); relayBuf = nullptr; }
 
-#ifdef BOARD_HAS_PSRAM
-  relayBuf = (uint8_t*)ps_malloc(size);
-#else
-  relayBuf = (uint8_t*)malloc(size);
-#endif
+  relayBuf = (uint8_t*)malloc(size);  // heap dan ajratish
 
   if (!relayBuf) {
     Serial.printf("[OTA-RELAY] RAM yetmadi: %d bayt kerak\n", size);
@@ -1372,7 +1368,7 @@ static bool otaRelayDownload(const String& url) {
   while (http.connected() && read < size) {
     size_t avail = stream->available();
     if (avail == 0) { delay(1); continue; }
-    int rd = stream->readBytes(relayBuf + read, min(avail, (size_t)(size - read)));
+    int rd = stream->readBytes(relayBuf + read, (avail < (size_t)(size - read)) ? avail : (size_t)(size - read));
     if (rd <= 0) break;
     read += rd;
     esp_task_wdt_reset();
@@ -1405,7 +1401,7 @@ static void otaRelaySendBegin() {
 // ---- Bitta paket yuborish ----
 static void otaRelaySendChunk() {
   uint32_t offset = relaySeq * OTA_RELAY_CHUNK;
-  uint16_t chunkLen = min((uint32_t)OTA_RELAY_CHUNK, relayBufSize - offset);
+  uint16_t chunkLen = ((uint32_t)OTA_RELAY_CHUNK < (relayBufSize - offset)) ? OTA_RELAY_CHUNK : (uint16_t)(relayBufSize - offset);
 
   uint8_t pkt[2 + OTA_RELAY_CHUNK];
   memcpy(pkt, &relaySeq, 2);
