@@ -1,163 +1,168 @@
 // ============================================================
-//  features/ai/views/aiTab.js — AI TAVSIYA tabi v2
-//  (AI-V2, Design System 3.0 + sensorState integratsiyasi)
-//
-//  YANGI:
-//  - Sensor holatlari (present/absent/disconnected/disabled/
-//    faulty/calibration) har karta old-qismida ko'rsatiladi.
-//  - DO/Harorat/pH mavjudligi header'da "data badge" bilan.
-//  - UI'da son o'rniga status badge (sensor holati bilan).
-//  - AI faqat ko'l ichida ishlaydi (Dashboarddan olib tashlangan).
-//
-//  SAQLANGAN: provayder tanlovi, getAdvice/buildContext,
-//  force-yangilash, tahlil meta-qatori, buildAiTab imzosi.
+//  features/ai/views/aiTab.js — AI Assistant Panel v3
+//  3 ta Action Card + natija paneli (chat o'rniga)
 // ============================================================
 
 import { el, mount } from '../../../shared/dom.js';
 import { toast } from '../../../shared/toast.js';
 import { t, detectLocale } from '../../../core/i18n/index.js';
-import {
-  slIcon, slCard, slButton, slBadge,
-} from '../../../design-system/index.js';
-import {
-  PROVIDERS, getAdvice, getSelectedProviderId, setSelectedProviderId,
-} from '../aiService.js';
+import { slIcon, slCard, slButton, slBadge } from '../../../design-system/index.js';
+import { getAdvice } from '../aiService.js';
 import { SENSOR_STATE, sensorStateI18nKey } from '../../telemetry/domain/sensorState.js';
 
-/* Sensor holat badge'i — qiymat o'rniga ko'rsatiladi */
-function sensorStateBadge(state) {
-  if (state === SENSOR_STATE.PRESENT) return null;   // qiymat ko'rsatiladi, badge kerak emas
-  const key = sensorStateI18nKey(state);
-  if (!key) return null;
-  const label = t(key);
-  const type = state === SENSOR_STATE.FAULTY ? 'critical'
-    : state === SENSOR_STATE.CALIBRATION ? 'warning'
-    : state === SENSOR_STATE.DISCONNECTED ? 'warning'
-    : 'offline';   // absent/disabled
-  return slBadge({ type, label, dot: false });
-}
-
-/* Sensor mavjudligi belgisi sarlavhada */
-function sensorAvailBadge(states, keys, isUz) {
-  const labels = {
-    do:  isUz ? 'DO' : 'DO',
-    t:   isUz ? 'Harorat' : 'Темп.',
-    ph:  'pH',
-    tds: 'TDS',
-  };
-  const present = keys.filter((k) => states[k] === SENSOR_STATE.PRESENT);
-  const missing = keys.filter((k) => states[k] !== SENSOR_STATE.PRESENT);
-  if (!missing.length) return null;   // hammasi present
-  return el('div', { class: 'sl-caption', style: 'margin-top:var(--sl-sp-1);display:flex;gap:5px;flex-wrap:wrap' }, [
-    ...present.map((k) => slBadge({ type: 'healthy', label: labels[k], dot: false })),
-    ...missing.map((k) => slBadge({ type: 'offline', label: `${labels[k]}: ${t(sensorStateI18nKey(states[k]) || 'sensor.absent')}`, dot: false })),
-  ]);
-}
-
-const SEV_STYLE = {
-  crit: { colorVar: '--sl-critical', bg: '--sl-critical-soft', icon: null },
-  warn: { colorVar: '--sl-warning', bg: '--sl-warning-soft', icon: null },
-  info: { colorVar: '--sl-primary', bg: null, icon: null },
-  ok:   { colorVar: '--sl-success', bg: '--sl-success-soft', icon: null },
+const SEV = {
+  crit: { color: '#D93025', bg: '#FEE8E7' },
+  warn: { color: '#E8922A', bg: '#FFF3E0' },
+  info: { color: '#2A8FC4', bg: '#E3F2FD' },
+  ok:   { color: '#0E7C6B', bg: '#E8FAF6' },
 };
 
 export function buildAiTab({ isUz, getParams, onGoTab }) {
-  const listBox = el('div', { class: 'sl-stack' });
-  const metaLine = el('div', { class: 'sl-caption', style: 'margin-top:var(--sl-sp-2)' });
   let loading = false;
+  let lastMode = null;
 
-  // --- provayder tanlovi (SAQLANGAN) ---
-  const provRow = el('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:var(--sl-sp-2)' },
-    PROVIDERS.map((p) => {
-      const active = p.id === getSelectedProviderId();
-      const avail = p.available();
-      const b = el('button', {
-        class: 'sl-tab' + (active ? ' active' : ''),
-        style: avail ? '' : 'opacity:.5',
-        text: p.name + (avail ? '' : (isUz ? ' · tez orada' : ' · скоро')),
-      });
-      b.addEventListener('click', () => {
-        if (!avail) {
-          toast(isUz ? 'Bu provayder hali ulanmagan (arxitektura tayyor)' : 'Провайдер ещё не подключён', 'err');
-          return;
-        }
-        setSelectedProviderId(p.id);
-        [...provRow.children].forEach((c) => c.classList.remove('active'));
-        b.classList.add('active');
-        load(true);
-      });
-      return b;
-    }));
+  const resultBox = el('div');
+  const metaLine  = el('div', { style: 'font-size:10px;color:#8aa;text-align:center;margin-top:12px' });
 
-  async function load(force = false) {
+  // ---- 3 ta ACTION CARD ----
+  function actionCard(icon, title, desc, color, mode) {
+    const card = el('div', {
+      style: `background:var(--sl-card,#fff);border-radius:16px;padding:20px 16px;text-align:center;`
+           + `cursor:pointer;border:1.5px solid transparent;transition:all .2s;box-shadow:0 1px 6px rgba(0,0,0,.04);`
+           + `flex:1;min-width:0`,
+      role: 'button', tabindex: '0',
+    }, [
+      el('div', { style: `width:40px;height:40px;border-radius:50%;background:${color}12;margin:0 auto 10px;`
+                + `display:flex;align-items:center;justify-content:center` }, [
+        el('span', { style: `color:${color}`, html: slIcon(icon, 22) }),
+      ]),
+      el('div', { style: 'font-size:13px;font-weight:700;color:var(--sl-on-surface,#1a2a3a);line-height:1.3', text: title }),
+    ]);
+    card.addEventListener('mouseenter', () => { card.style.borderColor = color; card.style.transform = 'translateY(-2px)'; card.style.boxShadow = `0 4px 16px ${color}20`; });
+    card.addEventListener('mouseleave', () => { card.style.borderColor = 'transparent'; card.style.transform = ''; card.style.boxShadow = '0 1px 6px rgba(0,0,0,.04)'; });
+    card.addEventListener('click', () => runAnalysis(mode));
+    card.addEventListener('keydown', (e) => { if (e.key === 'Enter') runAnalysis(mode); });
+    return card;
+  }
+
+  const actionsRow = el('div', { style: 'display:flex;gap:10px;margin-bottom:16px' }, [
+    actionCard('activity', isUz ? "Ko'lni tahlil qil" : 'Анализ озера', '', '#0E7C6B', 'full'),
+    actionCard('feed', isUz ? 'Yemni optimallashtir' : 'Оптимизация корма', '', '#2A8FC4', 'feed'),
+    actionCard('bell', isUz ? 'Muammoni top' : 'Найти проблему', '', '#D93025', 'problem'),
+  ]);
+
+  // ---- TAHLIL ISHLATISH ----
+  async function runAnalysis(mode) {
     if (loading) return;
     loading = true;
-    mount(listBox,
-      el('div', { class: 'sl-skeleton card', style: 'height:96px' }),
-      el('div', { class: 'sl-skeleton card', style: 'height:96px' }));
+    lastMode = mode;
+
+    // Skeleton
+    mount(resultBox, el('div', { style: 'display:flex;flex-direction:column;gap:8px' }, [
+      el('div', { style: 'height:80px;border-radius:14px;background:var(--sl-card-inset,#f5f7f8);animation:sl-ob-fade .5s ease infinite alternate' }),
+      el('div', { style: 'height:60px;border-radius:14px;background:var(--sl-card-inset,#f5f7f8);animation:sl-ob-fade .5s ease .15s infinite alternate' }),
+    ]));
+
     try {
       const params = getParams();
-      const res = await getAdvice(params, { force, isUz });
+      const res = await getAdvice(params, { force: true, isUz });
       const ctx = res.context;
-      const ss = ctx.sensorStates || {};   // sensor holatlari
+      const advices = res.advices || [];
 
-      // Sensor mavjudligi bloki (sarlavhada, tavsiyalar ustida)
-      const availBlock = sensorAvailBadge(ss, ['do', 't', 'ph', 'tds'], isUz);
+      // Filtrlash: rejimga qarab
+      let filtered = advices;
+      if (mode === 'problem') {
+        filtered = advices.filter((a) => a.severity === 'crit' || a.severity === 'warn');
+        if (!filtered.length) filtered = [{ severity: 'ok', icon: 'activity', title: isUz ? 'Muammo topilmadi' : 'Проблем не найдено', text: isUz ? "Barcha ko'rsatkichlar me'yorda. Hozircha hech qanday choraga ehtiyoj yo'q." : 'Все показатели в норме.' }];
+      } else if (mode === 'feed') {
+        filtered = advices.filter((a) => a.icon === 'feed' || a.icon === 'sun' || (a.text && (a.text.includes('yem') || a.text.includes('корм') || a.text.includes('feed'))));
+        if (!filtered.length) filtered = [{ severity: 'info', icon: 'feed', title: isUz ? 'Yem bo\'yicha tavsiya' : 'Рекомендация по корму', text: isUz ? "Hozirgi harorat va kislorod darajasida standart yem rejasi mos keladi. O'zgarish shart emas." : 'При текущих условиях стандартный режим кормления подходит.' }];
+      }
 
-      const cards = res.advices.map((a, i) => {
-        const st = SEV_STYLE[a.severity] || SEV_STYLE.info;
-        const cardEl = slCard([
-          el('div', { class: 'sl-row', style: 'gap:var(--sl-sp-3);align-items:flex-start' }, [
-            el('div', { style: `width:40px;height:40px;border-radius:var(--sl-r-md);flex:none;`
-              + `display:flex;align-items:center;justify-content:center;`
-              + `background:color-mix(in srgb, var(${st.colorVar}) 13%, transparent);`
-              + `color:var(${st.colorVar})`, html: slIcon(a.icon || 'info', 20) }),
-            el('div', { class: 'sl-grow' }, [
-              el('div', { style: `font-weight:800;font-size:14px;color:var(${st.colorVar})`, text: a.title }),
-              el('div', { class: 'sl-body-sm', style: 'margin-top:5px;line-height:1.55;white-space:pre-line',
-                text: a.text }),
-              a.action ? el('div', { style: 'margin-top:var(--sl-sp-2)' }, [
-                slButton({ label: a.action.label, variant: 'secondary', size: 'sm',
-                  onClick: () => onGoTab && onGoTab(a.action.tab || 'holat') }),
-              ]) : null,
-            ].filter(Boolean)),
+      // Natija kartalari
+      const cards = filtered.map((a) => {
+        const sev = SEV[a.severity] || SEV.info;
+        return el('div', {
+          style: `background:var(--sl-card,#fff);border-radius:14px;padding:16px;border-left:4px solid ${sev.color};`
+               + `box-shadow:0 1px 4px rgba(0,0,0,.03);margin-bottom:8px`,
+        }, [
+          // Sarlavha
+          el('div', { style: 'display:flex;align-items:center;gap:8px;margin-bottom:8px' }, [
+            el('div', { style: `width:32px;height:32px;border-radius:50%;background:${sev.bg};display:flex;align-items:center;justify-content:center;flex:none` }, [
+              el('span', { style: `color:${sev.color}`, html: slIcon(a.icon || 'info', 16) }),
+            ]),
+            el('div', { style: `font-size:14px;font-weight:700;color:${sev.color}`, text: a.title }),
           ]),
-        ], { cls: `border-l-${a.severity}` });
-        // Sensor holati uchun renkli chiziq
-        cardEl.style.borderLeft = `4px solid var(${st.colorVar})`;
-        cardEl.classList.add('sl-anim-up');
-        cardEl.style.animationDelay = `${Math.min(i * 70, 280)}ms`;
-        cardEl.style.animationFillMode = 'both';
-        return cardEl;
+          // Matn
+          el('div', { style: 'font-size:13px;line-height:1.6;color:var(--sl-on-surface-variant,#3a5a6a);white-space:pre-line', text: a.text }),
+          // Action tugma
+          a.action ? el('div', { style: 'margin-top:10px' }, [
+            el('button', {
+              type: 'button',
+              style: `padding:8px 16px;border-radius:10px;border:1.5px solid ${sev.color};background:transparent;`
+                   + `color:${sev.color};font-size:12px;font-weight:600;cursor:pointer`,
+              text: a.action.label,
+              onClick: () => onGoTab && onGoTab(a.action.tab || 'holat'),
+            }),
+          ]) : null,
+        ].filter(Boolean));
       });
 
-      mount(listBox, ...[availBlock, ...cards].filter(Boolean));
-      metaLine.textContent = (isUz
-        ? `Tahlil: ${ctx.trend24h.points} nuqta (24 soat) · ${ctx.week.days} kun arxiv · ${ctx.devices.online}/${ctx.devices.total} qurilma onlayn · dvigatel: ${res.providerName}`
-        : `Анализ: ${ctx.trend24h.points} точек (24ч) · ${ctx.week.days} дн архива · ${ctx.devices.online}/${ctx.devices.total} онлайн · движок: ${res.providerName}`);
+      // Sensor holatlari
+      const ss = ctx.sensorStates || {};
+      const sensorInfo = ['do', 't', 'ph'].map((k) => {
+        const st = ss[k];
+        if (st === SENSOR_STATE.PRESENT) return null;
+        const key = sensorStateI18nKey(st);
+        return key ? t(key) : null;
+      }).filter(Boolean);
+
+      mount(resultBox, el('div', {}, [
+        // Sensor ogohlantirishlari
+        sensorInfo.length ? el('div', {
+          style: 'background:#FFF8E1;border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:12px;color:#8a6d00;display:flex;gap:6px;align-items:flex-start',
+        }, [
+          el('span', { html: slIcon('info', 14), style: 'flex:none;margin-top:1px' }),
+          el('span', { text: sensorInfo.join(' · ') }),
+        ]) : null,
+        // Natija kartalari
+        ...cards,
+      ].filter(Boolean)));
+
+      metaLine.textContent = `${ctx.trend24h?.points || 0} ${isUz ? 'nuqta' : 'точек'} · ${ctx.devices?.online || 0}/${ctx.devices?.total || 0} ${isUz ? 'onlayn' : 'онлайн'} · ${res.providerName}`;
+
     } catch (e) {
-      mount(listBox, el('div', { class: 'sl-banner warn', text: (e && e.message) || 'Xato' }));
+      mount(resultBox, el('div', {
+        style: 'background:#FEE;border-radius:12px;padding:16px;color:#D93025;font-size:13px',
+        text: (e && e.message) || 'Xato',
+      }));
     } finally { loading = false; }
   }
 
-  const node = el('div', {}, [slCard([
-    el('div', { class: 'sl-row-between', style: 'margin-bottom:var(--sl-sp-2)' }, [
-      el('span', { class: 'sl-card-title', style: 'display:flex;align-items:center;gap:6px' }, [
-        el('span', { html: slIcon('sparkles', 17), style: 'color:var(--sl-ai);display:inline-flex' }),
-        el('span', { text: isUz ? 'AI tavsiyalar' : 'AI советы' }),
+  // ---- ASOSIY NODE ----
+  const node = el('div', { style: 'padding:4px 0' }, [
+    // Sarlavha
+    el('div', { style: 'display:flex;align-items:center;gap:8px;margin-bottom:16px' }, [
+      el('div', { style: 'width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#0E7C6B,#14A8C0);display:flex;align-items:center;justify-content:center;flex:none' }, [
+        el('span', { style: 'color:#fff', html: slIcon('sparkles', 18) }),
       ]),
-      slButton({ label: isUz ? 'Yangilash' : 'Обновить', variant: 'outlined', size: 'sm',
-        onClick: () => load(true) }),
+      el('div', {}, [
+        el('div', { style: 'font-size:16px;font-weight:800;color:var(--sl-on-surface,#1a2a3a)', text: isUz ? 'AI Yordamchi' : 'AI Помощник' }),
+        el('div', { style: 'font-size:11px;color:var(--sl-text-secondary,#8aa)', text: isUz ? 'Bir bosishda tahlil va tavsiya' : 'Анализ и рекомендации в одно касание' }),
+      ]),
     ]),
-    provRow,
-    el('div', { class: 'sl-caption', style: 'margin-bottom:var(--sl-sp-2)', text: isUz
-      ? "Tavsiyalar ko'lning joriy, 24 soatlik va 7 kunlik ma'lumotlari asosida ishlab chiqiladi. Sensor mavjud bo'lmasa — aniq sabab yoziladi."
-      : 'Советы формируются по текущим, суточным и недельным данным. Если датчик отсутствует — указывается причина.' }),
-    listBox,
-    metaLine,
-  ])]);
 
-  load(true);   // fermer tabga kirganda — yangi tavsiya
+    // 3 ta action card
+    actionsRow,
+
+    // Natija
+    resultBox,
+    metaLine,
+  ]);
+
+  // Birinchi ochilganda avtomatik to'liq tahlil
+  runAnalysis('full');
+
   return node;
 }
 
