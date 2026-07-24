@@ -1,105 +1,126 @@
 // ============================================================
 //  features/settings/views/settingsTab.js — SOZLAMALAR
-//  Drawer'dagi "Sozlamalar" bosilganda ochiladi.
-//  Ichida: Tungi rejim, Til (kelajak), Chiqish
+//  Profil'dan ko'chirilgan: Tungi rejim, Til, Admin panel,
+//  Parol o'zgartirish, Onboarding, Chiqish
 // ============================================================
 
 import { el, mount } from '../../../shared/dom.js';
-import { t, detectLocale } from '../../../core/i18n/index.js';
-import { authStore } from '../../auth/index.js';
-import { getTheme, toggleTheme } from '../../../shared/ui/theme.js';
-import { appBar } from '../../../shared/ui/index.js';
-import { slIcon, slCard, slButton, slListItem, ICONS } from '../../../design-system/index.js';
+import { toast } from '../../../shared/toast.js';
+import { t, getLocale, setLocale as setI18nLocale } from '../../../core/i18n/index.js';
+import { icon } from '../../../shared/icons.js';
+import { appBar, mdCard, listItem, mdButton, select, openDialog } from '../../../shared/ui/index.js';
+import { toggleTheme, getTheme } from '../../../shared/ui/theme.js';
+import { LOCALES } from '../../../core/config.js';
+import { authService, authStore, access } from '../../auth/index.js';
+import { userService } from '../../users/index.js';
+
+const APP_VERSION = '2.0';
+
+function switchRow(labelText, icName, on, onToggle) {
+  const knob = el('span', {
+    style: `position:absolute;top:2px;left:${on ? '22px' : '2px'};width:20px;height:20px;border-radius:50%;background:#fff;transition:left var(--motion) var(--ease)`,
+  });
+  const track = el('button', {
+    style: `position:relative;width:46px;height:24px;border-radius:999px;border:none;cursor:pointer;background:${on ? 'var(--md-primary)' : 'var(--md-outline)'}`,
+  }, [knob]);
+  track.addEventListener('click', () => onToggle(track, knob));
+  return el('div', { class: 'md-listitem' }, [
+    el('div', { class: 'li-lead', html: icon(icName, 20) }),
+    el('div', { class: 'grow t-title-sm', text: labelText }),
+    track,
+  ]);
+}
 
 export function renderSettingsTab(nav) {
-  const isUz = detectLocale() === 'uz';
+  const content = el('div', { class: 'md-content' });
+  const node = el('div', {}, [appBar({ title: t('menu.settings') }), content]);
 
-  /* --- Tungi rejim --- */
-  const themeToggle = el('button', {
-    type: 'button',
-    style: 'width:48px;height:28px;border-radius:14px;border:none;cursor:pointer;position:relative;'
-         + 'transition:background .2s;'
-         + (getTheme() === 'dark'
-           ? 'background:var(--sl-primary)'
-           : 'background:var(--sl-border)'),
-  });
-  const themeKnob = el('span', {
-    style: 'position:absolute;top:3px;width:22px;height:22px;border-radius:50%;background:#fff;'
-         + 'box-shadow:0 1px 3px rgba(0,0,0,.2);transition:left .2s;'
-         + (getTheme() === 'dark' ? 'left:23px' : 'left:3px'),
-  });
-  themeToggle.appendChild(themeKnob);
+  function render() {
+    const st = authStore.getState();
 
-  function updateThemeUI() {
-    const dark = getTheme() === 'dark';
-    themeToggle.style.background = dark ? 'var(--sl-primary)' : 'var(--sl-border)';
-    themeKnob.style.left = dark ? '23px' : '3px';
-    themeIcon.innerHTML = slIcon(dark ? 'moon' : 'sun', 22);
-    themeLabel.textContent = dark
-      ? (isUz ? 'Tungi rejim yoqilgan' : 'Тёмный режим включён')
-      : (isUz ? 'Kunduzgi rejim' : 'Светлый режим');
+    // Tungi rejim
+    const darkOn = getTheme() === 'dark';
+
+    // Til
+    const localeSel = select(LOCALES.map((l) => ({ value: l, label: l.toUpperCase() })), getLocale());
+    localeSel.addEventListener('change', async () => {
+      setI18nLocale(localeSel.value);
+      try { if (st.uid) await userService.setLocale(st.uid, localeSel.value); } catch (_) {}
+      nav.reTab();
+    });
+
+    const settingsCard = mdCard([
+      // Admin panel (faqat admin uchun)
+      ...(access.isAdmin(st.role) ? [
+        listItem({
+          leading: 'shield',
+          title: "Admin Panelga o'tish",
+          subtitle: "Tizimni to'liq boshqarish va monitoring qilish",
+          onClick: () => { window.location.href = '/admin.html'; },
+        }),
+      ] : []),
+
+      // Tungi rejim
+      switchRow(t('settings.darkMode'), darkOn ? 'moon' : 'sun', darkOn, () => {
+        toggleTheme();
+        render();  // qayta chizish (icon yangilanadi)
+      }),
+
+      // Til
+      el('div', { class: 'md-listitem' }, [
+        el('div', { class: 'li-lead', html: icon('globe', 20) }),
+        el('div', { class: 'grow t-title-sm', text: t('settings.language') }),
+        localeSel,
+      ]),
+
+      // Parol o'zgartirish
+      listItem({
+        leading: 'mail',
+        title: t('settings.changePassword'),
+        onClick: async () => {
+          try {
+            await authService.resetPassword(st.email);
+            toast(t('auth.resetSent'), 'ok');
+          } catch (_) { toast(t('error.generic'), 'err'); }
+        },
+      }),
+
+      // Onboarding
+      listItem({
+        leading: 'help',
+        title: "Ilova yo'riqnomasi (Onboarding)",
+        subtitle: "Tizim imkoniyatlarini qaytadan ko'rish",
+        onClick: () => {
+          try { localStorage.removeItem('sl_onboarded_' + st.uid); } catch (_) {}
+          window.location.reload();
+        },
+      }),
+
+      // Ilova haqida
+      listItem({ leading: 'info', title: t('settings.about'), subtitle: `SmartLake v${APP_VERSION}` }),
+    ]);
+
+    // Chiqish
+    const logoutBtn = el('div', { style: 'margin-top:16px' }, [
+      mdButton({
+        label: t('common.logout'), variant: 'danger', icon: 'logout', full: true,
+        onClick: () => {
+          openDialog({
+            title: t('common.logout') + '?',
+            body: t('settings.logoutConfirm'),
+            actions: [
+              { label: t('common.cancel'), variant: 'text' },
+              { label: t('common.logout'), variant: 'text', onClick: () => authService.signOut() },
+            ],
+          });
+        },
+      }),
+    ]);
+
+    mount(content, el('div', { class: 'stack' }, [settingsCard, logoutBtn]));
   }
 
-  const themeIcon = el('span', {
-    style: 'display:inline-flex;color:var(--sl-primary);flex:none',
-    html: slIcon(getTheme() === 'dark' ? 'moon' : 'sun', 22),
-  });
-  const themeLabel = el('span', {
-    style: 'font-size:14px;font-weight:600',
-    text: getTheme() === 'dark'
-      ? (isUz ? 'Tungi rejim yoqilgan' : 'Тёмный режим включён')
-      : (isUz ? 'Kunduzgi rejim' : 'Светлый режим'),
-  });
-
-  themeToggle.addEventListener('click', () => {
-    toggleTheme();
-    updateThemeUI();
-  });
-
-  const themeRow = el('div', {
-    style: 'display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--sl-divider)',
-  }, [themeIcon, el('div', { class: 'sl-grow' }, [themeLabel]), themeToggle]);
-
-  /* --- Ilova haqida --- */
-  const aboutRow = el('div', {
-    style: 'display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--sl-divider)',
-  }, [
-    el('span', { style: 'display:inline-flex;color:var(--sl-text-secondary);flex:none', html: slIcon('info', 22) }),
-    el('div', { class: 'sl-grow' }, [
-      el('div', { style: 'font-size:14px;font-weight:600', text: isUz ? 'Ilova haqida' : 'О приложении' }),
-      el('div', { style: 'font-size:12px;color:var(--sl-text-secondary)', text: 'SmartLake v2.0' }),
-    ]),
-  ]);
-
-  /* --- Chiqish --- */
-  const logoutBtn = slButton({
-    label: isUz ? 'Tizimdan chiqish' : 'Выйти из системы',
-    variant: 'outlined',
-    icon: 'logout',
-    onClick: () => {
-      const ok = confirm(t('settings.logoutConfirm'));
-      if (ok && nav.logout) nav.logout();
-    },
-  });
-  logoutBtn.style.width = '100%';
-  logoutBtn.style.marginTop = '16px';
-  logoutBtn.style.color = 'var(--sl-critical)';
-  logoutBtn.style.borderColor = 'var(--sl-critical)';
-
-  const content = el('div', { class: 'md-content' }, [
-    slCard([
-      el('div', { class: 'sl-card-title', style: 'margin-bottom:12px',
-        text: isUz ? 'Sozlamalar' : 'Настройки' }),
-      themeRow,
-      aboutRow,
-      logoutBtn,
-    ]),
-  ]);
-
-  const node = el('div', {}, [
-    appBar({ title: isUz ? 'Sozlamalar' : 'Настройки' }),
-    content,
-  ]);
+  render();
   return node;
 }
 

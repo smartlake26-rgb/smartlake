@@ -1,47 +1,26 @@
 // ============================================================
-//  features/auth/views/profileTab.js — Profil + Sozlamalar
+//  features/auth/views/profileTab.js — Profil (faqat shaxsiy ma'lumotlar)
+//  Sozlamalar alohida settingsTab.js da
 // ============================================================
 
 import { el, mount } from '../../../shared/dom.js';
-import { toast } from '../../../shared/toast.js';
-import { t, getLocale, setLocale as setI18nLocale } from '../../../core/i18n/index.js';
-import { icon } from '../../../shared/icons.js';
-import { appBar, mdCard, listItem, mdButton, select, openDialog } from '../../../shared/ui/index.js';
-import { toggleTheme, getTheme } from '../../../shared/ui/theme.js';
-import { LOCALES } from '../../../core/config.js';
-import { authService, authStore, access } from '../index.js';
-import { userService } from '../../users/index.js';
+import { t } from '../../../core/i18n/index.js';
+import { appBar, mdCard, listItem, mdButton } from '../../../shared/ui/index.js';
+import { authStore } from '../index.js';
 import { renderProfileEditPage } from './profileEditPage.js';
 
-const APP_VERSION = '2.0';
-
-function switchRow(labelText, icName, on, onToggle) {
-  const knob = el('span', { style: `position:absolute;top:2px;left:${on ? '22px' : '2px'};width:20px;height:20px;border-radius:50%;background:#fff;transition:left var(--motion) var(--ease)` });
-  const track = el('button', {
-    style: `position:relative;width:46px;height:24px;border-radius:999px;border:none;cursor:pointer;background:${on ? 'var(--md-primary)' : 'var(--md-outline)'}`,
-  }, [knob]);
-  track.addEventListener('click', () => onToggle(track, knob));
-  return el('div', { class: 'md-listitem' }, [
-    el('div', { class: 'li-lead', html: icon(icName, 20) }),
-    el('div', { class: 'grow t-title-sm', text: labelText }),
-    track,
-  ]);
-}
-
 export function renderProfileTab(nav) {
-  const s = authStore.getState();
-  const p = s.profile || {};
   const content = el('div', { class: 'md-content' });
   const node = el('div', {}, [appBar({ title: t('nav.profile') }), content]);
 
   function render() {
     const st = authStore.getState();
     const pr = st.profile || {};
-    // Profil karta
+
     const profileCard = mdCard([
       el('div', { class: 'row', style: 'gap:14px' }, [
-        pr.photoUrl 
-          ? el('img', { src: pr.photoUrl, class: 'md-avatar', style: 'width:56px;height:56px;object-fit:cover;border:1px solid rgba(0, 112, 144, 0.2)' })
+        pr.photoUrl
+          ? el('img', { src: pr.photoUrl, class: 'md-avatar', style: 'width:56px;height:56px;object-fit:cover;border:1px solid rgba(0,112,144,0.2)' })
           : el('div', { class: 'md-avatar', style: 'width:56px;height:56px;font-size:20px', text: `${(pr.ism || '?')[0] || ''}${(pr.fam || '')[0] || ''}`.toUpperCase() }),
         el('div', { class: 'grow' }, [
           el('div', { class: 't-title', text: `${pr.ism || ''} ${pr.fam || ''}` }),
@@ -55,54 +34,7 @@ export function renderProfileTab(nav) {
       ]),
     ], { elevated: true });
 
-    // Sozlamalar
-    const darkOn = getTheme() === 'dark';
-    const localeSel = select(LOCALES.map((l) => ({ value: l, label: l.toUpperCase() })), getLocale());
-    localeSel.addEventListener('change', async () => {
-      setI18nLocale(localeSel.value);
-      try { if (st.uid) await userService.setLocale(st.uid, localeSel.value); } catch (_) { /* ignore */ }
-      nav.reTab();
-    });
-
-    const settingsCard = mdCard([
-      el('div', { class: 't-label muted', style: 'margin-bottom:6px', text: t('settings.title') }),
-      ...(access.isAdmin(st.role) ? [
-        listItem({ 
-          leading: 'shield', 
-          title: "Admin Panelga o'tish", 
-          subtitle: "Tizimni to'liq boshqarish va monitoring qilish", 
-          onClick: () => { window.location.href = '/admin.html'; } 
-        })
-      ] : []),
-      switchRow(t('settings.darkMode'), darkOn ? 'moon' : 'sun', darkOn, () => { toggleTheme(); nav.reTab(); }),
-      el('div', { class: 'md-listitem' }, [
-        el('div', { class: 'li-lead', html: icon('globe', 20) }),
-        el('div', { class: 'grow t-title-sm', text: t('settings.language') }),
-        localeSel,
-      ]),
-      listItem({ leading: 'mail', title: t('settings.changePassword'), onClick: async () => {
-        try { await authService.resetPassword(st.email); toast(t('auth.resetSent'), 'ok'); } catch (_) { toast(t('error.generic'), 'err'); }
-      } }),
-      listItem({ leading: 'help', title: "Ilova yo'riqnomasi (Onboarding)", subtitle: "Tizim imkoniyatlarini qaytadan ko'rish", onClick: () => {
-        try { localStorage.removeItem('sl_onboarded_' + st.uid); } catch (_) {}
-        window.location.reload();
-      } }),
-      listItem({ leading: 'info', title: t('settings.about'), subtitle: `SmartLake v${APP_VERSION}` }),
-    ]);
-
-    const logoutBtn = el('div', { style: 'margin-top:16px' }, [
-      mdButton({ label: t('common.logout'), variant: 'danger', icon: 'logout', full: true, onClick: () => {
-        openDialog({
-          title: t('common.logout') + '?', body: t('settings.logoutConfirm'),
-          actions: [
-            { label: t('common.cancel'), variant: 'text' },
-            { label: t('common.logout'), variant: 'text', onClick: () => authService.signOut() },
-          ],
-        });
-      } }),
-    ]);
-
-    mount(content, el('div', { class: 'stack' }, [profileCard, settingsCard, logoutBtn]));
+    mount(content, el('div', { class: 'stack' }, [profileCard]));
   }
 
   render();
