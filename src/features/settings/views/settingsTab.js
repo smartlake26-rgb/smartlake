@@ -50,6 +50,29 @@ export function renderSettingsTab(nav) {
     });
 
     const settingsCard = mdCard([
+      // Push bildirishnomalar
+      (() => {
+        const pushStatus = ('Notification' in window) ? Notification.permission : 'unsupported';
+        const pushOn = pushStatus === 'granted';
+        const pushRow = switchRow(
+          pushOn ? t('settings.pushOn') : t('settings.pushOff'),
+          'bell', pushOn, async (track, knob) => {
+            const { pushService } = await import('../../../core/pushService.js');
+            if (pushService.isEnabled()) {
+              await pushService.disable(st.uid);
+            } else {
+              await pushService.requestPermission(st.uid);
+            }
+            render();  // holat yangilanadi
+          }
+        );
+        if (pushStatus === 'unsupported') {
+          pushRow.style.opacity = '0.5';
+          pushRow.title = "Bu qurilma push bildirishnomalarni qo'llab-quvvatlamaydi";
+        }
+        return pushRow;
+      })(),
+
       // Admin panel (faqat admin uchun)
       ...(access.isAdmin(st.role) ? [
         listItem({

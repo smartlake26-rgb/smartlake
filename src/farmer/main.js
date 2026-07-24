@@ -91,7 +91,11 @@ function main() {
     if (shell) { shell.destroy(); shell = null; }
     if (next === 'auth') { dataStore.stop(); authMode = AUTH_SCREENS.LOGIN; renderAuthScreen(); }
     else if (next === 'blocked') { dataStore.stop(); root.replaceChildren(blockedScreen('home.suspended', logout)); }
-    else { dataStore.start(s.uid); startArchiver(dataStore, s.uid); shell = createShell(root, { onLogout: logout }); }
+    else {
+      dataStore.start(s.uid); startArchiver(dataStore, s.uid); shell = createShell(root, { onLogout: logout });
+      // Push bildirishnomalar — foydalanuvchi kirganidan keyin init
+      import('../core/pushService.js').then(({ pushService }) => pushService.init(s.uid)).catch(() => {});
+    }
   });
 
   root.replaceChildren(loadingScreen());
