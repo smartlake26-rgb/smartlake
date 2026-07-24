@@ -86,36 +86,25 @@ export function createProfileDrawer(nav) {
     ]);
 
     /* --- Menyu qatorlari --- */
-    const themeLabel = () => getTheme() === 'dark'
-      ? (t('menu.theme') + ' · 🌙')
-      : (t('menu.theme') + ' · ☀️');
-    const themeRow = slListItem({
-      leading: 'moon', title: themeLabel(),
-      onClick: () => { toggleTheme(); themeRow.querySelector('.sl-listitem-title').textContent = themeLabel(); },
-    });
-
     const menuBody = el('div', { class: 'sl-pdrawer-body' }, [
-      slListItem({ leading: ICONS.navigation.profile, title: t('menu.profile'), subtitle: t('menu.profileDesc'),
+      slListItem({ leading: ICONS.navigation.profile, title: t('menu.profile'),
+        subtitle: t('menu.profileSub'),
         onClick: () => goto('profile') }),
-      slListItem({ leading: ICONS.navigation.devices, title: t('menu.devices'), subtitle: t('menu.devicesDesc'),
+      slListItem({ leading: ICONS.navigation.devices, title: t('menu.devices'),
+        subtitle: t('menu.devicesDesc'),
         onClick: () => goto('devices') }),
-      slListItem({ leading: ICONS.navigation.alerts, title: t('menu.alerts'), subtitle: t('menu.alertsDesc'),
+      slListItem({ leading: 'settings', title: t('menu.settings'),
+        subtitle: t('menu.settingsDesc'),
+        onClick: () => goto('settings') }),
+      slListItem({ leading: ICONS.navigation.alerts, title: t('menu.alerts'),
+        subtitle: t('menu.alertsDesc'),
         onClick: () => goto('alerts') }),
-      themeRow,
     ]);
 
-    /* --- Pastki: Chiqish --- */
-    const foot = el('div', { class: 'sl-pdrawer-foot' }, [
-      slListItem({
-        leading: ICONS.navigation.logout, title: t('common.logout'),
-        onClick: () => { closeDrawer(true); nav.logout && nav.logout(); },
-      }),
-    ]);
-
-    /* --- Yig'ish --- */
+    /* --- Yig'ish (Chiqish va Tungi rejim olib tashlandi — Sozlamalar ichida) --- */
     drawerEl = el('div', {
       class: 'sl-pdrawer', role: 'dialog', 'aria-modal': 'true', 'aria-label': t('menu.title'),
-    }, [head, menuBody, foot]);
+    }, [head, menuBody]);
 
     scrimEl = el('div', { class: 'sl-pdrawer-scrim', 'aria-hidden': 'true' });
     scrimEl.addEventListener('click', () => closeDrawer());

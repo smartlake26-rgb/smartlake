@@ -250,8 +250,9 @@ uz.dash = {
 };
 uz.menu = {
   title: 'Menyu',
-  profile: 'Profil', profileDesc: "Shaxsiy ma'lumotlar va sozlamalar",
+  profile: 'Profil', profileSub: "Shaxsiy ma'lumotlar",
   devices: 'Qurilmalar', devicesDesc: 'Datchiklar holati va ulash',
+  settings: 'Sozlamalar', settingsDesc: "Tema, til va chiqish",
   alerts: 'Bildirishnomalar', alertsDesc: 'Ogohlantirishlar tarixi',
   theme: "Tungi rejim", themeDesc: "Ko'rinishni almashtirish",
 };

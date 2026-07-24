@@ -12,6 +12,7 @@ import { renderLakesTab }         from '../features/lakes/views/lakesTab.js';
 import { renderDevicesTab }       from '../features/devices/views/devicesTab.js';
 import { renderProfileTab }       from '../features/auth/views/profileTab.js';
 import { renderAiHomeTab }        from '../features/ai/views/aiHomeTab.js';
+import { renderSettingsTab }      from '../features/settings/views/settingsTab.js';
 import { renderReportsTab }       from '../features/telemetry/views/reportsTab.js';
 import { renderAnnouncementsTab } from '../features/announcements/views/announcementsTab.js';
 
@@ -23,6 +24,7 @@ const TABS = {
   devices: renderDevicesTab,
   alerts:  renderNotificationsTab,
   profile: renderProfileTab,
+  settings: renderSettingsTab,
   ai:      renderAiHomeTab,
 };
 

@@ -242,8 +242,9 @@ ru.dash = {
 };
 ru.menu = {
   title: 'Меню',
-  profile: 'Профиль', profileDesc: 'Личные данные и настройки',
+  profile: 'Профиль', profileSub: 'Личные данные',
   devices: 'Устройства', devicesDesc: 'Состояние датчиков и подключение',
+  settings: 'Настройки', settingsDesc: 'Тема, язык и выход',
   alerts: 'Уведомления', alertsDesc: 'История оповещений',
   theme: 'Тёмный режим', themeDesc: 'Переключить оформление',
 };
