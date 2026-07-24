@@ -71,8 +71,11 @@ jobs:
           arduino-cli lib install "ArduinoJson"
           arduino-cli lib install "WiFiManager"
           arduino-cli lib install "LiquidCrystal I2C"
-          # Firebase lib (manual install)
-          git clone https://github.com/mobizt/Firebase-ESP-Client.git ~/Arduino/libraries/Firebase_ESP_Client
+          # Firebase lib (zip release — git clone timeout qiladi)
+          FIREBASE_VER="4.4.14"
+          curl -sL "https://github.com/mobizt/Firebase-ESP-Client/archive/refs/tags/v${FIREBASE_VER}.zip" -o /tmp/fb.zip
+          unzip -q /tmp/fb.zip -d ~/Arduino/libraries/
+          mv ~/Arduino/libraries/Firebase-ESP-Client-${FIREBASE_VER} ~/Arduino/libraries/Firebase_ESP_Client
 
       - name: Compile ${{ matrix.name }}
         if: steps.skip.outputs.skip != 'true'
