@@ -14,6 +14,7 @@ import * as adminStore from './adminStore.js';
 
 import { renderAdminDashboard } from '../features/telemetry/views/adminDashboard.js';
 import { renderAdminDevices } from '../features/devices/views/adminDevices.js';
+import { renderAdminOtaPage } from '../features/ota/views/adminOta.js';
 import { renderAdminMonitoring } from '../features/telemetry/views/adminMonitoring.js';
 import { renderAdminLakes } from '../features/lakes/views/adminLakes.js';
 import { renderAdminUsers } from '../features/users/views/adminUsers.js';
@@ -26,6 +27,7 @@ import { renderAdminSettings } from '../features/auth/views/adminSettings.js';
 const SECTIONS = [
   { id: 'dashboard', name: 'nav.dashboard', ic: 'home', roles: ['super', 'operator', 'region'], render: renderAdminDashboard },
   { id: 'devices', name: 'nav.devices', ic: 'chip', roles: ['super', 'operator', 'region'], render: renderAdminDevices },
+  { id: 'ota', name: 'OTA Firmware', ic: 'zap', roles: ['super'], render: (nav) => renderAdminOtaPage(nav) },
   { id: 'monitoring', name: 'nav.monitoring', ic: 'activity', roles: ['super', 'operator', 'region'], render: renderAdminMonitoring },
   { id: 'commands', name: 'nav.commands', ic: 'power', roles: ['super', 'operator', 'region'], render: renderAdminCommands },
   { id: 'lakes', name: 'nav.lakes', ic: 'droplet', roles: ['super', 'operator', 'region'], render: renderAdminLakes },
