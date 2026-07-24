@@ -35,55 +35,35 @@ const L = (u, r) => uz ? u : r;
 async function makePdf({ deviceId, serialNumber, region, activationKey }) {
 
   const { jsPDF } = await import('jspdf');
-  const doc = new jsPDF({ format: [90, 130], unit: 'mm' });
-
+  const W = 100, H = 160;
+  const doc = new jsPDF({ format: [W, H], unit: 'mm' });
   // Header
-  doc.setFillColor(14, 124, 107);
-  doc.rect(0, 0, 90, 22, 'F');
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(14); doc.setFont('helvetica', 'bold');
-  doc.text('SmartLake', 7, 10);
+  doc.setFillColor(14, 124, 107); doc.rect(0, 0, W, 20, 'F');
+  doc.setTextColor(255); doc.setFontSize(15); doc.setFont('helvetica', 'bold');
+  doc.text('SmartLake', 8, 10);
   doc.setFontSize(7); doc.setFont('helvetica', 'normal');
-  doc.text(L('Qurilma faollashtirish kartasi', 'Карта активации устройства'), 7, 17);
-
-  // Ma'lumotlar
-  doc.setTextColor(20, 20, 20);
-  let y = 30;
+  doc.text(L('Qurilma faollashtirish kartasi', 'Карта активации устройства'), 8, 16);
+  let y = 28;
   const field = (label, value, mono = false) => {
-    doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(120, 120, 120);
-    doc.text(label, 7, y);
-    doc.setFontSize(10); doc.setTextColor(14, 60, 50);
-    doc.setFont(mono ? 'courier' : 'helvetica', 'bold');
-    doc.text(value || '—', 7, y + 6);
-    y += 14;
+    doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(130, 130, 130);
+    doc.text(label, 8, y);
+    doc.setFontSize(11); doc.setFont(mono ? 'courier' : 'helvetica', 'bold'); doc.setTextColor(20, 50, 40);
+    doc.text(value || '\u2014', 8, y + 5); y += 12;
   };
-
   field(L('Seriya raqami', 'Серийный номер'), serialNumber);
   field('Device ID', deviceId, true);
   field(L('Hudud', 'Регион'), region);
-
-  // Kalit — alohida blok
-  doc.setFillColor(240, 255, 250);
-  doc.roundedRect(5, y - 2, 80, 14, 2, 2, 'F');
+  doc.setFillColor(235, 250, 245); doc.roundedRect(6, y - 3, W - 12, 16, 2, 2, 'F');
   doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(14, 124, 107);
-  doc.text(L('Faollashtirish kodi', 'Код активации'), 8, y + 3);
-  doc.setFontSize(11); doc.setFont('courier', 'bold'); doc.setTextColor(14, 80, 60);
-  doc.text(activationKey, 8, y + 10);
-  y += 18;
-
-  // QR kod
+  doc.text(L('Faollashtirish kodi', 'Код активации') + ':', 9, y + 2);
+  doc.setFontSize(13); doc.setFont('courier', 'bold'); doc.setTextColor(14, 80, 60);
+  doc.text(activationKey, 9, y + 10); y += 20;
   try {
-    const resp = await fetch(qrUrl);
-    const blob = await resp.blob();
-    const b64 = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
-    doc.addImage(b64, 'PNG', 20, y, 50, 50);
-    y += 54;
-  } catch { y += 4; }
-
-  // Footer
+    const qrDataUrl = await QRCode.toDataURL(deviceId + '|' + activationKey, { width: 300, margin: 1, color: { dark: '#0E7C6B' } });
+    const qs = 45; doc.addImage(qrDataUrl, 'PNG', (W - qs) / 2, y, qs, qs); y += qs + 4;
+  } catch { }
   doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(160, 160, 160);
-  doc.text(L("Bu kartani saqlab qo'ying — qurilmani ulash uchun kerak.", 'Сохраните эту карту — нужна для подключения устройства.'), 7, y, { maxWidth: 76 });
-
+  doc.text(L("Bu kartani saqlab qo'ying.", 'Сохраните эту карту.'), 8, y + 2);
   return { blob: doc.output('blob'), filename: `smartlake-${deviceId}.pdf` };
 }
 
