@@ -1624,6 +1624,13 @@ void loraBuyruqQolla(uint8_t cmd, int32_t val) {
       histSendBosh   = (eeprom_count_cache == MAX_RECORDS) ? eeprom_head_cache : 0;
       histSendActive = (histSendTotal > 0);
       break;
+    // === OTA buyruqlari (Gateway orqali firmware yangilash) ===
+    case CMD_OTA_BEGIN:
+      nodeOtaHandleBegin((const uint8_t*)&val, 8);
+      break;
+    case CMD_OTA_END:
+      nodeOtaHandleEnd((const uint8_t*)&val, 4);
+      break;
     default: break;
   }
 }
@@ -1887,6 +1894,9 @@ void setup() {
   lcd.setCursor(0, 1); lcd.print("Doim ishlaydi   ");
   esp_task_wdt_reset(); delay(1500); esp_task_wdt_reset(); delay(500); esp_task_wdt_reset();
   lcd.clear(); esp_task_wdt_reset();
+
+  // OTA: rollback tekshiruvi
+  otaNodeSetup();
 }
 
 // ================================================================
@@ -1979,4 +1989,7 @@ void loop() {
     // Uxlash ekrani
     uxlashEkrani();
   }
+
+  // OTA: paket timeout tekshiruvi
+  otaNodeCheck();
 }

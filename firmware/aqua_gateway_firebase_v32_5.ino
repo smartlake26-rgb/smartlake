@@ -161,6 +161,12 @@ static const uint32_t BROADCAST_ID = 0xFFFFFFFFUL;
 #define CMD_STATUS    0x07
 #define CMD_TIME      0x08   // Fix 6: val = Unix timestamp — Node RTC ni sinxronlash
 #define CMD_HIST      0x09   // Fix 13: NVS tarixini so'rash
+// OTA buyruq kodlari
+#define CMD_OTA_BEGIN   0xF0
+#define CMD_OTA_DATA    0xF1
+#define CMD_OTA_END     0xF2
+#define CMD_OTA_ACK     0xF3
+#define CMD_OTA_ABORT   0xF4
 
 #define FT_HIST       5      // Fix 13: node -> gateway tarix paketi
 
@@ -1141,6 +1147,9 @@ void setup() {
   lcd.clear();
 #endif
   Serial.println("[GW] tayyor");
+
+  // OTA: rollback tekshiruvi va firmware versiyasini log qilish
+  otaSetup();
 }
 
 // ================================================================
@@ -1185,6 +1194,12 @@ void loop() {
 
   // 6) Holat LCD
   lcdHolat();
+
+  // 7) OTA: Gateway o'zini yangilash tekshiruvi (har 5 daqiqa)
+  otaCheck();
+
+  // 8) OTA Relay: Node firmware'ni LoRa orqali uzatish
+  otaRelayCheck();
 }
 
 // ================================================================
