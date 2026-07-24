@@ -1,0 +1,10 @@
+{
+  "name": "smartlake-functions",
+  "description": "SmartLake Cloud Functions — push notifications",
+  "engines": { "node": "22" },
+  "main": "pushNotifier.js",
+  "dependencies": {
+    "firebase-admin": "^13.0.0",
+    "firebase-functions": "^6.3.0"
+  }
+}
