@@ -26,13 +26,14 @@ import { ownershipService } from '../../ownership/index.js';
 import { deviceService } from '../index.js';
 import * as dataStore from '../../../farmer/dataStore.js';
 import { slIcon, slCard, slButton, slField } from '../../../design-system/index.js';
+import QRCode from 'qrcode';
 
 const uz = detectLocale() === 'uz';
 const L = (u, r) => uz ? u : r;
 
 /* ---------- PDF yaratish ---------- */
 async function makePdf({ deviceId, serialNumber, region, activationKey }) {
-  const qrUrl = `https://chart.googleapis.com/chart?chs=220x220&cht=qr&chl=${encodeURIComponent(deviceId + '|' + activationKey)}&choe=UTF-8&chld=M|1`;
+
   const { jsPDF } = await import('jspdf');
   const doc = new jsPDF({ format: [90, 130], unit: 'mm' });
 
@@ -175,11 +176,14 @@ export function openAdminProvisionPage(nav) {
                 el('div', { class: 'sl-caption', style: 'color:var(--sl-text-secondary)',
                   text: L("PDF avtomatik yuklanmoqda...", 'PDF загружается автоматически...') }),
               ]),
-              el('img', {
-                src: `https://chart.googleapis.com/chart?chs=120x120&cht=qr&chl=${encodeURIComponent(result.deviceId + '|' + result.activationKey)}&choe=UTF-8&chld=M|1`,
-                alt: 'QR', width: '120', height: '120',
-                style: 'border-radius:8px;border:1px solid var(--sl-border)',
-              }),
+              await (async () => {
+                const qrEl = el('img', { alt: 'QR', width: '120', height: '120',
+                  style: 'border-radius:8px;border:1px solid var(--sl-border)' });
+                try {
+                  qrEl.src = await QRCode.toDataURL(result.deviceId + '|' + result.activationKey, { width: 120, margin: 1, color: { dark: '#0E7C6B' } });
+                } catch {}
+                return qrEl;
+              })(),
             ]),
             el('div', { style: 'margin-top:12px' }, [
               slButton({

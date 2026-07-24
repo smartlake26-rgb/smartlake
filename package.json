@@ -16,9 +16,10 @@
   },
   "dependencies": {
     "firebase": "^10.12.2",
-    "xlsx": "^0.18.5",
     "jspdf": "^2.5.1",
-    "jspdf-autotable": "^3.8.2"
+    "jspdf-autotable": "^3.8.2",
+    "qrcode": "^1.5.4",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^3.0.4",

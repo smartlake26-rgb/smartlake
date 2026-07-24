@@ -1,3 +1,4 @@
+import QRCode from 'qrcode';
 // ============================================================
 //  features/devices/views/adminDevices.js — Qurilmalar jadvali (admin)
 //
@@ -82,14 +83,11 @@ function provisioningCard() {
     doc.setFontSize(11); doc.setFont('courier', 'bold'); doc.setTextColor(14, 80, 60);
     doc.text(activationKey, 8, y + 10); y += 18;
 
-    // QR kod (Google Charts API)
+    // QR kod
     try {
-      const qrUrl = `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(deviceId + '|' + activationKey)}&choe=UTF-8&chld=M|1`;
-      const resp = await fetch(qrUrl);
-      const blob = await resp.blob();
-      const b64 = await new Promise((res) => { const r = new FileReader(); r.onload = () => res(r.result); r.readAsDataURL(blob); });
-      doc.addImage(b64, 'PNG', 20, y, 50, 50); y += 54;
-    } catch { y += 4; }
+      const qrDataUrl = await QRCode.toDataURL(deviceId + '|' + activationKey, { width: 200, margin: 1, color: { dark: '#0E7C6B' } });
+      doc.addImage(qrDataUrl, 'PNG', 20, y, 50, 50); y += 54;
+    } catch (qe) { console.error('QR xato:', qe); y += 4; }
 
     doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(160, 160, 160);
     doc.text("Bu kartani saqlab qo'ying — qurilmani ulash uchun kerak.", 7, y + 4, { maxWidth: 76 });
@@ -236,11 +234,8 @@ export function renderAdminDevices() {
               doc.setFontSize(11); doc.setFont('courier','bold'); doc.setTextColor(14,80,60);
               doc.text(key, 8, y+10); y+=18;
               try {
-                const qrUrl2 = `https://chart.googleapis.com/chart?chs=200x200&cht=qr&chl=${encodeURIComponent(r.id + '|' + key)}&choe=UTF-8&chld=M|1`;
-                const resp2 = await fetch(qrUrl2);
-                const blob2 = await resp2.blob();
-                const b642 = await new Promise((res) => { const rdr = new FileReader(); rdr.onload = () => res(rdr.result); rdr.readAsDataURL(blob2); });
-                doc.addImage(b642, 'PNG', 20, y, 50, 50); y+=54;
+                const qrB64 = await QRCode.toDataURL(r.id + '|' + key, { width: 200, margin: 1, color: { dark: '#0E7C6B' } });
+                doc.addImage(qrB64, 'PNG', 20, y, 50, 50); y+=54;
               } catch {}
               const url = URL.createObjectURL(doc.output('blob'));
               const a = document.createElement('a'); a.href=url; a.download=`smartlake-${r.id}.pdf`; a.click();
