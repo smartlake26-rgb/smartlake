@@ -270,51 +270,35 @@ export function buildLakeSettingsTab({ lakeId, uid, isUz, devicesCard, onSaved }
   ]);
 
   /* ============================================================
-     4 · AERATORLAR (faqat soni + kW; model olib tashlandi)
+     4 · AERATOR + ELEKTR (bitta karta, bitta saqlash)
      ============================================================ */
   const aerCountIn = field(t('lset.aerCount'), { ph: '2' });
   const aerKwIn    = field(t('lset.aerKw'), { step: '0.1', ph: '1.5' });
+  const tariffIn   = field(t('lset.aerTariff'), { step: '10', ph: '1000' });
 
   const aeratorCard = slCard([
     secTitle('power', t('lset.aerTitle'), '--sl-chart-energy'),
     el('div', { class: 'sl-row', style: 'gap:var(--sl-sp-2);flex-wrap:wrap;align-items:flex-end' },
       [aerCountIn, aerKwIn]),
     el('div', { class: 'sl-caption', style: 'margin-top:var(--sl-sp-1)', text: t('lset.aerNote') }),
+    el('div', { style: 'margin-top:var(--sl-sp-4);padding-top:var(--sl-sp-3);border-top:1px solid var(--sl-divider)' }, [
+      el('div', { style: 'display:flex;align-items:center;gap:6px;margin-bottom:var(--sl-sp-2)' }, [
+        el('span', { html: slIcon('zap', 16), style: 'color:var(--sl-chart-energy);display:inline-flex' }),
+        el('span', { style: 'font-weight:700;font-size:14px', text: t('lset.tariffTitle') }),
+      ]),
+      el('div', { class: 'sl-row', style: 'gap:var(--sl-sp-2);flex-wrap:wrap;align-items:flex-end' }, [tariffIn]),
+      el('div', { class: 'sl-caption', style: 'margin-top:var(--sl-sp-1)', text: t('lset.tariffNote') }),
+    ]),
     el('div', { style: 'margin-top:var(--sl-sp-3)' }, [
       slButton({ label: t('common.save'), variant: 'secondary', onClick: () => {
         const count = num(aerCountIn.input.value);
         const kwEach = num(aerKwIn.input.value);
+        const tariff = numOrNull(tariffIn.input.value);
         const totalKw = count > 0 && kwEach > 0 ? +(count * kwEach).toFixed(2) : (kwEach || null);
         save({
-          aerators: {
-            count:  count || null,
-            model:  (meta && meta.aerators && meta.aerators.model) || '',  // eski qiymat SAQLANADI
-            kw:     kwEach || null,
-          },
-          energy: {
-            ...((meta && meta.energy) || {}),
-            kw: totalKw ?? ((meta && meta.energy && meta.energy.kw) || null),
-          },
+          aerators: { count: count || null, model: (meta && meta.aerators && meta.aerators.model) || '', kw: kwEach || null },
+          energy: { kw: totalKw ?? ((meta && meta.energy && meta.energy.kw) || null), tariff: tariff },
         });
-      } }),
-    ]),
-  ]);
-
-  /* ============================================================
-     5 · ELEKTR NARXI — aeratordan ajralib, alohida karta
-         Hisobot bu qiymatni O'QIYDI, Sozlamalar O'ZGARTIRADI.
-     ============================================================ */
-  const tariffIn = field(t('lset.aerTariff'), { step: '10', ph: '1000' });
-  const tariffCard = slCard([
-    secTitle('zap', t('lset.tariffTitle'), '--sl-chart-energy'),
-    el('div', { class: 'sl-row', style: 'gap:var(--sl-sp-2);flex-wrap:wrap;align-items:flex-end' },
-      [tariffIn]),
-    el('div', { class: 'sl-caption', style: 'margin-top:var(--sl-sp-1)', text: t('lset.tariffNote') }),
-    el('div', { style: 'margin-top:var(--sl-sp-3)' }, [
-      slButton({ label: t('common.save'), variant: 'secondary', onClick: () => {
-        const tariff = numOrNull(tariffIn.input.value);
-        if (tariff == null) return toast(t('lset.enterNum'), 'err');
-        save({ energy: { ...((meta && meta.energy) || {}), tariff } });
       } }),
     ]),
   ]);
@@ -334,7 +318,6 @@ export function buildLakeSettingsTab({ lakeId, uid, isUz, devicesCard, onSaved }
     fishCard,
     feedCard,
     aeratorCard,
-    tariffCard,
     note,
   ].filter(Boolean));
 

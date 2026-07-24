@@ -403,6 +403,12 @@ export function renderLakeDetailPage(nav, lakeId) {
 
   /* ---------- kompozitsion render ---------- */
   function render() {
+    // SOZLAMALAR tabi ochiq bo'lsa — telemetriya emit'ida qayta render qilinmaydi
+    // (aks holda inputga yozayotganda fokus va qiymat yo'qoladi).
+    // Faqat birinchi ochilishda yoki tab almashganda chiziladi.
+    if (activeTab === 'sozlama' && settingsTabNode && content.contains(settingsTabNode)) {
+      return;   // sozlamalar allaqachon DOM'da — tegmaymiz
+    }
     const st = dataStore.getState();
     if (st.loading) { mount(content, skeletonCards(3)); return; }
     const lake = st.lakes.find((l) => l.id === lakeId) || st.archivedLakes.find((l) => l.id === lakeId);
@@ -633,6 +639,7 @@ export function renderLakeDetailPage(nav, lakeId) {
     const rsVal = (fn) => runStats ? fn(runStats) : (runStatsLoading ? '…' : '—');
 
     const aeratorCard = slCard([
+      // Sarlavha + holat badge
       el('div', { class: 'sl-card-head' }, [
         el('div', { class: 'sl-card-title', style: 'display:flex;align-items:center;gap:6px' }, [
           el('span', { style: 'color:var(--sl-primary);display:inline-flex', html: slIcon('power', 18) }),
@@ -640,23 +647,61 @@ export function renderLakeDetailPage(nav, lakeId) {
         ]),
         slBadge({ type: aerOn ? 'online' : 'offline', label: aerOn ? t('lakedet.working') : t('lakedet.stopped') }),
       ]),
+
+      // Qurilma tanlash (agar bir nechta bo'lsa)
       devChips,
-      el('div', { class: 'sl-row', style: 'gap:var(--sl-sp-2);flex-wrap:wrap' }, [btnAuto, btnOn, btnOff]),
-      el('div', { class: 'sl-caption', style: 'margin-top:var(--sl-sp-2)', text: t('lakedet.offNote') }),
-      el('div', { style: 'margin-top:var(--sl-sp-2)' }, [
-        slKvRow({ icon: 'settings', key: t('lakedet.mode'),
-          value: isManual
-            ? t('lakedet.manual') + (selTel && selTel.man_remain > 0 ? ` (${selTel.man_remain} ${isUz ? 'daq' : 'мин'})` : '')
-            : (selTel && selTel.mode === 1 ? t('lakedet.autoTime') : t('lakedet.autoDo')) }),
-        slKvRow({ icon: 'clock', key: t('lakedet.lastCmd'),
-          value: selTel && selTel.last_cmd_ts ? fmtAgo(selTel.last_cmd_ts, isUz) : '—' }),
-        slKvRow({ icon: 'power', key: t('lakedet.lastOn'),
-          value: rsVal((r) => r.lastOnTs ? fmtAgo(r.lastOnTs, isUz) : '—') }),
-        slKvRow({ icon: 'clock', key: t('lakedet.runToday'),
-          value: rsVal((r) => fmtHours(r.todayMs, isUz)) }),
-        slKvRow({ icon: 'clock', key: t('lakedet.runWeek'),
-          value: rsVal((r) => fmtHours(r.weekMs, isUz)) }),
+
+      // Boshqaruv tugmalari — ixcham 3 ta
+      el('div', { style: 'display:flex;gap:8px;margin:12px 0' }, [
+        btnAuto, btnOn, btnOff,
       ]),
+
+      // Rejim va holat — ikkita qator
+      el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px' }, [
+        el('div', { style: 'padding:10px 12px;border-radius:var(--sl-r-md);background:var(--sl-card-inset)' }, [
+          el('div', { class: 'sl-caption', text: t('lakedet.mode') }),
+          el('div', { style: 'font-size:13px;font-weight:700;margin-top:2px', text:
+            isManual
+              ? t('lakedet.manual') + (selTel && selTel.man_remain > 0 ? ` (${selTel.man_remain} ${isUz ? 'daq' : 'мин'})` : '')
+              : (selTel && selTel.mode === 1 ? t('lakedet.autoTime') : t('lakedet.autoDo')) }),
+        ]),
+        el('div', { style: 'padding:10px 12px;border-radius:var(--sl-r-md);background:var(--sl-card-inset)' }, [
+          el('div', { class: 'sl-caption', text: t('lakedet.lastCmd') }),
+          el('div', { style: 'font-size:13px;font-weight:700;margin-top:2px',
+            text: selTel && selTel.last_cmd_ts ? fmtAgo(selTel.last_cmd_ts, isUz) : '—' }),
+        ]),
+      ]),
+
+      // Ish vaqti statistikasi — kompakt
+      el('div', { style: 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px' }, [
+        el('div', { style: 'text-align:center;padding:8px;border-radius:var(--sl-r-md);background:color-mix(in srgb,var(--sl-chart-energy) 8%,transparent)' }, [
+          el('div', { style: 'font-size:16px;font-weight:800;color:var(--sl-chart-energy)', text: rsVal((r) => fmtHours(r.todayMs, isUz)) }),
+          el('div', { class: 'sl-caption', text: isUz ? 'Bugun' : 'Сегодня' }),
+        ]),
+        el('div', { style: 'text-align:center;padding:8px;border-radius:var(--sl-r-md);background:color-mix(in srgb,var(--sl-primary) 8%,transparent)' }, [
+          el('div', { style: 'font-size:16px;font-weight:800;color:var(--sl-primary)', text: rsVal((r) => fmtHours(r.weekMs, isUz)) }),
+          el('div', { class: 'sl-caption', text: isUz ? 'Hafta' : 'Неделя' }),
+        ]),
+        el('div', { style: 'text-align:center;padding:8px;border-radius:var(--sl-r-md);background:color-mix(in srgb,var(--sl-info) 8%,transparent)' }, [
+          el('div', { style: 'font-size:16px;font-weight:800;color:var(--sl-info)',
+            text: (() => {
+              // Elektr sarfi (agar lakeMeta'da kW va tarif bor bo'lsa)
+              const kw = lakeMeta && lakeMeta.energy && lakeMeta.energy.kw;
+              const tariff = lakeMeta && lakeMeta.energy && lakeMeta.energy.tariff;
+              const weekH = rsVal((r) => r.weekMs != null ? r.weekMs / 3600e3 : null);
+              if (kw && tariff && typeof weekH === 'number') {
+                const cost = weekH * kw * tariff;
+                return cost > 0 ? `${Math.round(cost / 1000)}K` : '—';
+              }
+              return '—';
+            })() }),
+          el('div', { class: 'sl-caption', text: isUz ? 'Haftalik xarajat' : 'Расход/нед.' }),
+        ]),
+      ]),
+
+      // Eslatma
+      el('div', { class: 'sl-caption', style: 'margin-top:8px;color:var(--sl-text-secondary)',
+        text: t('lakedet.offNote') }),
     ]);
 
     // LAKEDET-V5: Yem tavsiyasi bu tabdan OLIB TASHLANDI (Dashboard va

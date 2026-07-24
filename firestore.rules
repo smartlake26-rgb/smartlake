@@ -163,8 +163,8 @@ service cloud.firestore {
     // ---------- telemetriya ARXIVI (B-bosqich: ilova yozadi) ----------
     match /telemetryArchive/{docId} {
       allow read: if owns(resource.data.ownerUid) || isAdmin();
-      allow create: if owns(request.resource.data.ownerUid);
-      allow update: if owns(resource.data.ownerUid) && owns(request.resource.data.ownerUid);
+      allow create: if owns(request.resource.data.ownerUid) || isAdmin();
+      allow update: if (owns(resource.data.ownerUid) && owns(request.resource.data.ownerUid)) || isAdmin();
       allow delete: if isAdmin();
     }
 
