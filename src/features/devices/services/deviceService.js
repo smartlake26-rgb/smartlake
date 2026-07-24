@@ -5,7 +5,7 @@
 //  Har muhim amal auditService orqali qayd qilinadi.
 // ============================================================
 
-import { doc, getDoc, setDoc, updateDoc, getDocs, query, where, collection, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, updateDoc, deleteDoc, getDocs, query, where, collection, serverTimestamp } from 'firebase/firestore';
 
 import { db } from '../../../core/firebase.js';
 import { DataError } from '../../../core/errors.js';
@@ -62,6 +62,20 @@ export const deviceService = {
     });
     logger.info('Qurilma provisioning qilindi:', deviceId);
     return { deviceId, activationKey };
+  },
+
+  /** Qurilmani o'chirish (faqat Super Admin). */
+  async deleteDevice(deviceId, actorUid) {
+    const id = String(deviceId || '').toUpperCase().trim();
+    if (!id) throw new DataError('deviceId majburiy', { messageKey: 'error.generic' });
+    try {
+      await deleteDoc(ref(id));
+    } catch (e) { throw wrap(e, 'deleteDevice'); }
+    auditService.log(AUDIT_ACTIONS.DEVICE_CREATED, {
+      actor: actorUid, targetType: AUDIT_TARGETS.DEVICE, targetId: id,
+      meta: { action: 'delete' },
+    });
+    logger.info('Qurilma o\'chirildi:', id);
   },
 
   /** Tartib raqam: barcha qurilmalar soniga +1 (qayta ulanganda ham o'sha) */

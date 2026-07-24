@@ -235,6 +235,22 @@ export function renderAdminDevices() {
           });
           return btn;
         }},
+        { key: '_del', label: '', render: (r) => {
+          const btn = mdButton({ label: '🗑', variant: 'text' });
+          btn.style.color = 'var(--md-critical, #c00)';
+          btn.addEventListener('click', async () => {
+            const ok = confirm(`${r.id} qurilmasini o'chirmoqchimisiz?\n\nBu amalni qaytarib bo'lmaydi.`);
+            if (!ok) return;
+            btn.disabled = true;
+            try {
+              await deviceService.deleteDevice(r.id, authStore.getState().uid);
+              toast(`${r.id} o'chirildi`, 'ok');
+              await adminStore.refresh();
+            } catch (e) { toast(e && e.message || 'Xato', 'err'); }
+            finally { btn.disabled = false; }
+          });
+          return btn;
+        }},
       ],
       rows, pageSize: 14,
       filters: [{ key: 'status', label: t('tm.status'), options: ['healthy', 'good', 'warning', 'critical', 'offline', 'unknown'].map((s) => ({ value: s, label: t('tm.status_' + s) })) }],
