@@ -136,11 +136,11 @@ static char fbPassword[64]  = "Sm@rtL@ke26!";   // Device user paroli
 // ================================================================
 static const float    LORA_FREQ     = 433.0;
 static const float    LORA_BW       = 125.0;
-static const uint8_t  LORA_SF       = 9;
-static const uint8_t  LORA_CR       = 7;
+static const uint8_t  LORA_SF       = 12;      // 9->12: masofa 2-3x, paket ~4s (har 30s — muammo emas)
+static const uint8_t  LORA_CR       = 8;       // 4/7->4/8: xato tuzatish kuchliroq
 static const uint8_t  LORA_SYNCWORD = 0x55;
 static const int8_t   LORA_POWER    = 17;
-static const uint16_t LORA_PREAMBLE = 10;
+static const uint16_t LORA_PREAMBLE = 12;      // 10->12: zaif signallarda sinxronizatsiya yaxshi
 
 // ================================================================
 //  PROTOKOL (node bilan bir xil) — O'ZGARTIRILMAGAN
