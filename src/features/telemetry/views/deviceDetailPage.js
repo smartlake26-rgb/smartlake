@@ -650,15 +650,7 @@ export function renderDeviceDetailPage(nav, deviceId) {
       sigIcon = 'wifi-off';
     }
     
-    const signalExplanationNode = mdCard([
-      el('div', { style: 'display:flex; align-items:center; gap:8px; margin-bottom:8px' }, [
-        el('span', { html: icon(sigIcon, 18), style: `color:${sigColor}; display:inline-flex` }),
-        el('span', { style: 'font-weight:700; font-size:14px; color:var(--md-on-surface)', text: `Aloqa Sifati: ${sigLabel}` })
-      ]),
-      el('p', { style: 'font-size:12px; line-height:1.4; color:var(--md-on-surface-variant); margin:0', text: `${sigText} (${rssiVal !== null ? 'Hozirgi RSSI kuchi: ' + rssiVal + ' dBm' : 'Signal kuchi mavjud emas'})` })
-    ], { elevated: true });
-
-    // Aloqa sifati — aeratorControlCard ichiga qo'shish (alohida karta kerak emas)
+    // Aloqa sifati — aeratorControlCard ICHIGA ixcham qator
     const signalLine = el('div', {
       style: `display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;margin-top:12px;`
            + `background:color-mix(in srgb,${sigColor} 8%,transparent)`,
@@ -667,8 +659,7 @@ export function renderDeviceDetailPage(nav, deviceId) {
       el('span', { style: `font-size:12px;font-weight:600;color:${sigColor}`,
         text: `${sigLabel}${rssiVal !== null ? ` (${rssiVal} dBm)` : ''}` }),
     ]);
-    aeratorControlCard.querySelector('.stack, .md-card-body, :last-child')?.append(signalLine)
-      || aeratorControlCard.append(signalLine);
+    aeratorControlCard.append(signalLine);
 
     // Qurilma info — ixcham qator (alohida katta karta emas)
     const infoLine = el('div', {

@@ -41,9 +41,8 @@ function cmdChip(status) {
   return el('span', { class: 'md-chip', style: `background:color-mix(in srgb, ${c} 16%, transparent);color:${c}`, text: t('cmdStatus.' + status) });
 }
 
-// Firmware qo'llaydigan tugma guruhlari (feed/restart olib tashlandi)
+// Firmware qo'llaydigan tugma guruhlari (aerator olib tashlandi — aeratorControlCard'da)
 const GROUPS = [
-  { key: 'aerator', types: [COMMAND_TYPES.AERATOR_ON, COMMAND_TYPES.AERATOR_OFF] },
   { key: 'mode',    types: [COMMAND_TYPES.MODE_DO, COMMAND_TYPES.MODE_TIME] },
   { key: 'system',  types: [COMMAND_TYPES.SYNC_TIME, COMMAND_TYPES.REQUEST_STATUS] },
 ];
