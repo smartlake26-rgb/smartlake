@@ -240,7 +240,7 @@ export function renderLakeDetailPage(nav, lakeId) {
     const now = Date.now();
     Promise.all([
       historyService.getHistory(devId, '24h').catch(() => []),
-      fetchArchive(s.uid, [devId], now - 2 * DAY, now).catch(() => []),
+      fetchArchive(s.uid, [devId], now - 2 * DAY, now, s.role === 'super' || s.role === 'operator').catch(() => []),
     ]).then(([buf, arch]) => {
       const seen = new Set(arch.map((x) => Math.floor(x.ts / 300e3)));
       const pts = arch.concat((buf || []).filter((x) => !seen.has(Math.floor(x.ts / 300e3))))

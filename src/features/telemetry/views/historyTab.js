@@ -431,7 +431,10 @@ export function buildHistoryTab({ lakeId, uid, isUz, getDevs, getTh, lakeName = 
       }
       // Arxiv — xato bo'lsa jim o'tkaziladi, bufer yetarli bo'ladi
       let arch = [];
-      try { arch = await fetchArchive(uid, ids, fromTs, toTs); } catch (_) {}
+      try {
+        const _r = authStore.getState().role;
+        arch = await fetchArchive(uid, ids, fromTs, toTs, _r === 'super' || _r === 'operator' || _r === 'region');
+      } catch (_) {}
       const seen = new Set(arch.map((x) => Math.floor(x.ts / 300e3)));
       samples = arch.concat(rtdb.filter((x) => !seen.has(Math.floor(x.ts / 300e3))))
         .sort((a, b) => a.ts - b.ts);

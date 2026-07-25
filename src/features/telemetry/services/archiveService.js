@@ -43,6 +43,8 @@ const lastWrite = new Map();   // deviceId -> {ts, wroteAt}
 export function startArchiver(dataStoreModule, uid) {
   if (started || !uid) return;
   started = true;
+
+  // 1. Real-time: telemetriya kelganda arxivlash
   dataStoreModule.subscribe((st) => {
     if (!st || !st.telemetry || !st.telemetry.forEach) return;
     st.telemetry.forEach((tel, deviceId) => {
@@ -64,29 +66,127 @@ export function startArchiver(dataStoreModule, uid) {
       }, { merge: true }).catch((e) => logger.warn('arxiv yozish:', e && e.message));
     });
   });
+
+  // 2. RTDB history buferdan o'tgan ma'lumotlarni arxivlash (bir martalik)
+  //    Ilova ochilganda RTDB'dagi 24h history'ni Firestore'ga yozadi
+  //    Bu yo'qolgan ma'lumotlarni tiklash uchun
+  setTimeout(() => {
+    backfillFromRtdb(dataStoreModule, uid);
+  }, 5000);
+
   logger.info('Telemetriya arxivlagichi ishga tushdi');
+}
+
+/** RTDB history buferdan Firestore'ga o'tgan ma'lumotlarni yozish */
+async function backfillFromRtdb(dataStoreModule, uid) {
+  try {
+    const st = dataStoreModule.getState();
+    if (!st || !st.devices || !st.devices.length) return;
+
+    // Firebase RTDB import
+    const { getDatabase, ref, get } = await import('firebase/database');
+    const rtdb = getDatabase();
+
+    for (const dev of st.devices) {
+      const devId = dev.id;
+      try {
+        // RTDB'dagi history bo'limi (agar mavjud bo'lsa)
+        const histRef = ref(rtdb, `nodes/${devId}/history`);
+        const snap = await get(histRef);
+        if (!snap.exists()) continue;
+
+        const histData = snap.val();
+        if (!histData || typeof histData !== 'object') continue;
+
+        // Kunlar bo'yicha guruhlash
+        const byDay = new Map();
+        Object.values(histData).forEach((entry) => {
+          if (!entry || typeof entry.ts !== 'number') return;
+          const dk = dayKey(entry.ts);
+          if (!byDay.has(dk)) byDay.set(dk, []);
+          const sample = { ts: entry.ts };
+          for (const k of ['do', 't', 'ph', 'aer', 'rssi', 'battery']) {
+            if (typeof entry[k] === 'number' && Number.isFinite(entry[k])) sample[k] = entry[k];
+          }
+          byDay.get(dk).push(sample);
+        });
+
+        // Har kunlik hujjatga yozish
+        for (const [dk, samples] of byDay) {
+          if (!samples.length) continue;
+          try {
+            // Avval mavjud hujjatni tekshirish
+            const docRef = doc(db, 'telemetryArchive', `${devId}_${dk}`);
+            const existing = await getDoc(docRef);
+            const existingSamples = existing.exists() ? (existing.data().samples || []) : [];
+            const existingTs = new Set(existingSamples.map((s) => s.ts));
+
+            // Faqat yangi sample'larni qo'shish
+            const newSamples = samples.filter((s) => !existingTs.has(s.ts));
+            if (!newSamples.length) continue;
+
+            await setDoc(docRef, {
+              deviceId: devId, ownerUid: uid, dayKey: dk,
+              updatedAt: serverTimestamp(),
+              samples: arrayUnion(...newSamples),
+            }, { merge: true });
+
+            logger.info(`Backfill: ${devId} ${dk} — ${newSamples.length} yangi sample`);
+          } catch (e) { logger.warn(`Backfill yozish: ${devId}_${dk}:`, e && e.message); }
+        }
+      } catch (e) { logger.warn(`Backfill ${devId}:`, e && e.message); }
+    }
+    logger.info('RTDB backfill tugadi');
+  } catch (e) { logger.warn('Backfill xato:', e && e.message); }
 }
 
 // ------------------------------------------------------------
 //  O'QUVCHI — davr bo'yicha sample'lar
 // ------------------------------------------------------------
-export async function fetchArchive(uid, deviceIds, fromTs, toTs) {
+export async function fetchArchive(uid, deviceIds, fromTs, toTs, isAdmin = false) {
   if (!uid || !deviceIds.length) return [];
   const fromKey = dayKey(fromTs), toKey = dayKey(toTs);
-  const q = query(collection(db, 'telemetryArchive'),
-    where('ownerUid', '==', uid),
-    where('dayKey', '>=', fromKey),
-    where('dayKey', '<=', toKey));
-  const snap = await getDocs(q);
-  const idSet = new Set(deviceIds);
+
+  // Admin bo'lsa — ownerUid filtrlamasdan, deviceId bo'yicha o'qiydi
+  // Fermer bo'lsa — faqat o'z ma'lumotlarini ko'radi
   const out = [];
-  snap.forEach((d) => {
-    const data = d.data();
-    if (!idSet.has(data.deviceId)) return;
-    (data.samples || []).forEach((sm) => {
-      if (sm && typeof sm.ts === 'number' && sm.ts >= fromTs && sm.ts <= toTs) out.push(sm);
+  const idSet = new Set(deviceIds);
+
+  if (isAdmin) {
+    // Admin: deviceId bo'yicha har kunlik hujjatlarni to'g'ridan o'qish
+    for (const devId of deviceIds) {
+      // fromKey dan toKey gacha barcha kunlarni generatsiya qilish
+      const start = new Date(fromTs);
+      const end = new Date(toTs);
+      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+        const dk = dayKey(d.getTime());
+        try {
+          const snap = await getDoc(doc(db, 'telemetryArchive', `${devId}_${dk}`));
+          if (snap.exists()) {
+            const data = snap.data();
+            (data.samples || []).forEach((sm) => {
+              if (sm && typeof sm.ts === 'number' && sm.ts >= fromTs && sm.ts <= toTs) out.push(sm);
+            });
+          }
+        } catch { /* skip */ }
+      }
+    }
+  } else {
+    // Fermer: ownerUid filtr bilan
+    const q = query(collection(db, 'telemetryArchive'),
+      where('ownerUid', '==', uid),
+      where('dayKey', '>=', fromKey),
+      where('dayKey', '<=', toKey));
+    const snap = await getDocs(q);
+    snap.forEach((d) => {
+      const data = d.data();
+      if (!idSet.has(data.deviceId)) return;
+      (data.samples || []).forEach((sm) => {
+        if (sm && typeof sm.ts === 'number' && sm.ts >= fromTs && sm.ts <= toTs) out.push(sm);
+      });
     });
-  });
+  }
+
   out.sort((a, b) => a.ts - b.ts);
   return out;
 }

@@ -303,7 +303,9 @@ export function buildReportTab({ lakeId, uid, isUz, getDevs, lakeName = '' }) {
     try {
       const ids = getDevs().map((d) => d.id);
       const [fromTs, toTs] = dateFilter.getRange();
-      const arch = await fetchArchive(uid, ids, fromTs, toTs);
+      const _role = authStore.getState().role;
+      const _isAdmin = _role === 'super' || _role === 'operator' || _role === 'region';
+      const arch = await fetchArchive(uid, ids, fromTs, toTs, _isAdmin);
       let rtdb = [];
       if (toTs >= Date.now() - DAY && ids.length) {
         const pts = await historyService.getHistory(ids[0], '24h').catch(() => []);
