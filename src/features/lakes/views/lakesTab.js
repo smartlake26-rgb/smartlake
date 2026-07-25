@@ -98,10 +98,10 @@ const SEV = { critical: 0, warning: 1, offline: 2, inactive: 3, archived: 4, onl
 export function renderLakesTab(nav) {
   const content = el('div', { class: 'md-content' });
   const node = el('div', {}, [
-    appBar({ title: t('lake.myLakes') }),
+    appBar({ title: t('lake.myLakes'),
+      actions: [mdIconButton({ icon: 'plus', label: t('lake.create'),
+        onClick: () => nav.push((n) => renderLakeFormPage(n, null)) })] }),
     content,
-    mdFab({ label: t('lake.create'), icon: 'plus',
-      onClick: () => nav.push((n) => renderLakeFormPage(n, null)) }),
   ]);
 
   // --- sahifa holati ---

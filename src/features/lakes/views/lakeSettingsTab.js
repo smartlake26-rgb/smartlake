@@ -119,81 +119,111 @@ export function buildLakeSettingsTab({ lakeId, uid, isUz, devicesCard, onSaved }
   }
 
   function fishRow(f, idx) {
-    /* Katalog dropdown */
+    const name = f.type || (f.typeId ? catalogName(fishCatItem(f), isUz) : '—');
+    const count = f.count != null ? String(f.count) : '—';
+    const weight = f.avgWeight != null ? `${f.avgWeight}g` : '—';
+
+    const row = el('div', {
+      style: 'display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:12px;'
+           + 'background:var(--sl-card-inset,#f8fafa);margin-bottom:6px;'
+           + 'animation:sl-ob-fade .25s ease both;transition:transform .15s,box-shadow .15s',
+    }, [
+      // Raqam badge
+      el('div', {
+        style: 'width:28px;height:28px;border-radius:50%;background:var(--sl-primary);color:#fff;'
+             + 'display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex:none',
+        text: String(idx + 1),
+      }),
+      // Ma'lumotlar
+      el('div', { style: 'flex:1;min-width:0' }, [
+        el('div', { style: 'font-size:14px;font-weight:700;color:var(--sl-on-surface,#1a2a3a);white-space:nowrap;overflow:hidden;text-overflow:ellipsis', text: name }),
+        el('div', { style: 'font-size:11px;color:var(--sl-text-secondary,#8aa);margin-top:2px',
+          text: `${count} ${isUz ? 'dona' : 'шт'} · ${weight}` }),
+      ]),
+      // Tahrirlash
+      el('button', {
+        type: 'button',
+        style: 'background:none;border:none;color:var(--sl-primary);cursor:pointer;padding:4px;display:flex',
+        html: slIcon('edit', 16),
+        onClick: () => openFishForm(idx),
+      }),
+      // O'chirish
+      el('button', {
+        type: 'button',
+        style: 'background:none;border:none;color:var(--sl-critical,#D93025);cursor:pointer;padding:4px;display:flex',
+        html: slIcon('x', 16),
+        onClick: () => { fish.splice(idx, 1); renderFish(); },
+      }),
+    ]);
+    row.addEventListener('mouseenter', () => { row.style.transform = 'translateX(4px)'; row.style.boxShadow = '0 2px 8px rgba(0,0,0,.06)'; });
+    row.addEventListener('mouseleave', () => { row.style.transform = ''; row.style.boxShadow = ''; });
+    return row;
+  }
+
+  /* Baliq qo'shish/tahrirlash formasi (bottom sheet) */
+  function openFishForm(editIdx) {
+    const isEdit = editIdx != null && editIdx >= 0;
+    const f = isEdit ? { ...fish[editIdx] } : { typeId: null, type: '', count: null, startWeight: null, avgWeight: null };
+
     const opts = [
       { value: '', label: t('lset.pickType') },
       ...catalogs.fish.map((c) => ({ value: c.id, label: catalogName(c, isUz) })),
     ];
-    if (!f.typeId && f.type) opts.push({ value: '_legacy', label: `${f.type} ${t('lset.legacy')}` });
-    const typeSel = slSelect(opts, f.typeId || (f.type ? '_legacy' : ''));
+    const typeSel = slSelect(opts, f.typeId || '');
+    const countIn = field(t('lset.count'));    countIn.input.value = f.count ?? '';
+    const swIn    = field(t('lset.startW'), { ph: 'g' }); swIn.input.value = f.startWeight ?? '';
+    const awIn    = field(t('lset.avgW'),   { ph: 'g' }); awIn.input.value = f.avgWeight ?? '';
 
-    const countIn = field(t('lset.count'));             countIn.input.value = f.count ?? '';
-    const swIn    = field(t('lset.startW'), { ph:'g' }); swIn.input.value  = f.startWeight ?? '';
-    const awIn    = field(t('lset.avgW'),   { ph:'g' }); awIn.input.value  = f.avgWeight ?? '';
-
-    /* Taxminiy joriy vazn — faqat feedBasedGrowth=true bo'lsa */
-    const estBox = el('div', { class: 'sl-caption', style: 'margin-top:var(--sl-sp-1)' });
-    function refreshEst() {
-      const cat = fishCatItem(f);
-      estBox.replaceChildren();
-      if (!cat) return;
-      // KATALOG PARAMETRI bo'yicha (nom bo'yicha emas)
-      if (cat.feedBasedGrowth === false) {
-        estBox.textContent = t('lset.noGrowth');
-        return;
-      }
-      const est = estimateAvgWeightG({
-        startWeightG: num(swIn.input.value),
-        stockedAtTs: null,   // stockedAt olib tashlandi — null
-        fcr: cat.fcr,
-      });
-      if (est == null) { estBox.textContent = t('lset.estHint'); return; }
-      mount(estBox,
-        el('span', { text: `${t('lset.estW')}: ~${est} g ` }),
-        slButton({ label: t('lset.apply'), variant: 'text', size: 'sm', onClick: () => {
-          awIn.input.value = est; f.avgWeight = est; refreshBiomass();
-        } }));
-    }
-
-    typeSel.addEventListener('change', () => {
-      f.typeId = typeSel.value === '_legacy' ? null : (typeSel.value || null);
-      if (f.typeId) f.type = catalogName(fishCatItem(f), isUz);
-      refreshEst();
+    const scrim = el('div', {
+      style: 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;display:flex;align-items:flex-end',
     });
-    countIn.input.addEventListener('input', () => { f.count = numOrNull(countIn.input.value); refreshBiomass(); });
-    swIn.input.addEventListener('input',    () => { f.startWeight = numOrNull(swIn.input.value); refreshEst(); });
-    awIn.input.addEventListener('input',    () => { f.avgWeight   = numOrNull(awIn.input.value); refreshBiomass(); });
+    const sheet = el('div', {
+      style: 'background:var(--sl-card,#fff);width:100%;max-width:480px;margin:0 auto;'
+           + 'border-radius:20px 20px 0 0;padding:8px 20px 32px;max-height:85vh;overflow-y:auto;'
+           + 'box-shadow:0 -4px 32px rgba(0,0,0,.18)',
+    });
 
-    /* O'lim korreksiyasi */
-    const deadIn = field(t('lset.dead'), { ph: '0', minW: '90px' });
-    deadIn.style.maxWidth = '120px';
-    const deadBtn = slButton({ label: t('lset.deadBtn'), variant: 'outlined', size: 'sm', onClick: () => {
-      const d = num(deadIn.input.value);
-      if (d <= 0) return toast(t('lset.enterNum'), 'err');
-      f.count = Math.max(0, num(f.count) - d);
-      countIn.input.value = f.count; deadIn.input.value = '';
-      refreshBiomass();
-      toast(fmt('lset.deadDone', { n: d }), 'ok');
-    } });
+    function close() { scrim.remove(); }
+    scrim.addEventListener('click', (e) => { if (e.target === scrim) close(); });
 
-    const rmBtn = slButton({ label: '✕', variant: 'text', size: 'sm',
-      onClick: () => { fish.splice(idx, 1); renderFish(); } });
-
-    refreshEst();
-    return el('div', { class: 'sl-card inset', style: 'margin-bottom:var(--sl-sp-2);box-shadow:none' }, [
-      el('div', { class: 'sl-row-between', style: 'margin-bottom:var(--sl-sp-1)' }, [
-        el('span', { class: 'sl-label', style: 'color:var(--sl-primary)', text: `${t('lset.fishN')} #${idx + 1}` }),
-        rmBtn,
+    sheet.append(
+      el('div', { style: 'width:40px;height:4px;border-radius:2px;background:var(--sl-border,#ddd);margin:12px auto 16px' }),
+      el('div', { style: 'font-size:16px;font-weight:800;margin-bottom:16px',
+        text: isEdit ? (isUz ? 'Baliqni tahrirlash' : 'Редактировать рыбу') : (isUz ? 'Baliq qo\'shish' : 'Добавить рыбу') }),
+      el('div', { style: 'margin-bottom:12px' }, [el('label', { class: 'sl-caption', text: t('lset.type') }), typeSel]),
+      el('div', { style: 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:16px' }, [countIn, swIn, awIn]),
+      el('div', { style: 'display:flex;gap:10px' }, [
+        el('button', {
+          type: 'button',
+          style: 'flex:1;padding:14px;border-radius:12px;border:1.5px solid var(--sl-border);background:var(--sl-card);'
+               + 'font-size:14px;font-weight:600;cursor:pointer;color:var(--sl-text-secondary)',
+          text: isUz ? 'Bekor' : 'Отмена',
+          onClick: close,
+        }),
+        el('button', {
+          type: 'button',
+          style: 'flex:1;padding:14px;border-radius:12px;border:none;background:var(--sl-primary);'
+               + 'color:#fff;font-size:14px;font-weight:700;cursor:pointer',
+          text: isUz ? 'Saqlash' : 'Сохранить',
+          onClick: () => {
+            const val = {
+              typeId: typeSel.value || null,
+              type: typeSel.value ? catalogName(fishCatItem({ typeId: typeSel.value }), isUz) : '',
+              count: numOrNull(countIn.input.value),
+              startWeight: numOrNull(swIn.input.value),
+              avgWeight: numOrNull(awIn.input.value),
+            };
+            if (isEdit) fish[editIdx] = val;
+            else fish.push(val);
+            renderFish();
+            close();
+          },
+        }),
       ]),
-      el('div', { class: 'sl-stack-sm' }, [
-        el('div', {}, [el('label', { class: 'sl-caption', text: t('lset.type') }), typeSel]),
-        el('div', { class: 'sl-row', style: 'gap:var(--sl-sp-2);flex-wrap:wrap;align-items:flex-end' },
-          [countIn, swIn, awIn]),
-        estBox,
-        el('div', { class: 'sl-row', style: 'gap:var(--sl-sp-2);align-items:flex-end;flex-wrap:wrap' },
-          [deadIn, deadBtn]),
-      ]),
-    ]);
+    );
+
+    scrim.append(sheet);
+    document.body.append(scrim);
   }
 
   function renderFish() {
@@ -204,10 +234,9 @@ export function buildLakeSettingsTab({ lakeId, uid, isUz, devicesCard, onSaved }
     refreshBiomass();
   }
 
-  const addFishBtn = slButton({ label: t('lset.addFish'), variant: 'outlined', onClick: () => {
+  const addFishBtn = slButton({ label: t('lset.addFish'), variant: 'outlined', icon: 'plus', onClick: () => {
     if (fish.length >= MAX_FISH) return;
-    fish.push({ typeId: null, type: '', count: null, startWeight: null, avgWeight: null });
-    renderFish();
+    openFishForm(null);
   } });
 
   const fishCard = slCard([
