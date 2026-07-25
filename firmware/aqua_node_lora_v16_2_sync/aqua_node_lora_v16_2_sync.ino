@@ -113,11 +113,11 @@ static const uint8_t RS485_DE = 4;
 // ================================================================
 static const float    LORA_FREQ     = 433.0;   // MHz (UZ ISM 433)
 static const float    LORA_BW       = 125.0;    // kHz
-static const uint8_t  LORA_SF       = 9;        // 7..12 (kattaroq = uzoqroq, sekinroq). 7-8km uchun 10-12 sinab ko'ring
-static const uint8_t  LORA_CR       = 7;        // 4/7
+static const uint8_t  LORA_SF       = 12;       // 12: maksimal masofa (7-10km), sensor data kichik — tezlik muhim emas
+static const uint8_t  LORA_CR       = 8;        // 4/8: maksimal xato tuzatish
 static const uint8_t  LORA_SYNCWORD = 0x55;     // shaxsiy tarmoq (LoRaWAN 0x34 EMAS)
 static const int8_t   LORA_POWER    = 17;       // dBm (PA_BOOST, 20 gacha)
-static const uint16_t LORA_PREAMBLE = 10;
+static const uint16_t LORA_PREAMBLE = 12;       // 12: zaif signallarda sinxronizatsiya yaxshi
 
 // ================================================================
 //  LoRa PROTOKOL — ikkilik kadr (little-endian) + CRC16
