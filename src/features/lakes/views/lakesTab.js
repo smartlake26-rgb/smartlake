@@ -242,21 +242,32 @@ export function renderLakesTab(nav) {
           ]),
         ]),
         // Ko'lni arxivlash (o'chirish)
-        el('div', { style: 'text-align:center;margin-top:6px' }, [
-          el('button', {
+        (() => {
+          const delWrap = el('div', { style: 'text-align:center;margin-top:6px' });
+          const delBtn = el('button', {
             type: 'button',
-            style: 'background:none;border:none;color:var(--sl-critical,#D93025);font-size:11px;cursor:pointer;padding:4px 8px;opacity:.6',
+            style: 'background:none;border:none;color:var(--sl-critical,#D93025);font-size:11px;cursor:pointer;padding:6px 12px;opacity:.6',
             text: isUz ? "Ko'lni o'chirish" : 'Удалить озеро',
-            onClick: (e) => {
-              e.stopPropagation();
-              if (confirm(isUz ? `"${vm.lk.name}" ko'lini arxivlashni tasdiqlaysizmi?` : `Архивировать "${vm.lk.name}"?`)) {
-                lakeService.archive(vm.lk.id, authStore.getState().uid)
-                  .then(() => { toast(isUz ? "Ko'l arxivlandi" : 'Озеро архивировано', 'ok'); dataStore.refresh(); })
-                  .catch((err) => toast(err?.message || 'Xato', 'err'));
-              }
-            },
-          }),
-        ]),
+          });
+          delBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            e.stopImmediatePropagation();
+            const ok = confirm(isUz ? `"${vm.lk.name}" ko'lini o'chirmoqchimisiz?` : `Удалить "${vm.lk.name}"?`);
+            if (!ok) return;
+            lakeService.archive(vm.lk.id, authStore.getState().uid)
+              .then(() => {
+                toast(isUz ? "Ko'l o'chirildi" : 'Озеро удалено', 'ok');
+                dataStore.refresh();
+              })
+              .catch((err) => {
+                console.error('Ko\'l arxivlash xatosi:', err);
+                toast(err?.message || 'Xato', 'err');
+              });
+          });
+          delWrap.append(delBtn);
+          return delWrap;
+        })(),
       ],
       dim: vm.kind === 'archived' || vm.kind === 'inactive',
       ariaLabel: vm.lk.name,
