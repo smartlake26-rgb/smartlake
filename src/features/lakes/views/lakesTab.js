@@ -97,25 +97,30 @@ const SEV = { critical: 0, warning: 1, offline: 2, inactive: 3, archived: 4, onl
    ============================================================ */
 export function renderLakesTab(nav) {
   const isUz = detectLocale() === 'uz';
-  const content = el('div', { class: 'md-content' });
 
   const addLakeBtn = el('button', {
     type: 'button',
-    style: 'display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:12px;'
-         + 'border:none;background:var(--sl-primary,#0E7C6B);color:#fff;font-size:13px;font-weight:700;'
-         + 'cursor:pointer;box-shadow:0 2px 8px rgba(14,124,107,.25);transition:transform .15s,box-shadow .15s',
+    style: 'display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border-radius:14px;'
+         + 'border:none;background:var(--sl-primary,#0E7C6B);color:#fff;font-size:14px;font-weight:700;'
+         + 'cursor:pointer;box-shadow:0 2px 10px rgba(14,124,107,.3);transition:transform .15s,box-shadow .15s',
     onClick: () => nav.push((n) => renderLakeFormPage(n, null)),
   }, [
-    el('span', { html: slIcon('plus', 16) }),
-    el('span', { text: isUz ? "Qo'shish" : 'Добавить' }),
+    el('span', { html: slIcon('plus', 18) }),
+    el('span', { text: isUz ? "Ko'l qo'shish" : 'Добавить озеро' }),
   ]);
-  addLakeBtn.addEventListener('mouseenter', () => { addLakeBtn.style.transform = 'scale(1.05)'; addLakeBtn.style.boxShadow = '0 4px 14px rgba(14,124,107,.35)'; });
-  addLakeBtn.addEventListener('mouseleave', () => { addLakeBtn.style.transform = ''; addLakeBtn.style.boxShadow = '0 2px 8px rgba(14,124,107,.25)'; });
+  addLakeBtn.addEventListener('mouseenter', () => { addLakeBtn.style.transform = 'scale(1.04)'; addLakeBtn.style.boxShadow = '0 4px 16px rgba(14,124,107,.4)'; });
+  addLakeBtn.addEventListener('mouseleave', () => { addLakeBtn.style.transform = ''; addLakeBtn.style.boxShadow = '0 2px 10px rgba(14,124,107,.3)'; });
 
-  const node = el('div', {}, [
-    appBar({ title: t('lake.myLakes'), actions: [addLakeBtn] }),
-    content,
+  // Yuqoridagi qator: sarlavha + tugma
+  const headerRow = el('div', {
+    style: 'display:flex;justify-content:space-between;align-items:center;padding:8px 16px 12px',
+  }, [
+    el('div', { style: 'font-size:18px;font-weight:800;color:var(--sl-on-surface,#1a2a3a)', text: t('lake.myLakes') }),
+    addLakeBtn,
   ]);
+
+  const content = el('div', { class: 'md-content' });
+  const node = el('div', {}, [headerRow, content]);
 
   // --- sahifa holati ---
   let query = '';
