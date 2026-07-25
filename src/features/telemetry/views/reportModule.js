@@ -56,14 +56,14 @@ export function buildReportTab({ lakeId, uid, isUz, getDevs, lakeName = '' }) {
   let loading = false;
 
   const sum = (v) => (v != null ? `${Math.round(v).toLocaleString()} ${isUz ? "so'm" : 'сум'}` : '—');
-  const dateFilter = buildDateFilter({ initial: 'oy', onChange: () => loadData() });
+  const dateFilter = buildDateFilter({ initial: 'bugun', onChange: () => loadData() });
 
   /* ---------- elektr yordamchilari (Tarixdan ko'chirilgan mantiq) ---------- */
   const kwIn = slField({ type: 'number', label: t('hist.kw'), attrs: { min: '0', step: '0.1' }, placeholder: '1.5' });
   const tarifIn = slField({ type: 'number', label: t('hist.tariff'), attrs: { min: '0', step: '1' }, placeholder: '1000' });
   [kwIn, tarifIn].forEach((f) => { f.querySelector('.sl-help').remove(); f.style.flex = '1'; f.style.minWidth = '120px'; });
-  const kwTotal = () => parseFloat(kwIn.input.value) || (meta && meta.energy && meta.energy.kw) || 0;
-  const tariffVal = () => parseFloat(tarifIn.input.value) || (meta && meta.energy && meta.energy.tariff) || 0;
+  const kwTotal = () => (meta && meta.energy && meta.energy.kw) || (meta && meta.aerators && meta.aerators.kw) || 0;
+  const tariffVal = () => (meta && meta.energy && meta.energy.tariff) || 0;
   const kwhOf = (ms) => { const kw = kwTotal(); return kw ? (ms / 3600e3) * kw : null; };
   const costOf = (kwh) => { const tf = tariffVal(); return kwh != null && tf ? Math.round(kwh * tf) : null; };
   const aerSamples = () => samples.filter((x) => 'aer' in x);
@@ -195,6 +195,11 @@ export function buildReportTab({ lakeId, uid, isUz, getDevs, lakeName = '' }) {
     }
 
     const bars = dailyEnergyBars();
+    // Elektr — lakeMeta'dan kW va tarif avtomatik olinadi (alohida input kerak emas)
+    const enKw = (meta && meta.energy && meta.energy.kw) || (meta && meta.aerators && meta.aerators.kw) || 0;
+    const enTariff = (meta && meta.energy && meta.energy.tariff) || 0;
+    const enAerCount = (meta && meta.aerators && meta.aerators.count) || 1;
+
     mount(energyBox, slCard([
       el('div', { class: 'sl-card-head' }, [
         el('div', { class: 'sl-card-title', style: 'display:flex;align-items:center;gap:6px' }, [
@@ -202,9 +207,14 @@ export function buildReportTab({ lakeId, uid, isUz, getDevs, lakeName = '' }) {
           el('span', { text: t('hist.energyTitle') }),
         ]),
       ]),
-      el('div', { class: 'sl-row', style: 'gap:var(--sl-sp-2);align-items:flex-end;flex-wrap:wrap;margin-bottom:var(--sl-sp-2)' }, [
-        kwIn, tarifIn, saveEnergyBtn,
-      ]),
+      // Hozirgi sozlamalar ko'rsatish (lakeMeta'dan)
+      enKw > 0 || enTariff > 0
+        ? el('div', { style: 'display:flex;gap:12px;margin-bottom:12px;padding:10px 14px;border-radius:10px;background:var(--sl-card-inset,#f5f7f8);font-size:12px' }, [
+            el('span', { style: 'color:var(--sl-text-secondary)', text: `${enAerCount} ta aerator · ${enKw} kW` }),
+            enTariff > 0 ? el('span', { style: 'color:var(--sl-text-secondary)', text: `Tarif: ${enTariff.toLocaleString()} so'm/kWh` }) : null,
+          ].filter(Boolean))
+        : el('div', { style: 'padding:10px 14px;border-radius:10px;background:#FFF3E0;font-size:12px;color:#E8922A;margin-bottom:12px',
+            text: isUz ? "Aerator va tarif sozlamalarda kiritilmagan — Sozlamalar tabiga o'ting" : 'Настройки аэратора не заданы — перейдите в Настройки' }),
       slKvRow({ icon: 'clock', key: t('hist.runTime'), value: hasAer ? fmtDur(runMs, isUz) : '—' }),
       slKvRow({ icon: 'zap', key: t('hist.consumption'),
         value: kwh != null ? `${kwh.toFixed(2)} kWh` : '—', valueColorVar: '--sl-chart-energy' }),

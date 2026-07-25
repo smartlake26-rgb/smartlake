@@ -34,6 +34,8 @@ import { presence } from '../../telemetry/domain/freshness.js';
 import { rssiQuality } from '../../telemetry/domain/signalQuality.js';
 import { computeFeedPlan } from '../../telemetry/domain/feedEngine.js';
 import { loadLakeMeta } from '../../telemetry/services/archiveService.js';
+import { lakeService } from '../index.js';
+import { authStore } from '../../auth/index.js';
 import { renderLakeDetailPage } from './lakeDetailPage.js';
 import { renderLakeFormPage } from './lakeFormPage.js';
 import { openFarmerClaimModal } from '../../devices/views/deviceClaimFlow.js';
@@ -238,6 +240,22 @@ export function renderLakesTab(nav) {
             el('span', { html: slIcon('plus', 16) }),
             el('span', { text: detectLocale() === 'uz' ? 'Qurilma ulash' : 'Подключить устройство' }),
           ]),
+        ]),
+        // Ko'lni arxivlash (o'chirish)
+        el('div', { style: 'text-align:center;margin-top:6px' }, [
+          el('button', {
+            type: 'button',
+            style: 'background:none;border:none;color:var(--sl-critical,#D93025);font-size:11px;cursor:pointer;padding:4px 8px;opacity:.6',
+            text: isUz ? "Ko'lni o'chirish" : 'Удалить озеро',
+            onClick: (e) => {
+              e.stopPropagation();
+              if (confirm(isUz ? `"${vm.lk.name}" ko'lini arxivlashni tasdiqlaysizmi?` : `Архивировать "${vm.lk.name}"?`)) {
+                lakeService.archive(vm.lk.id, authStore.getState().uid)
+                  .then(() => { toast(isUz ? "Ko'l arxivlandi" : 'Озеро архивировано', 'ok'); dataStore.refresh(); })
+                  .catch((err) => toast(err?.message || 'Xato', 'err'));
+              }
+            },
+          }),
         ]),
       ],
       dim: vm.kind === 'archived' || vm.kind === 'inactive',

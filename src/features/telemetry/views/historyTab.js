@@ -274,9 +274,28 @@ export function buildHistoryTab({ lakeId, uid, isUz, getDevs, getTh, lakeName = 
       emptyText: t('hist.empty'),
     });
     mount(tableBox, slCard([
-      el('div', { class: 'sl-card-head' }, [
+      el('div', { class: 'sl-card-head', style: 'margin-bottom:8px' }, [
         el('div', { class: 'sl-card-title', text: t('hist.tableTitle') }),
         slBadge({ type: 'info', label: String(rows.length), dot: false }),
+      ]),
+      // Sana oralig'i — jadval ichida ham ko'rinadi
+      el('div', { style: 'margin-bottom:10px;padding:8px 12px;border-radius:10px;background:var(--sl-card-inset,#f5f7f8);font-size:12px;color:var(--sl-text-secondary);display:flex;align-items:center;gap:6px' }, [
+        el('span', { html: slIcon('calendar', 14), style: 'display:inline-flex;flex:none' }),
+        el('span', { text: (() => {
+          const [f, to] = dateFilter.getRange();
+          const fd = new Date(f), td = new Date(to);
+          const fmt = (d) => `${p2(d.getDate())}.${p2(d.getMonth()+1)}.${d.getFullYear()}`;
+          return `${fmt(fd)} — ${fmt(td)}`;
+        })() }),
+        el('button', {
+          type: 'button',
+          style: 'margin-left:auto;background:none;border:none;color:var(--sl-primary);font-size:11px;font-weight:600;cursor:pointer;text-decoration:underline',
+          text: isUz ? 'Oralikni o\'zgartirish ↑' : 'Изменить период ↑',
+          onClick: () => {
+            // Sahifa yuqorisidagi dateFilter ga scroll qilish
+            dateFilter.node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          },
+        }),
       ]),
       table,
     ]));
