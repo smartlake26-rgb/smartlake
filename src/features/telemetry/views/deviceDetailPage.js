@@ -658,7 +658,36 @@ export function renderDeviceDetailPage(nav, deviceId) {
       el('p', { style: 'font-size:12px; line-height:1.4; color:var(--md-on-surface-variant); margin:0', text: `${sigText} (${rssiVal !== null ? 'Hozirgi RSSI kuchi: ' + rssiVal + ' dBm' : 'Signal kuchi mavjud emas'})` })
     ], { elevated: true });
 
-    const stackItems = [header, sensors, thresholdsCard, aeratorControlCard, signalExplanationNode, cmdPanel, info, history];
+    // Aloqa sifati — aeratorControlCard ichiga qo'shish (alohida karta kerak emas)
+    const signalLine = el('div', {
+      style: `display:flex;align-items:center;gap:8px;padding:10px 14px;border-radius:10px;margin-top:12px;`
+           + `background:color-mix(in srgb,${sigColor} 8%,transparent)`,
+    }, [
+      el('span', { html: icon(sigIcon, 16), style: `color:${sigColor};display:inline-flex` }),
+      el('span', { style: `font-size:12px;font-weight:600;color:${sigColor}`,
+        text: `${sigLabel}${rssiVal !== null ? ` (${rssiVal} dBm)` : ''}` }),
+    ]);
+    aeratorControlCard.querySelector('.stack, .md-card-body, :last-child')?.append(signalLine)
+      || aeratorControlCard.append(signalLine);
+
+    // Qurilma info — ixcham qator (alohida katta karta emas)
+    const infoLine = el('div', {
+      style: 'display:flex;gap:16px;flex-wrap:wrap;padding:12px 16px;border-radius:12px;background:var(--md-surface-container,#f5f7f8);font-size:12px;color:var(--md-on-surface-variant)',
+    }, [
+      el('span', { text: `FW: ${tel && tel.fw ? tel.fw : '—'}` }),
+      el('span', { text: `GW: ${tel && tel.gw ? tel.gw : '—'}` }),
+      el('span', { text: `${device.region || '—'}` }),
+      el('span', { text: `${lake ? lake.name : '—'}` }),
+    ]);
+
+    // Optimallashtirilgan tartib:
+    // 1. Header (salomatlik + gauge'lar)
+    // 2. Sensorlar (kartalar)
+    // 3. Aerator boshqaruvi + aloqa sifati (birlashtirilgan)
+    // 4. DO chegaralar + buyruqlar (birlashtirilgan)
+    // 5. Qurilma info (ixcham qator)
+    // 6. Tarix grafik
+    const stackItems = [header, sensors, aeratorControlCard, thresholdsCard, cmdPanel, infoLine, history];
 
     mount(content, el('div', { class: 'stack' }, stackItems));
   }
