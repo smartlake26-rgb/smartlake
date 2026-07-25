@@ -96,11 +96,24 @@ const SEV = { critical: 0, warning: 1, offline: 2, inactive: 3, archived: 4, onl
    ASOSIY SAHIFA
    ============================================================ */
 export function renderLakesTab(nav) {
+  const isUz = detectLocale() === 'uz';
   const content = el('div', { class: 'md-content' });
+
+  const addLakeBtn = el('button', {
+    type: 'button',
+    style: 'display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border-radius:12px;'
+         + 'border:none;background:var(--sl-primary,#0E7C6B);color:#fff;font-size:13px;font-weight:700;'
+         + 'cursor:pointer;box-shadow:0 2px 8px rgba(14,124,107,.25);transition:transform .15s,box-shadow .15s',
+    onClick: () => nav.push((n) => renderLakeFormPage(n, null)),
+  }, [
+    el('span', { html: slIcon('plus', 16) }),
+    el('span', { text: isUz ? "Qo'shish" : 'Добавить' }),
+  ]);
+  addLakeBtn.addEventListener('mouseenter', () => { addLakeBtn.style.transform = 'scale(1.05)'; addLakeBtn.style.boxShadow = '0 4px 14px rgba(14,124,107,.35)'; });
+  addLakeBtn.addEventListener('mouseleave', () => { addLakeBtn.style.transform = ''; addLakeBtn.style.boxShadow = '0 2px 8px rgba(14,124,107,.25)'; });
+
   const node = el('div', {}, [
-    appBar({ title: t('lake.myLakes'),
-      actions: [mdIconButton({ icon: 'plus', label: t('lake.create'),
-        onClick: () => nav.push((n) => renderLakeFormPage(n, null)) })] }),
+    appBar({ title: t('lake.myLakes'), actions: [addLakeBtn] }),
     content,
   ]);
 

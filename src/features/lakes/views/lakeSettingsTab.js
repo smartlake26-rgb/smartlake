@@ -73,26 +73,82 @@ export function buildLakeSettingsTab({ lakeId, uid, isUz, devicesCard, onSaved }
     } catch (e) { toast((e && e.message) || 'Xato', 'err'); }
   }
 
+  /* Umumiy sozlama modal (bottom sheet) */
+  function openSettingsModal(title, bodyEls, onSave) {
+    const scrim = el('div', {
+      style: 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:2000;display:flex;align-items:flex-end',
+    });
+    const sheet = el('div', {
+      style: 'background:var(--sl-card,#fff);width:100%;max-width:480px;margin:0 auto;'
+           + 'border-radius:20px 20px 0 0;padding:8px 20px 32px;max-height:85vh;overflow-y:auto;'
+           + 'box-shadow:0 -4px 32px rgba(0,0,0,.18)',
+    });
+    function close() { scrim.remove(); }
+    scrim.addEventListener('click', (e) => { if (e.target === scrim) close(); });
+    sheet.append(
+      el('div', { style: 'width:40px;height:4px;border-radius:2px;background:var(--sl-border,#ddd);margin:12px auto 16px' }),
+      el('div', { style: 'font-size:16px;font-weight:800;margin-bottom:16px;color:var(--sl-on-surface)', text: title }),
+      ...bodyEls,
+      el('div', { style: 'display:flex;gap:10px;margin-top:20px' }, [
+        el('button', { type: 'button',
+          style: 'flex:1;padding:14px;border-radius:12px;border:1.5px solid var(--sl-border);background:var(--sl-card);font-size:14px;font-weight:600;cursor:pointer;color:var(--sl-text-secondary)',
+          text: isUz ? 'Bekor' : 'Отмена', onClick: close }),
+        el('button', { type: 'button',
+          style: 'flex:1;padding:14px;border-radius:12px;border:none;background:var(--sl-primary);color:#fff;font-size:14px;font-weight:700;cursor:pointer',
+          text: isUz ? 'Saqlash' : 'Сохранить', onClick: () => { onSave(); close(); } }),
+      ]),
+    );
+    scrim.append(sheet);
+    document.body.append(scrim);
+  }
+
   /* ============================================================
-     1 · KO'L PASPORTI
+     1 · KO'L PASPORTI (ixcham ko'rsatish + modal tahrirlash)
      ============================================================ */
-  const areaIn    = field(t('lset.area'),     { step: '0.01', ph: '1.5' });
-  const avgDepthIn= field(t('lset.avgDepth'), { step: '0.1',  ph: '1.8' });
-  const maxDepthIn= field(t('lset.maxDepth'), { step: '0.1',  ph: '3.0' });
+  let passArea = null, passAvgD = null, passMaxD = null;
+
+  function passportRow() {
+    const items = [
+      { label: t('lset.area'), val: passArea, unit: isUz ? 'ga' : 'га' },
+      { label: t('lset.avgDepth'), val: passAvgD, unit: isUz ? 'm' : 'м' },
+      { label: t('lset.maxDepth'), val: passMaxD, unit: isUz ? 'm' : 'м' },
+    ];
+    return el('div', { style: 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px' },
+      items.map(({ label, val, unit }) =>
+        el('div', { style: 'text-align:center;padding:12px 8px;border-radius:12px;background:var(--sl-card-inset,#f8fafa)' }, [
+          el('div', { style: 'font-size:18px;font-weight:800;color:var(--sl-on-surface,#1a2a3a)', text: val != null ? String(val) : '—' }),
+          el('div', { style: 'font-size:10px;color:var(--sl-text-secondary);margin-top:2px', text: `${label} (${unit})` }),
+        ])
+      ));
+  }
+
+  const passContent = el('div');
+  function renderPassport() {
+    mount(passContent, passportRow());
+  }
+
+  function openPassportForm() {
+    const aIn = field(t('lset.area'), { step: '0.01', ph: '1.5' }); aIn.input.value = passArea ?? '';
+    const dIn = field(t('lset.avgDepth'), { step: '0.1', ph: '1.8' }); dIn.input.value = passAvgD ?? '';
+    const mIn = field(t('lset.maxDepth'), { step: '0.1', ph: '3.0' }); mIn.input.value = passMaxD ?? '';
+    openSettingsModal(isUz ? "Ko'l pasporti" : 'Паспорт озера', [
+      el('div', { style: 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px' }, [aIn, dIn, mIn]),
+    ], () => {
+      passArea = numOrNull(aIn.input.value);
+      passAvgD = numOrNull(dIn.input.value);
+      passMaxD = numOrNull(mIn.input.value);
+      save({ passport: { area: passArea, avgDepth: passAvgD, maxDepth: passMaxD } });
+      renderPassport();
+    });
+  }
 
   const passportCard = slCard([
-    secTitle('droplet', t('lset.passport')),
-    el('div', { class: 'sl-row', style: 'gap:var(--sl-sp-2);flex-wrap:wrap;align-items:flex-end' },
-      [areaIn, avgDepthIn, maxDepthIn]),
-    el('div', { style: 'margin-top:var(--sl-sp-3)' }, [
-      slButton({ label: t('common.save'), variant: 'secondary', onClick: () =>
-        save({ passport: {
-          area:     numOrNull(areaIn.input.value),
-          avgDepth: numOrNull(avgDepthIn.input.value),
-          maxDepth: numOrNull(maxDepthIn.input.value),
-        } }),
-      }),
+    el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px' }, [
+      secTitle('droplet', t('lset.passport')),
+      el('button', { type: 'button', style: 'background:none;border:none;color:var(--sl-primary);cursor:pointer;padding:4px;display:flex',
+        html: slIcon('edit', 16), onClick: openPassportForm }),
     ]),
+    passContent,
   ]);
 
   /* ============================================================
@@ -280,56 +336,99 @@ export function buildLakeSettingsTab({ lakeId, uid, isUz, devicesCard, onSaved }
     refreshFeedInfo();
   }
 
+  const feedContent = el('div');
+  let feedType = '', feedPrice = null;
+
+  function renderFeedInfo() {
+    const name = feedType || (isUz ? 'Tanlanmagan' : 'Не выбран');
+    const price = feedPrice != null ? `${feedPrice.toLocaleString()} ${isUz ? "so'm/kg" : 'сум/кг'}` : '—';
+    mount(feedContent, el('div', { style: 'display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:12px;background:var(--sl-card-inset,#f8fafa)' }, [
+      el('div', { style: 'width:36px;height:36px;border-radius:50%;background:color-mix(in srgb,var(--sl-chart-feed) 12%,transparent);display:flex;align-items:center;justify-content:center;flex:none' }, [
+        el('span', { style: 'color:var(--sl-chart-feed)', html: slIcon('feed', 18) }),
+      ]),
+      el('div', { style: 'flex:1' }, [
+        el('div', { style: 'font-size:14px;font-weight:700;color:var(--sl-on-surface)', text: name }),
+        el('div', { style: 'font-size:11px;color:var(--sl-text-secondary);margin-top:2px', text: price }),
+      ]),
+    ]));
+  }
+
+  function openFeedForm() {
+    openSettingsModal(t('lset.feedTitle'), [feedSelWrap, feedPriceIn, feedCatInfo], () => {
+      const c = feedSel ? feedCatItem(feedSel.value) : null;
+      feedType = c ? catalogName(c, isUz) : '';
+      feedPrice = numOrNull(feedPriceIn.input.value);
+      save({ feed: {
+        typeId: c ? c.id : null,
+        type: feedType,
+        protein: c ? (c.protein ?? null) : ((meta && meta.feed && meta.feed.protein) ?? null),
+        fcr: c ? (c.fcr ?? null) : ((meta && meta.feed && meta.feed.fcr) ?? null),
+        price: feedPrice,
+      } });
+      renderFeedInfo();
+    });
+  }
+
   const feedCard = slCard([
-    secTitle('feed', t('lset.feedTitle'), '--sl-chart-feed'),
-    el('div', { class: 'sl-stack-sm' }, [feedSelWrap, feedPriceIn, feedCatInfo]),
-    el('div', { style: 'margin-top:var(--sl-sp-3)' }, [
-      slButton({ label: t('common.save'), variant: 'secondary', onClick: () => {
-        const c = feedSel ? feedCatItem(feedSel.value) : null;
-        const legacyType = (meta && meta.feed && meta.feed.type) || '';
-        save({ feed: {
-          typeId:   c ? c.id             : null,
-          type:     c ? catalogName(c, isUz) : legacyType,
-          protein:  c ? (c.protein ?? null)  : ((meta && meta.feed && meta.feed.protein) ?? null),
-          fcr:      c ? (c.fcr ?? null)      : ((meta && meta.feed && meta.feed.fcr) ?? null),
-          price:    numOrNull(feedPriceIn.input.value),
-        } });
-      } }),
+    el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px' }, [
+      secTitle('feed', t('lset.feedTitle'), '--sl-chart-feed'),
+      el('button', { type: 'button', style: 'background:none;border:none;color:var(--sl-primary);cursor:pointer;padding:4px;display:flex',
+        html: slIcon('edit', 16), onClick: openFeedForm }),
     ]),
+    feedContent,
   ]);
 
   /* ============================================================
-     4 · AERATOR + ELEKTR (bitta karta, bitta saqlash)
+     4 · AERATOR + ELEKTR (ixcham ko'rsatish + modal)
      ============================================================ */
-  const aerCountIn = field(t('lset.aerCount'), { ph: '2' });
-  const aerKwIn    = field(t('lset.aerKw'), { step: '0.1', ph: '1.5' });
-  const tariffIn   = field(t('lset.aerTariff'), { step: '10', ph: '1000' });
+
+  const aerContent = el('div');
+  let aerCount = null, aerKw = null, aerTariff = null;
+
+  function renderAerInfo() {
+    const items = [
+      { label: isUz ? 'Soni' : 'Кол-во', val: aerCount, icon: 'power' },
+      { label: isUz ? 'Quvvat' : 'Мощность', val: aerKw ? `${aerKw} kW` : '—', icon: 'zap' },
+      { label: isUz ? 'Tarif' : 'Тариф', val: aerTariff ? `${aerTariff.toLocaleString()}` : '—', icon: 'creditCard' },
+    ];
+    mount(aerContent, el('div', { style: 'display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px' },
+      items.map(({ label, val, icon: ic }) =>
+        el('div', { style: 'text-align:center;padding:12px 8px;border-radius:12px;background:var(--sl-card-inset,#f8fafa)' }, [
+          el('div', { style: 'color:var(--sl-chart-energy);display:flex;justify-content:center;margin-bottom:4px', html: slIcon(ic, 16) }),
+          el('div', { style: 'font-size:16px;font-weight:800;color:var(--sl-on-surface)', text: val != null ? String(val) : '—' }),
+          el('div', { style: 'font-size:10px;color:var(--sl-text-secondary);margin-top:2px', text: label }),
+        ])
+      )));
+  }
+
+  function openAerForm() {
+    const cIn = field(t('lset.aerCount'), { ph: '2' }); cIn.input.value = aerCount ?? '';
+    const kIn = field(t('lset.aerKw'), { step: '0.1', ph: '1.5' }); kIn.input.value = aerKw ?? '';
+    const tIn = field(t('lset.aerTariff'), { step: '10', ph: '1000' }); tIn.input.value = aerTariff ?? '';
+    openSettingsModal(t('lset.aerTitle') + ' + ' + t('lset.tariffTitle'), [
+      el('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px' }, [cIn, kIn]),
+      tIn,
+      el('div', { style: 'font-size:11px;color:var(--sl-text-secondary);margin-top:4px', text: t('lset.tariffNote') }),
+    ], () => {
+      aerCount = numOrNull(cIn.input.value);
+      aerKw = numOrNull(kIn.input.value);
+      aerTariff = numOrNull(tIn.input.value);
+      const totalKw = aerCount > 0 && aerKw > 0 ? +(aerCount * aerKw).toFixed(2) : (aerKw || null);
+      save({
+        aerators: { count: aerCount, model: (meta && meta.aerators && meta.aerators.model) || '', kw: aerKw },
+        energy: { kw: totalKw ?? ((meta && meta.energy && meta.energy.kw) || null), tariff: aerTariff },
+      });
+      renderAerInfo();
+    });
+  }
 
   const aeratorCard = slCard([
-    secTitle('power', t('lset.aerTitle'), '--sl-chart-energy'),
-    el('div', { class: 'sl-row', style: 'gap:var(--sl-sp-2);flex-wrap:wrap;align-items:flex-end' },
-      [aerCountIn, aerKwIn]),
-    el('div', { class: 'sl-caption', style: 'margin-top:var(--sl-sp-1)', text: t('lset.aerNote') }),
-    el('div', { style: 'margin-top:var(--sl-sp-4);padding-top:var(--sl-sp-3);border-top:1px solid var(--sl-divider)' }, [
-      el('div', { style: 'display:flex;align-items:center;gap:6px;margin-bottom:var(--sl-sp-2)' }, [
-        el('span', { html: slIcon('zap', 16), style: 'color:var(--sl-chart-energy);display:inline-flex' }),
-        el('span', { style: 'font-weight:700;font-size:14px', text: t('lset.tariffTitle') }),
-      ]),
-      el('div', { class: 'sl-row', style: 'gap:var(--sl-sp-2);flex-wrap:wrap;align-items:flex-end' }, [tariffIn]),
-      el('div', { class: 'sl-caption', style: 'margin-top:var(--sl-sp-1)', text: t('lset.tariffNote') }),
+    el('div', { style: 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px' }, [
+      secTitle('power', t('lset.aerTitle'), '--sl-chart-energy'),
+      el('button', { type: 'button', style: 'background:none;border:none;color:var(--sl-primary);cursor:pointer;padding:4px;display:flex',
+        html: slIcon('edit', 16), onClick: openAerForm }),
     ]),
-    el('div', { style: 'margin-top:var(--sl-sp-3)' }, [
-      slButton({ label: t('common.save'), variant: 'secondary', onClick: () => {
-        const count = num(aerCountIn.input.value);
-        const kwEach = num(aerKwIn.input.value);
-        const tariff = numOrNull(tariffIn.input.value);
-        const totalKw = count > 0 && kwEach > 0 ? +(count * kwEach).toFixed(2) : (kwEach || null);
-        save({
-          aerators: { count: count || null, model: (meta && meta.aerators && meta.aerators.model) || '', kw: kwEach || null },
-          energy: { kw: totalKw ?? ((meta && meta.energy && meta.energy.kw) || null), tariff: tariff },
-        });
-      } }),
-    ]),
+    aerContent,
   ]);
 
   const note = el('div', { class: 'sl-banner info' }, [
@@ -367,9 +466,10 @@ export function buildLakeSettingsTab({ lakeId, uid, isUz, devicesCard, onSaved }
     const pArea  = m?.passport?.area     ?? (lk && lk.area != null ? parseFloat(lk.area) : null);
     const pAvgD  = m?.passport?.avgDepth ?? (lk && lk.averageDepth != null ? parseFloat(lk.averageDepth) : null);
     const pMaxD  = m?.passport?.maxDepth ?? null;
-    if (pArea != null && Number.isFinite(pArea)) areaIn.input.value = pArea;
-    if (pAvgD != null && Number.isFinite(pAvgD)) avgDepthIn.input.value = pAvgD;
-    if (pMaxD != null) maxDepthIn.input.value = pMaxD;
+    if (pArea != null && Number.isFinite(pArea)) passArea = pArea;
+    if (pAvgD != null && Number.isFinite(pAvgD)) passAvgD = pAvgD;
+    if (pMaxD != null) passMaxD = pMaxD;
+    renderPassport();
 
     // Baliq: meta.fish bo'lsa u; bo'lmasa lake.fishSpecies dan konvert
     if (Array.isArray(m?.fish) && m.fish.length) {
@@ -395,12 +495,15 @@ export function buildLakeSettingsTab({ lakeId, uid, isUz, devicesCard, onSaved }
       fish = [];
     }
 
-    if (m?.feed && m.feed.price != null) feedPriceIn.input.value = m.feed.price;
+    if (m?.feed && m.feed.price != null) { feedPriceIn.input.value = m.feed.price; feedPrice = m.feed.price; }
+    if (m?.feed && m.feed.type) feedType = m.feed.type;
+    renderFeedInfo();
     if (m?.aerators) {
-      if (m.aerators.count != null) aerCountIn.input.value = m.aerators.count;
-      if (m.aerators.kw    != null) aerKwIn.input.value    = m.aerators.kw;
+      if (m.aerators.count != null) { aerCount = m.aerators.count; }
+      if (m.aerators.kw    != null) { aerKw = m.aerators.kw; }
     }
-    if (m?.energy && m.energy.tariff != null) tariffIn.input.value = m.energy.tariff;
+    if (m?.energy && m.energy.tariff != null) { aerTariff = m.energy.tariff; }
+    renderAerInfo();
 
     buildFeedSelect();
     renderFish();
