@@ -23,9 +23,12 @@ import { renderAdminCommands } from '../features/commands/index.js';
 import { renderAdminAlerts } from '../features/telemetry/views/adminAlerts.js';
 import { renderAdminAudit } from '../features/audit/views/adminAudit.js';
 import { renderAdminSettings } from '../features/auth/views/adminSettings.js';
+import { renderAdminMap } from '../features/map/views/adminMap.js';
+import { renderAdminPushSupport } from '../features/notifications/views/adminPush.js';
 
 const SECTIONS = [
   { id: 'dashboard', name: 'nav.dashboard', ic: 'home', roles: ['super', 'operator', 'region'], render: renderAdminDashboard },
+  { id: 'map', name: 'Xarita', ic: 'location', roles: ['super', 'operator', 'region'], render: renderAdminMap },
   { id: 'devices', name: 'nav.devices', ic: 'chip', roles: ['super', 'operator', 'region'], render: renderAdminDevices },
   { id: 'ota', name: 'OTA Firmware', ic: 'zap', roles: ['super'], render: (nav) => renderAdminOtaPage(nav) },
   { id: 'monitoring', name: 'nav.monitoring', ic: 'activity', roles: ['super', 'operator', 'region'], render: renderAdminMonitoring },
@@ -33,6 +36,7 @@ const SECTIONS = [
   { id: 'lakes', name: 'nav.lakes', ic: 'droplet', roles: ['super', 'operator', 'region'], render: renderAdminLakes },
   { id: 'users', name: 'nav.users', ic: 'user', roles: ['super', 'operator', 'region'], render: renderAdminUsers },
   { id: 'approvals', name: 'nav.approvals', ic: 'check', roles: ['super', 'operator', 'region'], render: renderAdminApprovals },
+  { id: 'push', name: 'Push / Support', ic: 'bell', roles: ['super', 'operator'], render: renderAdminPushSupport },
   { id: 'alerts', name: 'nav.alerts', ic: 'bell', roles: ['super', 'operator', 'region'], render: renderAdminAlerts },
   { id: 'audit', name: 'nav.audit', ic: 'info', roles: ['super'], render: renderAdminAudit },
   { id: 'settings', name: 'nav.settings', ic: 'settings', roles: ['super'], render: renderAdminSettings },
